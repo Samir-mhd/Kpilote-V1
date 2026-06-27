@@ -1,4 +1,5 @@
-import HomeCard from "./components/HomeCard";
+import HomeCard from "@/components/HomeCard";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -23,20 +24,24 @@ export default function Home() {
               <p className="mt-4 text-slate-500 text-lg">
                 Une mission claire chaque jour. Une équipe engagée. Des objectifs suivis en temps réel.
               </p>
+<div className="grid gap-5">
 
-              <div className="mt-12 grid gap-5">
-                <HomeCard
-                  icon="👤"
-                  title="Je suis conseiller"
-                  subtitle="Accéder à ma mission du jour"
-                />
+ <Link
+  href="/choix"
+  className="block bg-green-500 text-white p-6 rounded-xl text-center text-2xl font-bold"
+>
+  JE SUIS CONSEILLER
+</Link>
 
-                <HomeCard
-                  icon="👑"
-                  title="Je suis manager"
-                  subtitle="Piloter les objectifs de la boutique"
-                />
-              </div>
+  <Link href="/manager" className="block">
+    <HomeCard
+      icon="👑"
+      title="Je suis manager"
+      subtitle="Piloter la boutique"
+    />
+  </Link>
+
+</div>
             </div>
 
             <div className="bg-slate-950 p-10 lg:p-14 text-white flex flex-col justify-between">
