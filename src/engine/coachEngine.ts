@@ -4,76 +4,101 @@ type CoachContext = {
   event: KpiloteEvent;
   produit: string;
   reste: number;
+  prenom?: string;
+  totalVentesJour?: number;
 };
 
-const messages: Record<KpiloteEvent, string[]> = {
-  PREMIERE_VENTE: [
-    "👏 C’est parti, la journée est lancée !",
-    "🚀 Belle entrée en matière !",
-    "🔥 On démarre fort !",
-    "💪 Première vente validée, continue comme ça !",
-    "⭐ Excellent démarrage, garde le rythme !",
-  ],
+const emojis = ["👏", "🔥", "🚀", "💪", "🤩", "⭐", "🏆", "🎯", "🙌", "⚡"];
 
-  DOUBLE: [
-    "👌 Deuxième vente, tu prends le rythme !",
-    "💥 Ça s’enchaîne bien, continue !",
-    "🚀 Deux ventes, la dynamique est bonne !",
-    "👏 Très bon début de journée !",
-  ],
+const encouragements = [
+  "très belle action",
+  "excellent réflexe",
+  "grosse dynamique",
+  "tu prends le rythme",
+  "tu montes en puissance",
+  "tu fais avancer ta journée",
+  "tu construis une belle performance",
+  "tu gardes le cap",
+  "tu fais plaisir à voir",
+  "tu es bien lancé",
+];
 
-  TRIPLE: [
-    "🔥 Wow, le triplé pour toi !",
-    "🚀 Tu es en feu aujourd’hui !",
-    "💥 Grosse dynamique, continue !",
-    "🤩 Là, tu prends une vraie cadence !",
-    "👏 Tu fais très fort aujourd’hui !",
-  ],
+const fins = [
+  "continue comme ça.",
+  "ne lâche rien.",
+  "la journée est bien lancée.",
+  "tu peux faire une très belle journée.",
+  "chaque vente compte.",
+  "tu es sur une bonne dynamique.",
+  "on garde ce rythme.",
+  "tu peux viser encore plus haut.",
+];
 
-  QUADRUPLE: [
-    "🤯 Quatre ventes, énorme rythme !",
-    "🔥 Tu es clairement en mode locomotive !",
-    "🚀 Tu tires la boutique vers le haut !",
-    "🏆 Très grosse journée qui se dessine !",
-  ],
+const missionsTerminees = [
+  "mission validée",
+  "objectif du jour atteint",
+  "mission accomplie",
+  "travail fait sur ce KPI",
+  "KPI sécurisé pour aujourd’hui",
+];
 
-  VENTE_SIMPLE: [
-    "🎯 Bien joué ! Encore {reste} {produit} pour terminer ta mission.",
-    "💪 Continue, il te reste {reste} {produit}.",
-    "🔥 Tu avances bien. Plus que {reste} {produit}.",
-    "🚀 Encore {reste} {produit} et c’est validé.",
-    "👏 Belle action, continue à pousser sur {produit}.",
-  ],
+const avance = [
+  "tu peux maintenant prendre de l’avance sur demain",
+  "chaque vente en plus sécurise ton mois",
+  "tu peux aider la boutique à aller chercher son objectif",
+  "tu transformes une bonne journée en très bonne journée",
+  "tu construis ton avance sur l’objectif mensuel",
+];
 
-  MISSION_TERMINEE: [
-    "🎉 Mission {produit} validée ! Maintenant, prends de l’avance sur demain.",
-    "🏆 Objectif {produit} du jour atteint, énorme travail !",
-    "🚀 Mission {produit} terminée ! Chaque vente en plus sécurise ton mois.",
-    "🔥 Tu as fait le job sur {produit}. Maintenant, tu peux aider la boutique.",
-    "👏 Super ! Tu peux viser plus haut maintenant.",
-    "💚 Mission validée. Tu donnes de l’air à toute l’équipe.",
-  ],
-
-  AVANCE_PRISE: [
-    "🚀 Tu prends de l’avance, c’est exactement l’esprit KPILOTE.",
-    "🔥 Tu ne fais pas que suivre le rythme, tu l’imposes.",
-    "🏪 Chaque vente en plus aide toute la boutique.",
-    "👏 Tu sécurises ton mois, continue !",
-    "💪 Tu construis déjà ton avance sur demain.",
-    "⭐ Tu transformes une bonne journée en très bonne journée.",
-  ],
-};
-
-function pick(list: string[]) {
+function random(list: string[]) {
   return list[Math.floor(Math.random() * list.length)];
+}
+
+function nom(prenom?: string) {
+  return prenom ? `${prenom}, ` : "";
 }
 
 export function genererMessageCoach({
   event,
   produit,
   reste,
+  prenom,
+  totalVentesJour = 0,
 }: CoachContext) {
-  return pick(messages[event])
-    .replaceAll("{reste}", String(reste))
-    .replaceAll("{produit}", produit);
+  const emoji = random(emojis);
+  const who = nom(prenom);
+
+  if (event === "PREMIERE_VENTE") {
+    return `${emoji} ${who}c’est parti ! Première vente validée, ${random(fins)}`;
+  }
+
+  if (event === "DOUBLE") {
+    return `${emoji} ${who}deuxième vente de la journée, ${random(encouragements)}. ${random(fins)}`;
+  }
+
+  if (event === "TRIPLE") {
+    return `${emoji} ${who}wow, le triplé ! Tu es en feu aujourd’hui. ${random(fins)}`;
+  }
+
+  if (event === "QUADRUPLE") {
+    return `${emoji} ${who}quatre ventes déjà ! Tu tires clairement la journée vers le haut.`;
+  }
+
+  if (event === "MISSION_TERMINEE") {
+    return `${emoji} ${who}${random(missionsTerminees)} sur ${produit}. ${random(avance)}.`;
+  }
+
+  if (event === "AVANCE_PRISE") {
+    return `${emoji} ${who}tu prends de l’avance sur ${produit}. ${random(avance)}.`;
+  }
+
+  if (reste === 1) {
+    return `${emoji} ${who}bien joué ! Encore une vente ${produit} et cette mission est validée.`;
+  }
+
+  if (totalVentesJour >= 5) {
+    return `${emoji} ${who}${totalVentesJour} ventes aujourd’hui, grosse cadence ! Continue, tu es dans un très bon jour.`;
+  }
+
+  return `${emoji} ${who}${random(encouragements)} ! Encore ${reste} ${produit} pour terminer cette mission.`;
 }

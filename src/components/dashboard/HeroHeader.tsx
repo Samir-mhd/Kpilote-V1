@@ -1,8 +1,9 @@
 type HeroHeaderProps = {
   nom: string;
+  message: string;
 };
 
-export default function HeroHeader({ nom }: HeroHeaderProps) {
+export default function HeroHeader({ nom, message }: HeroHeaderProps) {
   return (
     <section className="relative overflow-hidden rounded-[36px] bg-gradient-to-br from-slate-950 via-slate-900 to-green-700 text-white p-10 shadow-2xl">
       <div className="absolute -right-16 -top-16 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
@@ -19,8 +20,7 @@ export default function HeroHeader({ nom }: HeroHeaderProps) {
           </h1>
 
           <p className="mt-5 text-xl text-slate-200 max-w-2xl">
-            Ton objectif est simple : avancer sur ta mission du jour, puis
-            prendre de l’avance sur ton mois.
+            {message}
           </p>
         </div>
 
