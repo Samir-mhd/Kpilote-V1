@@ -4,14 +4,12 @@ type HeroHeaderProps = {
 
 export default function HeroHeader({ nom }: HeroHeaderProps) {
   return (
-    <section className="relative overflow-hidden rounded-[36px] bg-gradient-to-br from-slate-900 via-slate-800 to-green-700 text-white p-10 shadow-2xl">
-
+    <section className="relative overflow-hidden rounded-[36px] bg-gradient-to-br from-slate-950 via-slate-900 to-green-700 text-white p-10 shadow-2xl">
       <div className="absolute -right-16 -top-16 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+      <div className="absolute -left-24 bottom-0 h-60 w-60 rounded-full bg-green-400/20 blur-3xl" />
 
-      <div className="relative flex items-center justify-between">
-
+      <div className="relative flex flex-col md:flex-row gap-8 md:items-center justify-between">
         <div>
-
           <p className="text-green-300 font-semibold tracking-widest uppercase">
             KPILOTE
           </p>
@@ -20,32 +18,22 @@ export default function HeroHeader({ nom }: HeroHeaderProps) {
             Bonjour {nom} 👋
           </h1>
 
-          <p className="mt-5 text-xl text-slate-200 max-w-xl">
-            🔥 Encore <span className="font-bold text-white">2 BOX</span> et
-            <span className="font-bold text-white"> 1 Mobile</span> pour terminer
-            ta mission.
+          <p className="mt-5 text-xl text-slate-200 max-w-2xl">
+            Ton objectif est simple : avancer sur ta mission du jour, puis
+            prendre de l’avance sur ton mois.
           </p>
-
         </div>
 
         <div className="text-center">
-
-          <div className="h-36 w-36 rounded-full bg-white flex items-center justify-center text-7xl shadow-xl">
-
-            😀
-
+          <div className="h-36 w-36 rounded-full bg-white flex items-center justify-center text-7xl shadow-xl animate-pulse">
+            🚀
           </div>
 
           <p className="mt-4 text-green-300 font-bold">
-
-            Niveau 8
-
+            Copilote actif
           </p>
-
         </div>
-
       </div>
-
     </section>
   );
 }

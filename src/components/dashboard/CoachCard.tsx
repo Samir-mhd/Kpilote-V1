@@ -1,8 +1,12 @@
 type CoachCardProps = {
   nom: string;
+  message: string;
 };
 
-export default function CoachCard({ nom }: CoachCardProps) {
+export default function CoachCard({
+  nom,
+  message,
+}: CoachCardProps) {
   return (
     <section className="mt-8 rounded-[32px] bg-gradient-to-r from-green-500 to-emerald-400 p-8 text-white shadow-2xl">
 
@@ -15,18 +19,15 @@ export default function CoachCard({ nom }: CoachCardProps) {
         <div>
 
           <p className="uppercase tracking-widest text-green-100 font-bold">
-            Ton copilote
+            TON COPILOTE
           </p>
 
           <h2 className="text-3xl font-black mt-2">
             Salut {nom} !
           </h2>
 
-          <p className="mt-3 text-lg leading-relaxed">
-            🔥 Tu es dans le rythme.
-            <br />
-            Encore <strong>2 BOX</strong> et <strong>1 Mobile</strong> avant de
-            terminer ta mission.
+          <p className="mt-3 text-xl leading-relaxed">
+            {message}
           </p>
 
         </div>
