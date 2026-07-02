@@ -1,7 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useManagerDashboard } from "@/hooks/useManagerDashboard";
 import { construireAlertes } from "@/engine/managerAI/alertesEngine";
+import { PRODUITS_ORDRE } from "@/utils/produits";
+import { Periode, PERIODE_LABELS, proratiserObjectif, couleurTaux } from "@/utils/periodes";
+import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 
 const healthLabel: Record<string, string> = {
     excellent: "Excellente dynamique",
@@ -32,6 +36,24 @@ function dateAujourdhui() {
 
 export default function ManagerDashboard() {
     const { dashboard, loading, refresh } = useManagerDashboard();
+    const [periodeKpi, setPeriodeKpi]     = useState<Periode>("mois");
+    const [kpiData, setKpiData]           = useState<ConseillerStats[]>([]);
+    const [kpiLoading, setKpiLoading]     = useState(false);
+
+    useEffect(() => {
+        setKpiLoading(true);
+        construireClassementPeriode(periodeKpi)
+            .then(setKpiData)
+            .catch(() => {})
+            .finally(() => setKpiLoading(false));
+    }, [periodeKpi]);
+
+    // Agrège tous les conseillers → totaux boutique
+    const boutiqueTotaux = PRODUITS_ORDRE.map(p => {
+        const realise  = kpiData.reduce((t, c) => t + c.produits[p.key], 0);
+        const objectif = Math.round(kpiData.reduce((t, c) => t + proratiserObjectif(c.objectifs[p.key], periodeKpi), 0));
+        return { ...p, realise, objectif };
+    });
 
     if (loading || !dashboard) {
         return (
@@ -272,6 +294,57 @@ export default function ManagerDashboard() {
                     )}
                 </div>
 
+            </div>
+
+            {/* Objectifs par produit */}
+            <div className="mt-8 rounded-[24px] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,.08)]">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-sm">📊</span>
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-600">Objectifs boutique par produit</p>
+                    </div>
+                    <div className="flex gap-2">
+                        {(["jour", "semaine", "mois"] as Periode[]).map(p => (
+                            <button key={p} onClick={() => setPeriodeKpi(p)}
+                                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                                    periodeKpi === p ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                }`}>
+                                {PERIODE_LABELS[p]}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {kpiLoading ? (
+                    <div className="flex h-24 items-center justify-center">
+                        <div className="h-6 w-6 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+                    </div>
+                ) : (
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                        {boutiqueTotaux.map(p => {
+                            const ct   = couleurTaux(p.realise, p.objectif);
+                            const pct  = p.objectif > 0 ? Math.min(Math.round((p.realise / p.objectif) * 100), 100) : 0;
+                            return (
+                                <div key={p.code} className={`rounded-2xl border p-4 ${ct.bg} ${ct.border}`}>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-lg">{p.emoji}</span>
+                                        <span className={`text-xs font-black ${ct.text}`}>{pct}%</span>
+                                    </div>
+                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{p.label}</p>
+                                    <p className={`mt-1 text-3xl font-black ${ct.text}`}>{p.realise}</p>
+                                    {p.objectif > 0 && (
+                                        <>
+                                            <p className="text-xs text-slate-400">/ {p.objectif} attendus</p>
+                                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/60">
+                                                <div className={`h-full rounded-full ${ct.bar} transition-all duration-700`} style={{ width: `${pct}%` }} />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             {/* Recommandation IA */}

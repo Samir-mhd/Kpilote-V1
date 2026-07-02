@@ -1,174 +1,45 @@
 "use client";
 
-import { Suspense } from "react";
-
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-import PhotoAvatar from "@/components/avatar/PhotoAvatar";
+import { PRODUITS_ORDRE } from "@/utils/produits";
+import { Periode, PERIODE_LABELS, proratiserObjectif, couleurTaux } from "@/utils/periodes";
+import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 import { getPhotosByIds } from "@/services/photoService";
-
-type Periode = "jour" | "semaine" | "mois";
-type SortDir = "asc" | "desc";
-type SortState = { key: string; dir: SortDir };
-
-type ConseillerRow = {
-    id: string;
-    nom: string;
-    produits: Record<string, number>;
-    total: number;
-};
-
-const periodeLabels: Record<Periode, string> = {
-    jour: "Aujourd'hui",
-    semaine: "Semaine",
-    mois: "Ce mois",
-};
-
-function dateDebut(periode: Periode): string {
-    const now = new Date();
-    if (periode === "jour") {
-        return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-    }
-    if (periode === "semaine") {
-        const jour = now.getDay();
-        const diffLundi = jour === 0 ? -6 : 1 - jour;
-        return new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffLundi).toISOString();
-    }
-    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-}
-
-function SortTh({
-    col,
-    label,
-    sort,
-    onSort,
-    align = "left",
-}: {
-    col: string;
-    label: string;
-    sort: SortState;
-    onSort: (col: string) => void;
-    align?: "left" | "right";
-}) {
-    const active = sort.key === col;
-    return (
-        <th
-            onClick={() => onSort(col)}
-            className={`cursor-pointer select-none whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-[0.15em] ${align === "right" ? "text-right" : "text-left"}`}
-        >
-            <span
-                className={`inline-flex items-center gap-1 transition-colors ${
-                    active ? "text-green-600" : "text-slate-400 hover:text-slate-600"
-                }`}
-            >
-                {align === "right" && (
-                    <span className="text-[10px]">
-                        {active ? (sort.dir === "desc" ? "↓" : "↑") : "⇅"}
-                    </span>
-                )}
-                {label}
-                {align === "left" && (
-                    <span className="text-[10px]">
-                        {active ? (sort.dir === "desc" ? "↓" : "↑") : "⇅"}
-                    </span>
-                )}
-            </span>
-        </th>
-    );
-}
+import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 
 const medals = ["🥇", "🥈", "🥉"];
 
-export default function ClassementPage() {
-    const searchParams = useSearchParams();
-    const conseillerId = searchParams.get("id") ?? "";
+function ClassementInner() {
+    const searchParams  = useSearchParams();
+    const conseillerId  = searchParams.get("id") ?? "";
 
-    const [periode, setPeriode] = useState<Periode>("mois");
-    const [classement, setClassement] = useState<ConseillerRow[]>([]);
-    const [produits, setProduits] = useState<string[]>([]);
-    const [photos, setPhotos] = useState<Record<string, string | null>>({});
-    const [loading, setLoading] = useState(true);
-    const [dernierUpdate, setDernierUpdate] = useState("");
-    const [sort, setSort] = useState<SortState>({ key: "total", dir: "desc" });
-
-    function handleSort(col: string) {
-        setSort((prev) =>
-            prev.key === col
-                ? { key: col, dir: prev.dir === "desc" ? "asc" : "desc" }
-                : { key: col, dir: "desc" }
-        );
-    }
-
-    async function charger(p: Periode) {
-        setLoading(true);
-        try {
-            const debut = dateDebut(p);
-
-            const [{ data: cons }, ventesRes] = await Promise.all([
-                supabase.from("conseillers").select("id, nom"),
-                supabase.from("ventes").select("conseiller_id, produit, quantite").gte("created_at", debut),
-            ]);
-
-            let ventesData = ventesRes.data;
-            if (ventesRes.error?.message?.includes("created_at")) {
-                const { data } = await supabase.from("ventes").select("conseiller_id, produit, quantite");
-                ventesData = data;
-            }
-
-            const rows: Record<string, ConseillerRow> = {};
-            const allProduits = new Set<string>();
-
-            (cons ?? []).forEach((c: any) => {
-                rows[c.id] = { id: c.id, nom: c.nom, produits: {}, total: 0 };
-            });
-
-            (ventesData ?? []).forEach((v: any) => {
-                if (!rows[v.conseiller_id]) return;
-                if (v.produit) {
-                    allProduits.add(v.produit);
-                    rows[v.conseiller_id].produits[v.produit] =
-                        (rows[v.conseiller_id].produits[v.produit] ?? 0) + (v.quantite ?? 1);
-                }
-                rows[v.conseiller_id].total += v.quantite ?? 1;
-            });
-
-            const sorted = Object.values(rows).sort((a, b) => b.total - a.total);
-            const produitsListe = [...allProduits].sort();
-
-            setProduits(produitsListe);
-            setClassement(sorted);
-            setDernierUpdate(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
-            const ids = sorted.map((c) => c.id);
-            getPhotosByIds(ids).then(setPhotos).catch(() => {});
-        } catch { /* silencieux */ }
-        finally { setLoading(false); }
-    }
+    const [periode, setPeriode]   = useState<Periode>("mois");
+    const [classement, setClassement] = useState<ConseillerStats[]>([]);
+    const [photos, setPhotos]     = useState<Record<string, string | null>>({});
+    const [loading, setLoading]   = useState(true);
+    const [maj, setMaj]           = useState("");
 
     useEffect(() => {
-        charger(periode);
-
-        const channel = supabase
-            .channel("classement-realtime")
-            .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventes" }, () => {
-                charger(periode);
+        setLoading(true);
+        construireClassementPeriode(periode)
+            .then(async (data) => {
+                setClassement(data);
+                setMaj(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
+                const ids = data.map(c => c.id);
+                const avs = await getPhotosByIds(ids).catch(() => ({}));
+                setPhotos(avs);
             })
-            .subscribe();
-
-        return () => { supabase.removeChannel(channel); };
+            .catch(() => {})
+            .finally(() => setLoading(false));
     }, [periode]);
 
-    const sortedRows = [...classement].sort((a, b) => {
-        const va = sort.key === "total" ? a.total : (a.produits[sort.key] ?? 0);
-        const vb = sort.key === "total" ? b.total : (b.produits[sort.key] ?? 0);
-        return sort.dir === "desc" ? vb - va : va - vb;
-    });
-
-    const monRang = classement.findIndex((c) => c.id === conseillerId) + 1;
-    const top3 = classement.slice(0, 3);
-    const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3;
-    const podiumHeights = ["h-20", "h-28", "h-16"];
+    const monRang = classement.findIndex(c => c.id === conseillerId) + 1;
+    const top3    = classement.slice(0, 3);
+    const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : [];
     const podiumRangs = [2, 1, 3];
+    const podiumH     = ["h-20", "h-28", "h-16"];
+    const podiumSizes = [56, 72, 56];
 
     return (
         <div className="space-y-8">
@@ -178,10 +49,10 @@ export default function ClassementPage() {
                 <div>
                     <p className="text-xs font-bold uppercase tracking-[0.25em] text-green-600">Classement</p>
                     <h1 className="mt-1 text-3xl font-black text-slate-900">Performance équipe</h1>
-                    {dernierUpdate && (
+                    {maj && (
                         <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
                             <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                            Mis à jour à {dernierUpdate}
+                            Mis à jour à {maj}
                         </p>
                     )}
                 </div>
@@ -193,19 +64,14 @@ export default function ClassementPage() {
                 )}
             </div>
 
-            {/* Filtre période */}
+            {/* Période */}
             <div className="flex gap-2">
-                {(["jour", "semaine", "mois"] as Periode[]).map((p) => (
-                    <button
-                        key={p}
-                        onClick={() => setPeriode(p)}
+                {(["jour", "semaine", "mois"] as Periode[]).map(p => (
+                    <button key={p} onClick={() => setPeriode(p)}
                         className={`rounded-2xl px-5 py-2.5 text-sm font-bold transition-all ${
-                            periode === p
-                                ? "bg-slate-900 text-white"
-                                : "bg-white text-slate-500 shadow-sm hover:bg-slate-50"
-                        }`}
-                    >
-                        {periodeLabels[p]}
+                            periode === p ? "bg-slate-900 text-white" : "bg-white text-slate-500 shadow-sm hover:bg-slate-50"
+                        }`}>
+                        {PERIODE_LABELS[p]}
                     </button>
                 ))}
             </div>
@@ -216,33 +82,30 @@ export default function ClassementPage() {
                 </div>
             ) : (
                 <>
-                    {/* Podium Top 3 */}
-                    {top3.length >= 3 && (
+                    {/* Podium */}
+                    {podiumOrder.length === 3 && (
                         <div className="rounded-[24px] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
                             <p className="mb-6 text-center text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
-                                🏆 Top performers — {periodeLabels[periode]}
+                                🏆 Top performers — {PERIODE_LABELS[periode]}
                             </p>
                             <div className="flex items-end justify-center gap-4">
                                 {podiumOrder.map((c, i) => {
-                                    if (!c) return null;
-                                    const rang = podiumRangs[i];
-                                    const isFirst = rang === 1;
+                                    const rang  = podiumRangs[i];
+                                    const first = rang === 1;
                                     const isMoi = c.id === conseillerId;
                                     return (
                                         <div key={c.id} className="flex flex-col items-center gap-3">
                                             <div className="relative">
-                                                {isFirst && (
-                                                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xl">👑</span>
-                                                )}
-                                                <div className={`${isMoi ? "ring-4 ring-green-500" : "ring-2 ring-slate-100"} rounded-full overflow-hidden`}>
-                                                    <PhotoAvatar nom={c.nom} photoUrl={photos[c.id]} size={isFirst ? 72 : 56} />
+                                                {first && <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xl">👑</span>}
+                                                <div className={`overflow-hidden rounded-full shadow-lg ${isMoi ? "ring-4 ring-green-500" : "ring-2 ring-slate-100"}`}>
+                                                    <PhotoAvatar nom={c.nom} photoUrl={photos[c.id]} size={podiumSizes[i]} />
                                                 </div>
                                             </div>
                                             <div className="text-center">
                                                 <p className={`font-black ${isMoi ? "text-green-700" : "text-slate-800"}`}>{c.nom}</p>
                                                 <p className="text-sm text-slate-400">{c.total} ventes</p>
                                             </div>
-                                            <div className={`flex ${podiumHeights[i]} w-24 flex-col items-center justify-center rounded-t-2xl text-white font-black text-lg ${
+                                            <div className={`flex ${podiumH[i]} w-24 flex-col items-center justify-center rounded-t-2xl ${
                                                 rang === 1 ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-slate-200"
                                             }`}>
                                                 <span className="text-2xl">{medals[rang - 1]}</span>
@@ -254,120 +117,97 @@ export default function ClassementPage() {
                         </div>
                     )}
 
-                    {/* Tableau trié par colonne */}
-                    <div className="rounded-[24px] bg-white shadow-[0_4px_24px_rgba(15,23,42,.07)] overflow-hidden">
-                        <div className="px-7 pt-7 pb-4">
-                            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
-                                Tableau de bord — toutes colonnes triables
-                            </p>
+                    {/* Tableau détaillé style manager équipe */}
+                    <div className="overflow-hidden rounded-[24px] bg-white shadow-[0_4px_24px_rgba(15,23,42,.07)]">
+                        <div className="px-7 pt-7 pb-3 flex items-center justify-between">
+                            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Classement détaillé — {PERIODE_LABELS[periode]}</p>
+                            <div className="flex items-center gap-3 text-xs text-slate-300">
+                                <span className="text-emerald-600 font-bold">● ≥ obj.</span>
+                                <span className="text-amber-500 font-bold">● ≥ 50%</span>
+                                <span className="text-red-500 font-bold">● {"< 50%"}</span>
+                            </div>
                         </div>
-
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[600px]">
-                                <thead className="border-b border-slate-100 bg-slate-50/60">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-400 w-10">
-                                            #
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
-                                            Conseiller
-                                        </th>
-                                        {produits.map((p) => (
-                                            <SortTh
-                                                key={p}
-                                                col={p}
-                                                label={p}
-                                                sort={sort}
-                                                onSort={handleSort}
-                                                align="right"
-                                            />
+                            <table className="w-full min-w-[680px] border-separate border-spacing-y-1.5">
+                                <thead>
+                                    <tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-300">
+                                        <th className="px-4 pb-2">#</th>
+                                        <th className="px-4 pb-2">Conseiller</th>
+                                        {PRODUITS_ORDRE.map(p => (
+                                            <th key={p.code} className="px-3 pb-2 text-center">{p.emoji} {p.label}</th>
                                         ))}
-                                        <SortTh col="total" label="Total" sort={sort} onSort={handleSort} align="right" />
+                                        <th className="px-4 pb-2 text-right">Total</th>
+                                        <th className="px-5 pb-2 text-right">Taux</th>
                                     </tr>
                                 </thead>
-
-                                <tbody className="divide-y divide-slate-50">
-                                    {sortedRows.map((c, idx) => {
-                                        const isMoi = c.id === conseillerId;
-                                        const rang = classement.findIndex((r) => r.id === c.id) + 1;
-
+                                <tbody>
+                                    {classement.map((c, idx) => {
+                                        const isMoi   = c.id === conseillerId;
+                                        const totalObj = PRODUITS_ORDRE.reduce((t, p) => t + proratiserObjectif(c.objectifs[p.key], periode), 0);
+                                        const taux    = totalObj > 0 ? Math.round((c.total / totalObj) * 100) : 0;
+                                        const ct      = couleurTaux(c.total, totalObj);
                                         return (
-                                            <tr
-                                                key={c.id}
-                                                className={`transition-colors ${
-                                                    isMoi
-                                                        ? "bg-green-50/70"
-                                                        : "hover:bg-slate-50/60"
-                                                }`}
-                                            >
-                                                {/* Rang */}
-                                                <td className="px-4 py-4 text-sm font-black text-slate-400">
-                                                    {rang <= 3 ? medals[rang - 1] : rang}
+                                            <tr key={c.id} className={`${isMoi ? "bg-green-50/70" : "bg-slate-50 hover:bg-slate-100"} transition-colors`}>
+                                                <td className="rounded-l-2xl px-4 py-3">
+                                                    {idx < 3 ? <span className="text-xl">{medals[idx]}</span> : <span className="text-sm font-black text-slate-400">{idx + 1}</span>}
                                                 </td>
-
-                                                {/* Conseiller */}
-                                                <td className="px-4 py-4">
+                                                <td className="px-4 py-3">
                                                     <div className="flex items-center gap-3">
-                                                        <PhotoAvatar nom={c.nom} photoUrl={photos[c.id]} size={36} />
+                                                        <div className="overflow-hidden rounded-full flex-shrink-0">
+                                                            <PhotoAvatar nom={c.nom} photoUrl={photos[c.id]} size={36} />
+                                                        </div>
                                                         <span className={`font-black text-sm ${isMoi ? "text-green-700" : "text-slate-800"}`}>
-                                                            {c.nom}
-                                                            {isMoi && (
-                                                                <span className="ml-2 text-xs font-semibold text-green-500">(moi)</span>
-                                                            )}
+                                                            {c.nom} {isMoi && <span className="text-xs font-semibold text-green-500">(moi)</span>}
                                                         </span>
                                                     </div>
                                                 </td>
-
-                                                {/* Par produit */}
-                                                {produits.map((p) => {
-                                                    const val = c.produits[p] ?? 0;
-                                                    const isSort = sort.key === p;
+                                                {PRODUITS_ORDRE.map(p => {
+                                                    const val = c.produits[p.key];
+                                                    const obj = Math.round(proratiserObjectif(c.objectifs[p.key], periode));
+                                                    const col = couleurTaux(val, obj);
                                                     return (
-                                                        <td
-                                                            key={p}
-                                                            className={`px-4 py-4 text-right font-black text-sm ${
-                                                                val > 0
-                                                                    ? isSort
-                                                                        ? "text-green-600"
-                                                                        : "text-slate-700"
-                                                                    : "text-slate-300"
-                                                            }`}
-                                                        >
-                                                            {val}
+                                                        <td key={p.code} className="px-3 py-3 text-center">
+                                                            <div>
+                                                                <div className={`mx-auto inline-flex h-8 min-w-[40px] items-center justify-center rounded-xl px-2 text-sm font-black ${col.bg} ${col.text} border ${col.border}`}>
+                                                                    {val}
+                                                                </div>
+                                                                {obj > 0 && (
+                                                                    <>
+                                                                        <div className="mx-auto mt-1 h-1 w-12 overflow-hidden rounded-full bg-slate-200">
+                                                                            <div className={`h-full rounded-full ${col.bar}`} style={{ width: `${Math.min(val / obj * 100, 100)}%` }} />
+                                                                        </div>
+                                                                        <p className={`text-[10px] ${col.text} opacity-70`}>{obj}</p>
+                                                                    </>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     );
                                                 })}
-
-                                                {/* Total */}
-                                                <td className={`px-4 py-4 text-right font-black text-base ${
-                                                    sort.key === "total" ? "text-green-600" : "text-slate-800"
-                                                }`}>
-                                                    {c.total}
+                                                <td className="px-4 py-3 text-right">
+                                                    <p className={`text-lg font-black ${isMoi ? "text-green-700" : "text-slate-800"}`}>{c.total}</p>
+                                                </td>
+                                                <td className="rounded-r-2xl px-5 py-3 text-right">
+                                                    <div className="flex flex-col items-end gap-1">
+                                                        <span className={`text-sm font-black ${ct.text}`}>{taux}%</span>
+                                                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-200">
+                                                            <div className={`h-full rounded-full ${ct.bar}`} style={{ width: `${Math.min(taux, 100)}%` }} />
+                                                        </div>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
                                     })}
-
-                                    {sortedRows.length === 0 && (
-                                        <tr>
-                                            <td
-                                                colSpan={produits.length + 3}
-                                                className="px-4 py-12 text-center text-slate-400"
-                                            >
-                                                Aucune donnée pour cette période.
-                                            </td>
-                                        </tr>
-                                    )}
                                 </tbody>
                             </table>
                         </div>
-
-                        <div className="px-7 pb-5 pt-4 text-xs text-slate-400">
-                            Cliquez sur un en-tête de colonne pour trier ↑↓ — colonnes actives en vert.
-                        </div>
+                        <div className="px-7 pb-5 pt-2 text-xs text-slate-300">Objectifs proratisés selon la période sélectionnée</div>
                     </div>
                 </>
             )}
         </div>
     );
+}
+
+export default function ClassementPage() {
+    return <Suspense><ClassementInner /></Suspense>;
 }

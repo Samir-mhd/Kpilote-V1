@@ -8,13 +8,11 @@ import {
     ObjectifBoutiqueRow,
 } from "@/services/objectifs";
 
-const PRODUITS_LABELS: Record<string, string> = {
-    box: "📦 Box",
-    forfaits: "📱 Forfaits",
-    telephones: "📲 Téléphones",
-    mcafee: "🛡️ McAfee",
-    assurance: "✅ Assurance",
-};
+import { PRODUITS_ORDRE } from "@/utils/produits";
+
+const PRODUITS_LABELS: Record<string, string> = Object.fromEntries(
+    PRODUITS_ORDRE.map(p => [p.code, `${p.emoji} ${p.label}`])
+);
 
 type Cellule = { id: string; produit_id: string; objectif: number; code: string; nom: string };
 
@@ -32,24 +30,19 @@ export default function ObjectifsBoutiqueCard() {
             // Charge les objectifs boutique existants
             const rows = await getObjectifsBoutique();
 
+            // Charge les produits pour avoir l'ordre canonique
+            const produits = await getProduits();
+            const ordre = PRODUITS_ORDRE.map(p => p.code);
+            const produitsTries = [...produits].sort((a, b) => ordre.indexOf(a.code) - ordre.indexOf(b.code));
+
             if (rows.length > 0) {
-                setCellules(rows.map((r) => ({
-                    id:         r.id,
-                    produit_id: r.produit_id,
-                    objectif:   r.objectif,
-                    code:       r.produits?.code ?? "",
-                    nom:        r.produits?.nom  ?? "",
-                })));
+                const rowMap = new Map(rows.map(r => [r.produit_id, r]));
+                setCellules(produitsTries.map(p => {
+                    const r = rowMap.get(p.id);
+                    return { id: r?.id ?? "", produit_id: p.id, objectif: r?.objectif ?? 0, code: p.code, nom: p.nom };
+                }));
             } else {
-                // Première fois : charge les produits pour créer les cellules vides
-                const produits = await getProduits();
-                setCellules(produits.map((p) => ({
-                    id:         "",
-                    produit_id: p.id,
-                    objectif:   0,
-                    code:       p.code,
-                    nom:        p.nom,
-                })));
+                setCellules(produitsTries.map(p => ({ id: "", produit_id: p.id, objectif: 0, code: p.code, nom: p.nom })));
             }
         } catch (e: any) {
             setErreur(e?.message ?? "Erreur chargement");

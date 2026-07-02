@@ -6,6 +6,10 @@ import { getPlanningMois, savePlanning, genererPrePlanificationTous, StatutJour 
 type Conseiller = { id: string; nom: string };
 type Props = { conseillers: Conseiller[] };
 
+// ID virtuel pour la boutique (pas de FK dans planning_conseillers)
+const BOUTIQUE_ID = "boutique";
+const BOUTIQUE_ENTRY: Conseiller = { id: BOUTIQUE_ID, nom: "🏪 Boutique" };
+
 // ─── Config statuts ────────────────────────────────────────────────────────────
 
 const STATUTS: {
@@ -44,7 +48,9 @@ export default function PlanningCalendrier({ conseillers }: Props) {
     const today = new Date();
     const [annee, setAnnee]               = useState(today.getFullYear());
     const [mois, setMois]                 = useState(today.getMonth() + 1);
-    const [conseillerId, setConseillerId] = useState(conseillers[0]?.id ?? "");
+    // Boutique + conseillers dans le menu
+    const tousOptions = [BOUTIQUE_ENTRY, ...conseillers];
+    const [conseillerId, setConseillerId] = useState(BOUTIQUE_ID);
     const [modeActif, setModeActif]       = useState<StatutJour>("present");
     const [planning, setPlanning]         = useState<Record<string, StatutJour>>({});
     const [modifications, setModifications] = useState<Record<string, StatutJour | null>>({});
@@ -90,7 +96,7 @@ export default function PlanningCalendrier({ conseillers }: Props) {
 
     async function handleGenererTous() {
         if (!window.confirm(
-            `Générer la pré-planification de ${MOIS_NOMS[mois - 1]} ${annee} pour TOUS les conseillers ?\n\n` +
+            `Générer la pré-planification de ${MOIS_NOMS[mois - 1]} ${annee} pour la Boutique + TOUS les conseillers ?\n\n` +
             `• Dimanches → OFF\n• Jours fériés → Jour férié\n• Reste → Planifié\n\n` +
             `⚠️ Cette action écrase le planning existant du mois.`
         )) return;
@@ -98,7 +104,8 @@ export default function PlanningCalendrier({ conseillers }: Props) {
         setGenerant(true);
         setStatutSave("idle");
         try {
-            await genererPrePlanificationTous(conseillers.map(c => c.id), annee, mois);
+            // Boutique + tous les conseillers
+            await genererPrePlanificationTous([BOUTIQUE_ID, ...conseillers.map(c => c.id)], annee, mois);
             const data = await getPlanningMois(conseillerId, annee, mois).catch(() => null);
             if (data) setPlanning(data);
             setModifications({});
@@ -172,7 +179,7 @@ export default function PlanningCalendrier({ conseillers }: Props) {
                         onChange={(e) => { setConseillerId(e.target.value); setStatutSave("idle"); }}
                         className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400"
                     >
-                        {conseillers.map((c) => (
+                        {tousOptions.map((c) => (
                             <option key={c.id} value={c.id}>{c.nom}</option>
                         ))}
                     </select>
