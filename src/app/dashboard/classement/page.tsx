@@ -7,6 +7,7 @@ import { Periode, PERIODE_LABELS, proratiserObjectif, couleurTaux } from "@/util
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
+import { supabase } from "@/lib/supabase";
 
 const medals = ["🥇", "🥈", "🥉"];
 
@@ -20,18 +21,31 @@ function ClassementInner() {
     const [loading, setLoading]   = useState(true);
     const [maj, setMaj]           = useState("");
 
-    useEffect(() => {
+    async function charger(p: Periode) {
         setLoading(true);
-        construireClassementPeriode(periode)
-            .then(async (data) => {
-                setClassement(data);
-                setMaj(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
-                const ids = data.map(c => c.id);
-                const avs = await getPhotosByIds(ids).catch(() => ({}));
-                setPhotos(avs);
+        try {
+            const data = await construireClassementPeriode(p);
+            setClassement(data);
+            setMaj(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
+            const ids = data.map(c => c.id);
+            const avs = await getPhotosByIds(ids).catch(() => ({}));
+            setPhotos(avs);
+        } catch {}
+        finally { setLoading(false); }
+    }
+
+    useEffect(() => {
+        charger(periode);
+
+        // Realtime : rafraîchit le classement à chaque nouvelle vente
+        const channel = supabase
+            .channel(`classement-conseiller-${periode}`)
+            .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventes" }, () => {
+                charger(periode);
             })
-            .catch(() => {})
-            .finally(() => setLoading(false));
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
     }, [periode]);
 
     const monRang = classement.findIndex(c => c.id === conseillerId) + 1;

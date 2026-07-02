@@ -45,11 +45,18 @@ export default function Dashboard() {
         } catch { return false; }
     });
 
-    // Vérifie si le manager a forcé le check Cerebro (override localStorage)
+    // checkForced = true uniquement si le manager a déclenché un reset → active la sauvegarde des valeurs
+    const [checkForced, setCheckForced] = useState(false);
+
     useEffect(() => {
-        if (!conseillerId || morningCheckValidated === false) return;
+        if (!conseillerId) return;
         checkForceActive(conseillerId)
-            .then((forced) => { if (forced) setMorningCheckValidated(false); })
+            .then((forced) => {
+                if (forced) {
+                    setCheckForced(true);
+                    setMorningCheckValidated(false); // force l'affichage du check même si déjà fait aujourd'hui
+                }
+            })
             .catch(() => {});
     }, [conseillerId]);
 
@@ -99,11 +106,15 @@ export default function Dashboard() {
             <MorningCheck
                 nom={nom}
                 conseillerId={conseillerId}
+                isReset={checkForced}
                 onValidated={() => {
                     if (cleCheck) { try { localStorage.setItem(cleCheck, "done"); } catch {} }
-                    // Efface le flag forcé en base (si c'était un reset manager)
                     if (conseillerId) clearForceCheck(conseillerId).catch(() => {});
+                    setCheckForced(false);
                     setMorningCheckValidated(true);
+                    // Recharge les missions après le check (les valeurs viennent d'être sauvées)
+                    chargerMissions();
+                    chargerRang();
                 }}
             />
         );

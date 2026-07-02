@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import { getMissionsCompletes } from "@/services/missionsReelles";
 import { sauvegarderCheckCerebro } from "@/services/resetService";
 
-type Props = { nom: string; conseillerId: string; onValidated: () => void };
+type Props = {
+    nom: string;
+    conseillerId: string;
+    /** true = check forcé après reset manager → sauvegarde les valeurs en base */
+    isReset?: boolean;
+    onValidated: () => void;
+};
 
 const JOURS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
@@ -20,7 +26,7 @@ const MESSAGES = [
 
 type Item = { produit: string; valeur: number };
 
-export default function MorningCheck({ nom, conseillerId, onValidated }: Props) {
+export default function MorningCheck({ nom, conseillerId, isReset = false, onValidated }: Props) {
     const [visible, setVisible] = useState(false);
     const [dateLabel, setDateLabel] = useState("");
     const [heure, setHeure] = useState("");
@@ -96,7 +102,9 @@ export default function MorningCheck({ nom, conseillerId, onValidated }: Props) 
                         Cerebro Check
                     </p>
                     <p className="mb-6 text-xs text-white/30">
-                        Vérifie tes volumes du mois en cours — ajuste si nécessaire.
+                        {isReset
+                            ? "⚠️ Tes données ont été réinitialisées. Saisis tes vrais chiffres du mois."
+                            : "Vérifie tes volumes du mois en cours — ajuste si nécessaire."}
                     </p>
 
                     {loading ? (
@@ -149,14 +157,14 @@ export default function MorningCheck({ nom, conseillerId, onValidated }: Props) 
                     <button
                         onClick={async () => {
                             setPressing(true);
-                            setSaving(true);
-                            // Si des valeurs ont été ajustées, on les sauvegarde comme ventes du mois
-                            const hasValues = items.some(it => it.valeur > 0);
-                            if (hasValues && conseillerId) {
+                            // Sauvegarde les valeurs EN BASE uniquement si le check est forcé après reset
+                            // En check normal du matin, les données sont déjà correctes → pas de sauvegarde
+                            if (isReset && conseillerId) {
+                                setSaving(true);
                                 try {
-                                    // Convertit le nom produit en code (ex: "Téléphones" → "telephones")
                                     const values: Record<string, number> = {};
                                     items.forEach(it => {
+                                        // "Téléphones" → "telephones", "Box" → "box", etc.
                                         const code = it.produit
                                             .normalize("NFD")
                                             .replace(/[̀-ͯ]/g, "")
@@ -165,8 +173,8 @@ export default function MorningCheck({ nom, conseillerId, onValidated }: Props) 
                                     });
                                     await sauvegarderCheckCerebro(conseillerId, values);
                                 } catch { /* silencieux */ }
+                                setSaving(false);
                             }
-                            setSaving(false);
                             setTimeout(onValidated, 100);
                         }}
                         className="group relative mt-6 w-full overflow-hidden rounded-[20px] border border-violet-500/20 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 px-7 py-6 text-left transition-all duration-300 hover:border-violet-500/50 hover:from-violet-600/30 hover:to-fuchsia-600/30 active:scale-[0.98]"
@@ -178,7 +186,7 @@ export default function MorningCheck({ nom, conseillerId, onValidated }: Props) 
                                     Tout est bon
                                 </p>
                                 <p className="mt-1 text-xl font-black text-white">
-                                    {saving ? "Enregistrement…" : "Démarrer la journée"}
+                                    {saving ? "Enregistrement…" : isReset ? "Valider et démarrer" : "Démarrer la journée"}
                                 </p>
                             </div>
                             <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white shadow-[0_4px_20px_rgba(124,58,237,.4)] transition-transform duration-300 group-hover:scale-110 group-hover:shadow-[0_6px_28px_rgba(124,58,237,.6)]">

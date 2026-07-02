@@ -61,6 +61,13 @@ export async function resetVentesDuMois(
  * Insère une ligne par produit avec la quantité totale déclarée.
  * Appelé après un reset — remplace les ventes supprimées par les chiffres réels.
  */
+/**
+ * Sauvegarde les valeurs saisies dans le Cerebro Check comme ventes du mois.
+ * Les entrées sont BACKDATÉES au 1er du mois à midi (heure locale) :
+ *   - getVentesDuJour (dashboard) ne les compte PAS (filtre aujourd'hui)
+ *   - getVentesDuMois (résultats + prochain check) les compte ✓
+ * Appelé UNIQUEMENT après un reset manager — jamais lors d'un check normal.
+ */
 export async function sauvegarderCheckCerebro(
     conseillerId: string,
     values: Record<string, number> // { produitCode: quantite }
@@ -74,12 +81,19 @@ export async function sauvegarderCheckCerebro(
         .in("code", codes);
     if (errP) throw new Error(errP.message ?? "Erreur récupération produits");
 
-    const inserts = (produits ?? []).map((p: any) => ({
-        conseiller_id: conseillerId,
-        produit_id:    p.id,
-        quantite:      values[p.code] ?? 0,
-        source:        "cerebro_check",
-    })).filter(r => r.quantite > 0);
+    // Backdaté au 1er du mois à midi pour ne pas parasiter getVentesDuJour
+    const now = new Date();
+    const premierMois = new Date(now.getFullYear(), now.getMonth(), 1, 12, 0, 0).toISOString();
+
+    const inserts = (produits ?? [])
+        .map((p: any) => ({
+            conseiller_id: conseillerId,
+            produit_id:    p.id,
+            quantite:      values[p.code] ?? 0,
+            source:        "cerebro_check",
+            created_at:    premierMois,
+        }))
+        .filter(r => r.quantite > 0);
 
     if (inserts.length === 0) return;
 
