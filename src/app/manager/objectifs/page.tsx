@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card";
 import SectionTitle from "@/components/ui/SectionTitle";
 import PlanningCalendrier from "@/components/manager/PlanningCalendrier";
 import ResetVentesCard from "@/components/manager/ResetVentesCard";
+import ObjectifsBoutiqueCard from "@/components/manager/ObjectifsBoutiqueCard";
 
 import {
     getObjectifsManager,
@@ -110,6 +111,11 @@ export default function ObjectifsPage() {
             <p className="mt-4 max-w-2xl text-lg text-slate-500">
                 Saisis ou ajuste les objectifs mensuels de chaque conseiller, produit par produit.
             </p>
+
+            {/* ── Objectifs Boutique ── */}
+            <div className="mt-8">
+                <ObjectifsBoutiqueCard />
+            </div>
 
             {confirmation && (
                 <div className="mt-6 rounded-2xl border border-green-200 bg-green-50 p-4 font-semibold text-green-700">
