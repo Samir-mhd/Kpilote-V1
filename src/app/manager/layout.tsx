@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import KPIIcon from "@/components/ui/KPIIcon";
+import ManagerAuthGate from "@/components/manager/ManagerAuthGate";
 
 const menu = [
     {
@@ -50,6 +51,7 @@ export default function ManagerLayout({
     const pathname = usePathname();
 
     return (
+        <ManagerAuthGate>
         <div className="flex min-h-screen bg-slate-50">
 
             <aside className="sticky top-0 flex h-screen w-[245px] flex-col bg-slate-950 px-5 py-7 text-white">
@@ -105,5 +107,6 @@ export default function ManagerLayout({
             </main>
 
         </div>
+        </ManagerAuthGate>
     );
 }
