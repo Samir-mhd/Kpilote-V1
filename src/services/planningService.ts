@@ -1,61 +1,189 @@
 import { supabase } from "@/lib/supabase";
 
-export type StatutJour = "present" | "off" | "formation" | "arret_maladie";
+export type StatutJour =
+    | "present"
+    | "off"
+    | "formation"
+    | "arret_maladie"
+    | "conges_payes"
+    | "ferie";
 
-// Jours où le conseiller peut vendre (pour le calcul des objectifs)
+// Seul "present" compte comme jour de vente pour les objectifs
 const STATUTS_VENDEUR: StatutJour[] = ["present"];
 
-function estWeekend(date: Date): boolean {
-    const d = date.getDay();
-    return d === 0 || d === 6;
+// ─── Helpers date ──────────────────────────────────────────────────────────────
+
+function jourStr(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function dateStr(annee: number, mois: number, jour: number): string {
+function jourStrParts(annee: number, mois: number, jour: number): string {
     return `${annee}-${String(mois).padStart(2, "0")}-${String(jour).padStart(2, "0")}`;
 }
 
-/**
- * Calcule le nombre de jours "vendeur" travaillés et restants pour un mois donné.
- *
- * Règles :
- * - Si un jour a le statut "present" dans le planning → compte comme jour de vente
- * - Si un jour a un autre statut (off, formation, arret_maladie) → ne compte pas
- * - Si aucune entrée planning pour ce jour → fallback : compte si c'est un jour de semaine (lun-ven)
- *
- * "travailles" = du 1er au jour J inclus (jours passés + aujourd'hui)
- * "restants"   = du lendemain à la fin du mois
+function estWeekend(d: Date): boolean {
+    return d.getDay() === 0 || d.getDay() === 6;
+}
+
+// ─── Jours fériés français ─────────────────────────────────────────────────────
+
+/** Calcul de Pâques (algorithme Meeus/Jones/Butcher). */
+function calculerPaques(annee: number): Date {
+    const a = annee % 19;
+    const b = Math.floor(annee / 100);
+    const c = annee % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const moisP = Math.floor((h + l - 7 * m + 114) / 31);
+    const jourP = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(annee, moisP - 1, jourP);
+}
+
+/** Retourne l'ensemble des jours fériés français pour une année (format YYYY-MM-DD). */
+export function joursFeriesAnnee(annee: number): Set<string> {
+    const feries = new Set<string>();
+
+    // Dates fixes
+    [
+        `${annee}-01-01`, // Jour de l'An
+        `${annee}-05-01`, // Fête du Travail
+        `${annee}-05-08`, // Victoire 1945
+        `${annee}-07-14`, // Fête Nationale
+        `${annee}-08-15`, // Assomption
+        `${annee}-11-01`, // Toussaint
+        `${annee}-11-11`, // Armistice
+        `${annee}-12-25`, // Noël
+    ].forEach((d) => feries.add(d));
+
+    // Dates mobiles (basées sur Pâques)
+    const paques = calculerPaques(annee);
+    const addJours = (base: Date, delta: number) => {
+        const d = new Date(base);
+        d.setDate(d.getDate() + delta);
+        feries.add(jourStr(d));
+    };
+
+    feries.add(jourStr(paques));    // Dimanche de Pâques (dimanche = off de toute façon)
+    addJours(paques, 1);            // Lundi de Pâques
+    addJours(paques, 39);           // Ascension
+    addJours(paques, 49);           // Dimanche de Pentecôte
+    addJours(paques, 50);           // Lundi de Pentecôte
+
+    return feries;
+}
+
+// ─── Pré-planification automatique ────────────────────────────────────────────
+
+/** Calcule le planning de base d'un mois :
+ *  - Dimanche      → "off"
+ *  - Jour férié    → "ferie"
+ *  - Reste (y compris samedi) → "present"
  */
+function calculerPlanningBase(
+    annee: number,
+    mois: number
+): { jour: string; statut: StatutJour }[] {
+    const feries = joursFeriesAnnee(annee);
+    const nb = new Date(annee, mois, 0).getDate();
+    const résultat: { jour: string; statut: StatutJour }[] = [];
+
+    for (let j = 1; j <= nb; j++) {
+        const date = new Date(annee, mois - 1, j);
+        const clé  = jourStrParts(annee, mois, j);
+
+        let statut: StatutJour;
+        if (feries.has(clé))          statut = "ferie";
+        else if (date.getDay() === 0) statut = "off";   // dimanche
+        else                           statut = "present";
+
+        résultat.push({ jour: clé, statut });
+    }
+
+    return résultat;
+}
+
+/**
+ * Génère la pré-planification automatique pour UN conseiller sur un mois entier.
+ * Écrase le planning existant pour ce mois.
+ */
+export async function genererPrePlanification(
+    conseillerId: string,
+    annee: number,
+    mois: number
+): Promise<void> {
+    const debut = jourStrParts(annee, mois, 1);
+    const fin   = jourStrParts(annee, mois, new Date(annee, mois, 0).getDate());
+
+    // Supprime tout le mois
+    const { error: errDel } = await supabase
+        .from("planning_conseillers")
+        .delete()
+        .eq("conseiller_id", conseillerId)
+        .gte("jour", debut)
+        .lte("jour", fin);
+
+    if (errDel) throw new Error(errDel.message ?? "Erreur suppression pré-planning");
+
+    // Insère le planning de base
+    const base = calculerPlanningBase(annee, mois).map((e) => ({
+        conseiller_id: conseillerId,
+        jour: e.jour,
+        statut: e.statut,
+    }));
+
+    const { error: errIns } = await supabase
+        .from("planning_conseillers")
+        .insert(base);
+
+    if (errIns) throw new Error(errIns.message ?? "Erreur insertion pré-planning");
+}
+
+/**
+ * Génère la pré-planification pour TOUS les conseillers d'un mois.
+ */
+export async function genererPrePlanificationTous(
+    conseillerIds: string[],
+    annee: number,
+    mois: number
+): Promise<void> {
+    await Promise.all(conseillerIds.map((id) => genererPrePlanification(id, annee, mois)));
+}
+
+// ─── Calcul jours travaillés ───────────────────────────────────────────────────
+
 export async function getJoursTravail(
     conseillerId: string,
     annee: number,
     mois: number
 ): Promise<{ travailles: number; restants: number }> {
-    // Récupère le planning du mois (silencieux si table absente)
     let planning: Record<string, StatutJour> = {};
     try {
         planning = await getPlanningMois(conseillerId, annee, mois);
-    } catch {
-        // Table planning_conseillers absente → fallback jours ouvrés
-    }
+    } catch { /* fallback : jours ouvrés classiques */ }
 
     const now = new Date();
     const jourAujourdhui =
         annee === now.getFullYear() && mois === now.getMonth() + 1
             ? now.getDate()
-            : null; // mois différent du mois courant
+            : null;
 
-    const nbJours = new Date(annee, mois, 0).getDate();
+    const nb = new Date(annee, mois, 0).getDate();
     let travailles = 0;
-    let restants = 0;
+    let restants   = 0;
 
-    for (let jour = 1; jour <= nbJours; jour++) {
-        const date = dateStr(annee, mois, jour);
-        const dateObj = new Date(annee, mois - 1, jour);
-        const statut = planning[date] as StatutJour | undefined;
+    for (let j = 1; j <= nb; j++) {
+        const clé    = jourStrParts(annee, mois, j);
+        const dateObj = new Date(annee, mois - 1, j);
+        const statut  = planning[clé] as StatutJour | undefined;
 
-        // Un jour compte comme jour de vente si :
-        // - planning explicitement "present"
-        // - OU aucune entrée ET c'est un jour de semaine
+        // Jour de vente = "present" explicite OU (pas de planning ET jour ouvré)
         const estJourVente = statut !== undefined
             ? STATUTS_VENDEUR.includes(statut)
             : !estWeekend(dateObj);
@@ -63,89 +191,73 @@ export async function getJoursTravail(
         if (!estJourVente) continue;
 
         if (jourAujourdhui === null) {
-            // Mois passé → tout compte en "travaillé"
-            if (annee < now.getFullYear() || mois < now.getMonth() + 1) {
-                travailles++;
-            } else {
-                // Mois futur → tout compte en "restants"
-                restants++;
-            }
-        } else if (jour <= jourAujourdhui) {
+            annee < now.getFullYear() || mois < now.getMonth() + 1
+                ? travailles++
+                : restants++;
+        } else if (j <= jourAujourdhui) {
             travailles++;
         } else {
             restants++;
         }
     }
 
-    return {
-        travailles: Math.max(travailles, 1),
-        restants: Math.max(restants, 1),
-    };
+    return { travailles: Math.max(travailles, 1), restants: Math.max(restants, 1) };
 }
 
-export type PlanningEntry = {
-    id?: string;
-    conseiller_id: string;
-    date: string; // YYYY-MM-DD
-    statut: StatutJour;
-};
+// ─── Lecture planning ──────────────────────────────────────────────────────────
 
 export async function getPlanningMois(
     conseillerId: string,
     annee: number,
-    mois: number // 1-12
+    mois: number
 ): Promise<Record<string, StatutJour>> {
-    const debut = `${annee}-${String(mois).padStart(2, "0")}-01`;
-    const fin = new Date(annee, mois, 0); // dernier jour du mois
-    const finStr = `${annee}-${String(mois).padStart(2, "0")}-${String(fin.getDate()).padStart(2, "0")}`;
+    const debut = jourStrParts(annee, mois, 1);
+    const fin   = jourStrParts(annee, mois, new Date(annee, mois, 0).getDate());
 
     const { data, error } = await supabase
         .from("planning_conseillers")
-        .select("date, statut")
+        .select("jour, statut")
         .eq("conseiller_id", conseillerId)
-        .gte("date", debut)
-        .lte("date", finStr);
+        .gte("jour", debut)
+        .lte("jour", fin);
 
-    if (error) throw new Error(error.message ?? "Erreur Supabase planning");
+    if (error) throw new Error(error.message ?? "Erreur lecture planning");
 
     const result: Record<string, StatutJour> = {};
-    (data ?? []).forEach((row: any) => {
-        result[row.date] = row.statut as StatutJour;
-    });
-
+    (data ?? []).forEach((row: any) => { result[row.jour] = row.statut as StatutJour; });
     return result;
 }
+
+// ─── Écriture planning ─────────────────────────────────────────────────────────
 
 export async function savePlanning(
     conseillerId: string,
     modifications: Record<string, StatutJour | null>
 ): Promise<void> {
-    const aUpsert: PlanningEntry[] = [];
+    const aInserer: { conseiller_id: string; jour: string; statut: StatutJour }[] = [];
     const aSupprimer: string[] = [];
 
-    Object.entries(modifications).forEach(([date, statut]) => {
-        if (statut === null) {
-            aSupprimer.push(date);
-        } else {
-            aUpsert.push({ conseiller_id: conseillerId, date, statut });
-        }
+    Object.entries(modifications).forEach(([jour, statut]) => {
+        statut === null
+            ? aSupprimer.push(jour)
+            : aInserer.push({ conseiller_id: conseillerId, jour, statut });
     });
 
-    if (aUpsert.length > 0) {
-        const { error } = await supabase
-            .from("planning_conseillers")
-            .upsert(aUpsert, { onConflict: "conseiller_id,date" });
+    const tousLesDates = [...aInserer.map((e) => e.jour), ...aSupprimer];
 
-        if (error) throw new Error(error.message ?? "Erreur Supabase planning");
-    }
-
-    for (const date of aSupprimer) {
+    if (tousLesDates.length > 0) {
         const { error } = await supabase
             .from("planning_conseillers")
             .delete()
             .eq("conseiller_id", conseillerId)
-            .eq("date", date);
+            .in("jour", tousLesDates);
+        if (error) throw new Error(error.message ?? "Erreur suppression planning");
+    }
 
-        if (error) throw new Error(error.message ?? "Erreur Supabase planning");
+    if (aInserer.length > 0) {
+        const { error } = await supabase
+            .from("planning_conseillers")
+            .insert(aInserer);
+        if (error) throw new Error(error.message ?? "Erreur insertion planning");
     }
 }

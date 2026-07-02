@@ -34,7 +34,7 @@ function SidebarInner() {
     }, [id]);
 
     return (
-        <aside className="sticky top-0 flex h-screen w-72 flex-col bg-slate-950 px-6 py-8 text-white">
+        <aside className="sticky top-0 flex h-screen w-[245px] flex-col bg-slate-950 px-5 py-7 text-white">
 
             <Link href="/" className="mb-10 flex items-center gap-3 opacity-90 hover:opacity-100 transition-opacity">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 font-black">
@@ -83,7 +83,7 @@ function SidebarInner() {
 
 // Fallback sidebar pendant le chargement (évite le layout shift)
 function SidebarFallback() {
-    return <aside className="sticky top-0 h-screen w-72 flex-shrink-0 bg-slate-950" />;
+    return <aside className="sticky top-0 h-screen w-[245px] flex-shrink-0 bg-slate-950" />;
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -93,7 +93,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <SidebarInner />
             </Suspense>
             <main className="flex-1 overflow-y-auto">
-                <div className="mx-auto max-w-6xl px-8 py-8">
+                <div className="mx-auto max-w-6xl px-6 py-7">
                     <Suspense fallback={
                         <div className="flex h-64 items-center justify-center">
                             <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-600 border-t-transparent" />

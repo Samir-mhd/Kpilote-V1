@@ -52,7 +52,7 @@ export default function ManagerLayout({
     return (
         <div className="flex min-h-screen bg-slate-50">
 
-            <aside className="sticky top-0 flex h-screen w-72 flex-col bg-slate-950 px-6 py-8 text-white">
+            <aside className="sticky top-0 flex h-screen w-[245px] flex-col bg-slate-950 px-5 py-7 text-white">
 
                 <Link href="/" className="mb-10 flex items-center gap-3 opacity-90 hover:opacity-100 transition-opacity">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 font-black">
@@ -99,7 +99,7 @@ export default function ManagerLayout({
             </aside>
 
             <main className="flex-1 overflow-y-auto">
-                <div className="mx-auto max-w-6xl px-8 py-8">
+                <div className="mx-auto max-w-6xl px-6 py-7">
                     {children}
                 </div>
             </main>

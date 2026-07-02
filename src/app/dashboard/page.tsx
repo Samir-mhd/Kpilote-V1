@@ -23,21 +23,24 @@ type MissionDashboard = {
     message: string;
 };
 
+/** Date locale au format YYYY-MM-DD (pas UTC — important pour les fuseaux horaires). */
+function dateLocale(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function Dashboard() {
     const searchParams = useSearchParams();
     const nom = searchParams.get("nom") || "Conseiller";
     const conseillerId = searchParams.get("id") || "";
 
-    const cleCheck = conseillerId
-        ? `morning-check-${conseillerId}-${new Date().toISOString().slice(0, 10)}`
-        : null;
+    // Clé unique par conseiller et par jour local — calculée une seule fois
+    const cleCheck = conseillerId ? `morning-check-${conseillerId}-${dateLocale()}` : null;
 
     const [morningCheckValidated, setMorningCheckValidated] = useState(() => {
-        if (!conseillerId) return true;
+        if (!conseillerId || !cleCheck) return true;
         try {
-            return localStorage.getItem(
-                `morning-check-${conseillerId}-${new Date().toISOString().slice(0, 10)}`
-            ) === "done";
+            return localStorage.getItem(cleCheck) === "done";
         } catch { return false; }
     });
 
