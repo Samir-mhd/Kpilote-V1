@@ -1,105 +1,121 @@
-import HomeCard from "@/components/HomeCard";
 import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#F6F8FB] flex items-center justify-center p-6">
-      <section className="w-full max-w-6xl">
-        <div className="bg-white rounded-[40px] shadow-2xl border border-slate-100 overflow-hidden">
-          <div className="grid lg:grid-cols-2">
-            <div className="p-10 lg:p-14">
-              <div className="inline-flex items-center gap-3 rounded-full bg-green-50 px-4 py-2 text-green-700 font-semibold mb-10">
-                <span className="h-2 w-2 rounded-full bg-green-500" />
-                Version prototype
-              </div>
+    <main
+      className="min-h-screen flex flex-col items-center justify-between px-6 py-10"
+      style={{ background: "#0a0a0f" }}
+    >
 
-              <h1 className="text-6xl lg:text-7xl font-black tracking-tight text-slate-900">
-                KPI<span className="text-green-500">LOTE</span>
-              </h1>
-
-              <p className="mt-6 text-2xl text-slate-600 leading-snug">
-                Votre copilote de performance commerciale.
-              </p>
-
-              <p className="mt-4 text-slate-500 text-lg">
-                Une mission claire chaque jour. Une équipe engagée. Des objectifs suivis en temps réel.
-              </p>
-<div className="grid gap-5">
-
- <Link
-  href="/choix"
-  className="block bg-green-500 text-white p-6 rounded-xl text-center text-2xl font-bold"
->
-  JE SUIS CONSEILLER
-</Link>
-
-  <Link href="/manager" className="block">
-    <HomeCard
-      icon="👑"
-      title="Je suis manager"
-      subtitle="Piloter la boutique"
-    />
-  </Link>
-
-</div>
-            </div>
-
-            <div className="bg-slate-950 p-10 lg:p-14 text-white flex flex-col justify-between">
-              <div>
-                <p className="text-green-400 font-semibold mb-4">
-                  Aujourd'hui
-                </p>
-
-                <h2 className="text-4xl font-bold leading-tight">
-                  Que dois-je faire maintenant ?
-                </h2>
-
-                <div className="mt-10 space-y-4">
-                  <div className="rounded-3xl bg-white/10 p-5 border border-white/10">
-                    <div className="text-sm text-slate-300">Mission boutique</div>
-                    <div className="mt-3 grid grid-cols-4 gap-3 text-center">
-                      <div className="rounded-2xl bg-white p-4 text-slate-900">
-                        <div className="text-3xl font-black text-green-500">7</div>
-                        <div className="text-xs font-bold mt-1">BOX</div>
-                      </div>
-                      <div className="rounded-2xl bg-white p-4 text-slate-900">
-                        <div className="text-3xl font-black text-blue-500">5</div>
-                        <div className="text-xs font-bold mt-1">MOBILE</div>
-                      </div>
-                      <div className="rounded-2xl bg-white p-4 text-slate-900">
-                        <div className="text-3xl font-black text-orange-500">4</div>
-                        <div className="text-xs font-bold mt-1">ASSUR.</div>
-                      </div>
-                      <div className="rounded-2xl bg-white p-4 text-slate-900">
-                        <div className="text-3xl font-black text-purple-500">3</div>
-                        <div className="text-xs font-bold mt-1">FLEX</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-3xl bg-white/10 p-5 border border-white/10">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <div className="text-sm text-slate-300">Objectif boutique</div>
-                        <div className="text-4xl font-black mt-2">82%</div>
-                      </div>
-                      <div className="text-5xl">🚀</div>
-                    </div>
-
-                    <div className="mt-5 h-3 rounded-full bg-white/10 overflow-hidden">
-                      <div className="h-full w-[82%] rounded-full bg-green-500" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <p className="text-slate-400 mt-10">
-                KPILOTE • Prototype V0.1
-              </p>
-            </div>
-          </div>
+      {/* Logo */}
+      <div className="flex items-center gap-3">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-semibold text-lg"
+          style={{ background: "linear-gradient(135deg, #7c3aed, #c026d3)" }}
+        >
+          K
         </div>
-      </section>
+        <span className="text-lg font-semibold tracking-widest">
+          <span style={{ color: "#a78bfa" }}>KPI</span>
+          <span className="text-white">LOTE</span>
+        </span>
+      </div>
+
+      {/* Hero */}
+      <div className="flex flex-col items-center text-center w-full max-w-lg">
+
+        {/* Slogan */}
+        <div className="flex items-center justify-center gap-4 mb-14 mt-16">
+          <span className="text-3xl font-semibold" style={{ color: "#a78bfa" }}>Piloter</span>
+          <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#4c1d95" }} />
+          <span className="text-3xl font-semibold text-white">Optimiser</span>
+          <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#4c1d95" }} />
+          <span className="text-3xl font-semibold" style={{ color: "#a78bfa" }}>Performer</span>
+        </div>
+
+        {/* Cartes */}
+        <div className="grid grid-cols-2 gap-4 w-full">
+
+          {/* Manager */}
+          <Link
+            href="/manager/dashboard"
+            className="rounded-2xl p-8 text-left relative overflow-hidden block transition-all duration-300 hover:-translate-y-2"
+            style={{
+              background: "linear-gradient(145deg, #1e1b4b, #2e1065)",
+              border: "0.5px solid rgba(124,58,237,0.4)",
+            }}
+          >
+            <div
+              className="absolute -top-8 -right-8 w-28 h-28 rounded-full blur-2xl opacity-20"
+              style={{ background: "#7c3aed" }}
+            />
+            <div className="relative">
+              <div
+                className="w-11 h-11 rounded-2xl flex items-center justify-center mb-5"
+                style={{ background: "rgba(124,58,237,0.3)" }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-4"/>
+                </svg>
+              </div>
+              <h2 className="text-white font-semibold text-lg mb-2">Manager</h2>
+              <p className="text-sm leading-relaxed" style={{ color: "#c4b5fd" }}>
+                Pilotez votre boutique, analysez les performances et guidez votre équipe.
+              </p>
+            </div>
+            <div
+              className="absolute bottom-5 right-5 w-7 h-7 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(124,58,237,0.35)", color: "#e9d5ff" }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </div>
+          </Link>
+
+          {/* Conseiller */}
+          <Link
+            href="/choix"
+            className="rounded-2xl p-8 text-left relative overflow-hidden block transition-all duration-300 hover:-translate-y-2"
+            style={{
+              background: "linear-gradient(145deg, #13111e, #1e1b4b)",
+              border: "0.5px solid rgba(167,139,250,0.25)",
+            }}
+          >
+            <div
+              className="absolute -top-8 -right-8 w-28 h-28 rounded-full blur-2xl opacity-10"
+              style={{ background: "#a78bfa" }}
+            />
+            <div className="relative">
+              <div
+                className="w-11 h-11 rounded-2xl flex items-center justify-center mb-5"
+                style={{ background: "rgba(167,139,250,0.15)" }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+              </div>
+              <h2 className="text-white font-semibold text-lg mb-2">Conseiller</h2>
+              <p className="text-sm leading-relaxed" style={{ color: "#a78bfa" }}>
+                Suivez vos missions, défiez vos collègues et atteignez vos objectifs du jour.
+              </p>
+            </div>
+            <div
+              className="absolute bottom-5 right-5 w-7 h-7 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(167,139,250,0.2)", color: "#a78bfa" }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </div>
+          </Link>
+
+        </div>
+      </div>
+
+      {/* Spacer bas */}
+      <div />
+
     </main>
   );
 }

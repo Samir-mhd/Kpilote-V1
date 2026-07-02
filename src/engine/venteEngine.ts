@@ -5,17 +5,21 @@ export type VenteInput = {
   produit: string;
 };
 
+function normaliserProduit(produit: string) {
+  return produit
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 export async function traiterVente({
   conseillerId,
   produit,
 }: VenteInput) {
+
   await enregistrerVente({
     conseillerId,
-    produitCode: produit
-      .toLowerCase()
-      .replace("é", "e")
-      .replace("è", "e")
-      .replace("ê", "e"),
+    produitCode: normaliserProduit(produit),
   });
 
   return true;

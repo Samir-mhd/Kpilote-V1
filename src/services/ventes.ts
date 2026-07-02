@@ -7,20 +7,33 @@ export async function enregistrerVente({
   conseillerId: string;
   produitCode: string;
 }) {
-  const { data: produit, error: produitError } = await supabase
+
+  console.log("Recherche :", `"${produitCode}"`);
+
+  const { data, error } = await supabase
     .from("produits")
-    .select("id")
-    .eq("code", produitCode)
-    .single();
+    .select("*")
+    .eq("code", produitCode);
 
-  if (produitError) throw produitError;
-
-  const { error } = await supabase.from("ventes").insert({
-    conseiller_id: conseillerId,
-    produit_id: produit.id,
-    quantite: 1,
-    source: "conseiller",
-  });
+  console.log("Résultat recherche :", data);
+  console.log("Erreur recherche :", error);
 
   if (error) throw error;
+
+  if (!data || data.length === 0) {
+    throw new Error(`Produit introuvable : ${produitCode}`);
+  }
+
+  const produit = data[0];
+
+  const { error: insertError } = await supabase
+    .from("ventes")
+    .insert({
+      conseiller_id: conseillerId,
+      produit_id: produit.id,
+      quantite: 1,
+      source: "conseiller",
+    });
+
+  if (insertError) throw insertError;
 }

@@ -1,26 +1,217 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ------------------------------------------------ */
+/* KPILOTE DESIGN SYSTEM V1                         */
+/* ------------------------------------------------ */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+html,
+body {
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+    margin: 0;
+
+    padding: 0;
+
+    min-height: 100%;
+    min-height: 100dvh; /* iOS Safari : hauteur dynamique (exclut la barre d'adresse) */
+
+    font-family: var(--font-inter), Inter, system-ui, -apple-system, sans-serif;
+
+    background: #eef2ff;
+
+    color: #0f172a;
+
+    /* Désactive le tap-highlight bleu sur iOS */
+    -webkit-tap-highlight-color: transparent;
+
+    /* Empêche le zoom automatique sur les inputs iOS */
+    -webkit-text-size-adjust: 100%;
+
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+
+    /* Fond en position fixe simulé par un pseudo-élément pour iOS Safari.
+       background-attachment: fixed est cassé sur iOS — on utilise un élément dédié. */
+    position: relative;
+
+    color: #0f172a;
+
+}
+
+/* Fond fixe compatible iOS Safari */
+body::before {
+
+    content: "";
+
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+
+    background:
+        radial-gradient(circle at 15% 20%,
+            rgba(124,58,237,.12),
+            transparent 28%),
+        radial-gradient(circle at 85% 15%,
+            rgba(59,130,246,.10),
+            transparent 28%),
+        radial-gradient(circle at 50% 90%,
+            rgba(236,72,153,.08),
+            transparent 35%),
+        linear-gradient(180deg, #f8fafc, #eef2ff);
+
+}
+
+/* Scrollbar */
+
+::-webkit-scrollbar {
+
+    width: 10px;
+
+}
+
+::-webkit-scrollbar-track {
+
+    background: transparent;
+
+}
+
+::-webkit-scrollbar-thumb {
+
+    border-radius: 999px;
+
+    background: linear-gradient(
+
+        #7c3aed,
+
+        #a855f7
+
+    );
+
+}
+
+/* Sélection */
+
+::selection {
+
+    background: #7c3aed;
+
+    color: white;
+
+}
+
+/* Animations */
+
+@keyframes float {
+
+    0% {
+
+        transform: translateY(0px);
+
+    }
+
+    50% {
+
+        transform: translateY(-6px);
+
+    }
+
+    100% {
+
+        transform: translateY(0px);
+
+    }
+
+}
+
+@keyframes pulseGlow {
+
+    0% {
+
+        box-shadow: 0 0 0 rgba(124,58,237,.25);
+
+    }
+
+    50% {
+
+        box-shadow: 0 0 35px rgba(124,58,237,.45);
+
+    }
+
+    100% {
+
+        box-shadow: 0 0 0 rgba(124,58,237,.25);
+
+    }
+
+}
+
+.float {
+
+    animation: float 5s ease-in-out infinite;
+
+}
+
+.glow {
+
+    animation: pulseGlow 2.8s infinite;
+
+}
+
+/* Cards */
+
+.card-premium {
+
+    border-radius: 32px;
+
+    background: rgba(255,255,255,.75);
+
+    -webkit-backdrop-filter: blur(18px); /* Safari */
+    backdrop-filter: blur(18px);
+
+    border: 1px solid rgba(255,255,255,.45);
+
+    box-shadow:
+
+        0 10px 35px rgba(15,23,42,.08),
+
+        inset 0 1px 0 rgba(255,255,255,.4);
+
+}
+
+/* Boutons */
+
+.btn-premium {
+
+    background: linear-gradient(
+
+        135deg,
+
+        #7c3aed,
+
+        #9333ea,
+
+        #c026d3
+
+    );
+
+    color: white;
+
+    transition: .25s;
+
+    /* Supprime le délai 300ms sur iOS Safari */
+    touch-action: manipulation;
+
+    /* Supprime l'highlight bleu au tap sur iOS */
+    -webkit-tap-highlight-color: transparent;
+
+}
+
+.btn-premium:hover {
+
+    transform: translateY(-2px);
+
+    box-shadow:
+
+        0 12px 30px rgba(124,58,237,.35);
+
 }
