@@ -32,7 +32,7 @@ export default function ObjectifsBoutiqueCard() {
 
             // Charge les produits pour avoir l'ordre canonique
             const produits = await getProduits();
-            const ordre = PRODUITS_ORDRE.map(p => p.code);
+            const ordre: string[] = PRODUITS_ORDRE.map(p => p.code);
             const produitsTries = [...produits].sort((a, b) => ordre.indexOf(a.code) - ordre.indexOf(b.code));
 
             if (rows.length > 0) {
