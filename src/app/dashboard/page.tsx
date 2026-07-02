@@ -14,6 +14,7 @@ import { traiterVente } from "@/engine/venteEngine";
 import { getMissionsReelles } from "@/services/missionsReelles";
 import { analyserDashboard } from "@/engine/contextEngine";
 import { supabase } from "@/lib/supabase";
+import { checkForceActive, clearForceCheck } from "@/services/resetService";
 
 type MissionDashboard = {
     produit: string;
@@ -43,6 +44,14 @@ export default function Dashboard() {
             return localStorage.getItem(cleCheck) === "done";
         } catch { return false; }
     });
+
+    // Vérifie si le manager a forcé le check Cerebro (override localStorage)
+    useEffect(() => {
+        if (!conseillerId || morningCheckValidated === false) return;
+        checkForceActive(conseillerId)
+            .then((forced) => { if (forced) setMorningCheckValidated(false); })
+            .catch(() => {});
+    }, [conseillerId]);
 
     const [totalVentesJour, setTotalVentesJour] = useState(0);
     const [heroMessage, setHeroMessage] = useState("Chargement de ta journée...");
@@ -92,6 +101,8 @@ export default function Dashboard() {
                 conseillerId={conseillerId}
                 onValidated={() => {
                     if (cleCheck) { try { localStorage.setItem(cleCheck, "done"); } catch {} }
+                    // Efface le flag forcé en base (si c'était un reset manager)
+                    if (conseillerId) clearForceCheck(conseillerId).catch(() => {});
                     setMorningCheckValidated(true);
                 }}
             />

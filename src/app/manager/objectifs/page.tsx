@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Card from "@/components/ui/Card";
 import SectionTitle from "@/components/ui/SectionTitle";
 import PlanningCalendrier from "@/components/manager/PlanningCalendrier";
+import ResetVentesCard from "@/components/manager/ResetVentesCard";
 
 import {
     getObjectifsManager,
@@ -192,6 +193,18 @@ export default function ObjectifsPage() {
             {lignes.length > 0 && (
                 <div className="mt-8">
                     <PlanningCalendrier
+                        conseillers={lignes.map((l) => ({
+                            id: l.conseillerId,
+                            nom: l.nom,
+                        }))}
+                    />
+                </div>
+            )}
+
+            {/* ── Réinitialisation des ventes ── */}
+            {lignes.length > 0 && (
+                <div className="mt-8">
+                    <ResetVentesCard
                         conseillers={lignes.map((l) => ({
                             id: l.conseillerId,
                             nom: l.nom,
