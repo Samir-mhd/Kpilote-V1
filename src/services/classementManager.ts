@@ -121,6 +121,11 @@ export async function construireClassementManager() {
 
   if (conseillersError) throw conseillersError;
 
+  // Filtre sur le mois en cours uniquement
+  const now = new Date();
+  const debutMois = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const finMois   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+
   const { data: ventes, error: ventesError } = await supabase
     .from("ventes")
     .select(`
@@ -129,7 +134,9 @@ export async function construireClassementManager() {
       produits (
         code
       )
-    `);
+    `)
+    .gte("created_at", debutMois)
+    .lte("created_at", finMois);
 
   if (ventesError) throw ventesError;
 

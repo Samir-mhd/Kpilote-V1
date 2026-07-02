@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getMissionsCompletes } from "@/services/missionsReelles";
+import { sauvegarderCheckCerebro } from "@/services/resetService";
 
 type Props = { nom: string; conseillerId: string; onValidated: () => void };
 
@@ -26,7 +27,8 @@ export default function MorningCheck({ nom, conseillerId, onValidated }: Props) 
     const [msg] = useState(() => MESSAGES[Math.floor(Math.random() * MESSAGES.length)]);
     const [items, setItems] = useState<Item[]>([]);
     const [loading, setLoading] = useState(true);
-    const [pressing, setPressing] = useState(false);
+    const [pressing, setPressing]   = useState(false);
+    const [saving, setSaving]        = useState(false);
 
     useEffect(() => {
         const now = new Date();
@@ -145,7 +147,28 @@ export default function MorningCheck({ nom, conseillerId, onValidated }: Props) 
                 {/* ── Carte CTA ────────────────────────────────────────────────── */}
                 {!loading && (
                     <button
-                        onClick={() => { setPressing(true); setTimeout(onValidated, 300); }}
+                        onClick={async () => {
+                            setPressing(true);
+                            setSaving(true);
+                            // Si des valeurs ont été ajustées, on les sauvegarde comme ventes du mois
+                            const hasValues = items.some(it => it.valeur > 0);
+                            if (hasValues && conseillerId) {
+                                try {
+                                    // Convertit le nom produit en code (ex: "Téléphones" → "telephones")
+                                    const values: Record<string, number> = {};
+                                    items.forEach(it => {
+                                        const code = it.produit
+                                            .normalize("NFD")
+                                            .replace(/[̀-ͯ]/g, "")
+                                            .toLowerCase();
+                                        if (it.valeur > 0) values[code] = it.valeur;
+                                    });
+                                    await sauvegarderCheckCerebro(conseillerId, values);
+                                } catch { /* silencieux */ }
+                            }
+                            setSaving(false);
+                            setTimeout(onValidated, 100);
+                        }}
                         className="group relative mt-6 w-full overflow-hidden rounded-[20px] border border-violet-500/20 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 px-7 py-6 text-left transition-all duration-300 hover:border-violet-500/50 hover:from-violet-600/30 hover:to-fuchsia-600/30 active:scale-[0.98]"
                         style={{ opacity: pressing ? 0.6 : 1, transform: pressing ? "scale(0.98)" : undefined }}
                     >
@@ -155,7 +178,7 @@ export default function MorningCheck({ nom, conseillerId, onValidated }: Props) 
                                     Tout est bon
                                 </p>
                                 <p className="mt-1 text-xl font-black text-white">
-                                    Démarrer la journée
+                                    {saving ? "Enregistrement…" : "Démarrer la journée"}
                                 </p>
                             </div>
                             <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white shadow-[0_4px_20px_rgba(124,58,237,.4)] transition-transform duration-300 group-hover:scale-110 group-hover:shadow-[0_6px_28px_rgba(124,58,237,.6)]">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { resetVentesDuJour, forcerCerebroCheck } from "@/services/resetService";
+import { resetVentesDuMois, forcerCerebroCheck } from "@/services/resetService";
 
 type Conseiller = { id: string; nom: string };
 
@@ -43,7 +43,7 @@ export default function ResetVentesCard({ conseillers }: Props) {
         setLoading(true);
         setErreur(null);
         try {
-            await resetVentesDuJour(
+            await resetVentesDuMois(
                 conseillerId,
                 tousSelec ? null : selProduits
             );
@@ -82,7 +82,7 @@ export default function ResetVentesCard({ conseillers }: Props) {
                     <div>
                         <h3 className="text-lg font-black text-slate-900">Réinitialiser les ventes</h3>
                         <p className="mt-0.5 text-sm text-slate-400">
-                            Remet à zéro les ventes du jour pour corriger des erreurs de saisie.
+                            Supprime toutes les ventes du mois en cours. Le conseiller re-saisit ses chiffres via le Cerebro Check.
                         </p>
                     </div>
                 </div>
@@ -200,7 +200,7 @@ export default function ResetVentesCard({ conseillers }: Props) {
                                         : PRODUITS.filter(p => selProduits.includes(p.code)).map(p => p.label).join(", ")
                                     }
                                 </strong></li>
-                                <li>• Période : <strong>aujourd'hui uniquement</strong></li>
+                                <li>• Période : <strong>mois en cours complet</strong></li>
                                 {avecCheck && <li>• 🤖 Cerebro Check forcé au prochain accès</li>}
                             </ul>
                             <p className="mt-3 text-xs text-red-500 font-semibold">

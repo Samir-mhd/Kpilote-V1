@@ -5,20 +5,29 @@ function dateLocale(): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function debutMois(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01T00:00:00.000Z`;
+}
+
+function finMois(): string {
+    const d = new Date();
+    const dernier = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(dernier.getDate()).padStart(2, "0")}T23:59:59.999Z`;
+}
+
 /**
- * Supprime les ventes du jour pour un conseiller.
+ * Supprime TOUTES les ventes du MOIS EN COURS pour un conseiller.
  * @param produitCodes  null = tous les produits, sinon liste de codes ("box", "forfaits"…)
  */
-export async function resetVentesDuJour(
+export async function resetVentesDuMois(
     conseillerId: string,
     produitCodes: string[] | null
 ): Promise<void> {
-    const today = dateLocale();
-    const debut = `${today}T00:00:00.000Z`;
-    const fin   = `${today}T23:59:59.999Z`;
+    const debut = debutMois();
+    const fin   = finMois();
 
     if (produitCodes === null) {
-        // Supprime toutes les ventes du jour
         const { error } = await supabase
             .from("ventes")
             .delete()
@@ -27,7 +36,6 @@ export async function resetVentesDuJour(
             .lte("created_at", fin);
         if (error) throw new Error(error.message ?? "Erreur reset ventes");
     } else {
-        // Récupère les IDs Supabase des produits sélectionnés
         const { data: produits, error: errP } = await supabase
             .from("produits")
             .select("id, code")
@@ -49,9 +57,44 @@ export async function resetVentesDuJour(
 }
 
 /**
- * Force le check Cerebro pour ce conseiller au prochain chargement de son dashboard.
- * Nécessite la colonne force_check_date dans la table conseillers.
+ * Sauvegarde les valeurs saisies dans le Cerebro Check comme ventes du mois.
+ * Insère une ligne par produit avec la quantité totale déclarée.
+ * Appelé après un reset — remplace les ventes supprimées par les chiffres réels.
  */
+export async function sauvegarderCheckCerebro(
+    conseillerId: string,
+    values: Record<string, number> // { produitCode: quantite }
+): Promise<void> {
+    const codes = Object.keys(values).filter(k => (values[k] ?? 0) > 0);
+    if (codes.length === 0) return;
+
+    const { data: produits, error: errP } = await supabase
+        .from("produits")
+        .select("id, code")
+        .in("code", codes);
+    if (errP) throw new Error(errP.message ?? "Erreur récupération produits");
+
+    const inserts = (produits ?? []).map((p: any) => ({
+        conseiller_id: conseillerId,
+        produit_id:    p.id,
+        quantite:      values[p.code] ?? 0,
+        source:        "cerebro_check",
+    })).filter(r => r.quantite > 0);
+
+    if (inserts.length === 0) return;
+
+    const { error } = await supabase.from("ventes").insert(inserts);
+    if (error) throw new Error(error.message ?? "Erreur sauvegarde check Cerebro");
+}
+
+// ── Garde l'ancien nom pour compatibilité (délègue au nouveau) ─────────────────
+export async function resetVentesDuJour(
+    conseillerId: string,
+    produitCodes: string[] | null
+): Promise<void> {
+    return resetVentesDuMois(conseillerId, produitCodes);
+}
+
 export async function forcerCerebroCheck(conseillerId: string): Promise<void> {
     const { error } = await supabase
         .from("conseillers")
@@ -60,9 +103,6 @@ export async function forcerCerebroCheck(conseillerId: string): Promise<void> {
     if (error) throw new Error(error.message ?? "Erreur force check Cerebro");
 }
 
-/**
- * Vérifie si le check Cerebro est forcé pour ce conseiller aujourd'hui.
- */
 export async function checkForceActive(conseillerId: string): Promise<boolean> {
     const { data, error } = await supabase
         .from("conseillers")
@@ -73,9 +113,6 @@ export async function checkForceActive(conseillerId: string): Promise<boolean> {
     return data.force_check_date === dateLocale();
 }
 
-/**
- * Efface le flag après que le conseiller a complété le check.
- */
 export async function clearForceCheck(conseillerId: string): Promise<void> {
     await supabase
         .from("conseillers")
