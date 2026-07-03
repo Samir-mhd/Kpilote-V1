@@ -23,18 +23,24 @@ import { getPhotosByIds } from "@/services/photoService";
 
 // ─── Chrono live ──────────────────────────────────────────────────────────────
 
-function Chrono({ expiresAt }: { expiresAt: number }) {
-    const [label, setLabel] = useState(formatTempsRestant(expiresAt));
+function Chrono({ expiresAt, duree }: { expiresAt: number; duree: number }) {
+    // Si expiresAt est dans le passé (challenge ancien sans started_at),
+    // on repart de maintenant + durée pour ne pas afficher 0:00 immédiatement
+    const targetExpiry = expiresAt > Date.now()
+        ? expiresAt
+        : Date.now() + (duree ?? 30) * 60 * 1000;
+
+    const [label, setLabel] = useState(formatTempsRestant(targetExpiry));
 
     useEffect(() => {
-        setLabel(formatTempsRestant(expiresAt));
+        setLabel(formatTempsRestant(targetExpiry));
         const t = setInterval(() => {
-            const r = expiresAt - Date.now();
-            setLabel(r <= 0 ? "0:00" : formatTempsRestant(expiresAt));
+            const r = targetExpiry - Date.now();
+            setLabel(r <= 0 ? "0:00" : formatTempsRestant(targetExpiry));
             if (r <= 0) clearInterval(t);
         }, 1000);
         return () => clearInterval(t);
-    }, [expiresAt]);
+    }, [targetExpiry]);
 
     const mins = parseInt(label.split(":")[0]);
     return (
@@ -59,7 +65,10 @@ function CarteDefiActif({ defi, onCloture }: { defi: DefiActifManager; onCloture
         } finally { setCloturing(false); }
     }
 
-    const estExpire = Date.now() >= defi.expiresAt;
+    const targetExpiry = defi.expiresAt > Date.now()
+        ? defi.expiresAt
+        : Date.now() + (defi.duree ?? 30) * 60 * 1000;
+    const estExpire = Date.now() >= targetExpiry;
     const estPending = defi.status === "pending";
 
     return (
@@ -90,7 +99,7 @@ function CarteDefiActif({ defi, onCloture }: { defi: DefiActifManager; onCloture
                         {!estPending && (
                             <div className="text-center">
                                 <p className="text-xs text-white/30">Temps</p>
-                                <Chrono expiresAt={defi.expiresAt} />
+                                <Chrono expiresAt={defi.expiresAt} duree={defi.duree} />
                             </div>
                         )}
                         <button
