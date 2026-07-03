@@ -53,7 +53,7 @@ function isChallenge(row: any): boolean {
 }
 
 function statutDefi(status: string): DefiRow["statut"] {
-    return status === "done" ? "terminé" : "en cours";
+    return (status === "finished" || status === "done") ? "terminé" : "en cours";
 }
 
 function resultatChallenge(row: any): ResultatChallenge {
