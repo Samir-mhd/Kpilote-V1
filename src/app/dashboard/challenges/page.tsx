@@ -153,13 +153,20 @@ export default function ChallengesPage() {
     // Countdown live + clôture automatique
     useEffect(() => {
         if (countdownRef.current) clearInterval(countdownRef.current);
-        if (!actif?.expiresAt) return;
+        if (!actif?.id || actif.status !== "running") return;
 
-        setCountdown(formatTempsRestant(actif.expiresAt));
+        // Si expiresAt est dans le passé (challenge ancien sans started_at),
+        // on repart de maintenant + duree pour ne pas clôturer immédiatement
+        const dureeMs     = (actif.duree ?? 30) * 60 * 1000;
+        const targetExpiry = actif.expiresAt > Date.now()
+            ? actif.expiresAt
+            : Date.now() + dureeMs;
+
+        setCountdown(formatTempsRestant(targetExpiry));
         setTermine(false);
 
         countdownRef.current = setInterval(async () => {
-            const remaining = actif.expiresAt - Date.now();
+            const remaining = targetExpiry - Date.now();
             if (remaining <= 0) {
                 clearInterval(countdownRef.current!);
                 setCountdown("0:00");
@@ -181,7 +188,7 @@ export default function ChallengesPage() {
                     setOnglet("historique");
                 }, 2000);
             } else {
-                setCountdown(formatTempsRestant(actif.expiresAt));
+                setCountdown(formatTempsRestant(targetExpiry));
             }
         }, 1000);
 
