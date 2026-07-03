@@ -84,16 +84,24 @@ export default function Dashboard() {
 
     // Countdown live pour la carte VS du défi
     const [defiCountdown, setDefiCountdown] = useState<string>("");
-    const defiIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const defiIntervalRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+    const defiExpiresAtRef  = useRef<number>(0); // valeur stable, jamais réinitialisée par les polls
 
     useEffect(() => {
         if (defiIntervalRef.current) clearInterval(defiIntervalRef.current);
-        if (!defisActif?.expiresAt || defisActif.status !== "running") {
+
+        if (!defisActif?.id || defisActif.status !== "running") {
             setDefiCountdown("");
+            defiExpiresAtRef.current = 0;
             return;
         }
+
+        // Capture expiresAt une seule fois par challenge (pas aux polls suivants)
+        // Si started_at est null, expiresAt = maintenant + duree → correct pour le 1er chargement
+        defiExpiresAtRef.current = defisActif.expiresAt;
+
         const tick = () => {
-            const r = defisActif.expiresAt - Date.now();
+            const r = defiExpiresAtRef.current - Date.now();
             if (r <= 0) {
                 setDefiCountdown("0:00");
                 clearInterval(defiIntervalRef.current!);
@@ -106,7 +114,9 @@ export default function Dashboard() {
         tick();
         defiIntervalRef.current = setInterval(tick, 1000);
         return () => { if (defiIntervalRef.current) clearInterval(defiIntervalRef.current); };
-    }, [defisActif?.id, defisActif?.expiresAt]);
+
+    // Dépend UNIQUEMENT de l'id — les polls qui changent expiresAt ne relancent pas le chrono
+    }, [defisActif?.id, defisActif?.status]);
 
     // Toast popup pour notifications entrantes + félicitations
     const [toast, setToast] = useState<{
