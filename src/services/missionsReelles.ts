@@ -1,5 +1,5 @@
 import { getObjectifsMensuels } from "@/services/objectifs";
-import { getVentesDuJour, getVentesDuMois } from "@/services/stats";
+import { getVentesDuMois } from "@/services/stats";
 import { getJoursTravail } from "@/services/planningService";
 import { calculerObjectifs, EtatObjectif } from "@/engine/objectifEngine";
 import { supabase } from "@/lib/supabase";
@@ -49,7 +49,7 @@ export type MissionComplete = {
 
 type VentesGetter = (id: string) => Promise<VenteSupabase[]>;
 
-async function calcul(conseillerId: string, annee: number, mois: number, ventesGetter: VentesGetter) {
+async function calcul(conseillerId: string, annee: number, mois: number, ventesGetter: VentesGetter = getVentesDuMois) {
     const [objectifs, ventes, joursTravail] = await Promise.all([
         getObjectifsMensuels(conseillerId) as Promise<ObjectifSupabase[]>,
         ventesGetter(conseillerId) as Promise<VenteSupabase[]>,
@@ -75,17 +75,22 @@ async function calcul(conseillerId: string, annee: number, mois: number, ventesG
 
 // ─── API publique ─────────────────────────────────────────────────────────────
 
-/** Vue simplifiée (dashboard principal) — ventes du JOUR uniquement, repart à 0 chaque matin */
+/**
+ * Vue simplifiée (dashboard principal) — cumul mensuel vs objectif mensuel.
+ * Se remet à 0 automatiquement au changement de mois (filtre created_at du mois en cours).
+ * Inclut les entrées cerebro_check (backdatées au 1er du mois) → dashboard mis à jour
+ * immédiatement après un reset + check.
+ */
 export async function getMissionsReelles(conseillerId: string) {
     const now = new Date();
-    const resultats = await calcul(conseillerId, now.getFullYear(), now.getMonth() + 1, getVentesDuJour);
+    const resultats = await calcul(conseillerId, now.getFullYear(), now.getMonth() + 1, getVentesDuMois);
 
     return resultats.map((m) => ({
-        produit: m.produit,
-        objectif: m.objectifJour,
-        realise: m.realise,
-        couleur: couleurProduit(m.produit),
-        message: m.message,
+        produit:  m.produit,
+        objectif: m.objectifMensuel,   // objectif mensuel total
+        realise:  m.realise,           // cumul du mois (incluant cerebro_check)
+        couleur:  couleurProduit(m.produit),
+        message:  m.message,
     }));
 }
 
