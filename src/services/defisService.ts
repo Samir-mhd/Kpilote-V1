@@ -194,7 +194,7 @@ export async function chargerClassementDefisEtChallenges(): Promise<StatsConseil
 export async function cloturerChallengesExpires(): Promise<void> {
     const { data } = await supabase
         .from("challenges")
-        .select("id, createur, adversaire, score_createur, score_adversaire, duree, created_at")
+        .select("id, createur, adversaire, score_createur, score_adversaire, duree, created_at, started_at")
         .in("status", ["pending", "running"]);
 
     if (!data?.length) return;

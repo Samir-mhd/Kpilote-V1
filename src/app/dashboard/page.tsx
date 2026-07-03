@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import HeroHeader from "@/components/dashboard/HeroHeader";
 import StatsBar from "@/components/dashboard/StatsBar";
@@ -81,6 +81,32 @@ export default function Dashboard() {
     const [invitAnim, setInvitAnim]      = useState(false);
     const [defiJustAccepte, setDefiJustAccepte] = useState(false);
     const [defiJustRecu,    setDefiJustRecu]    = useState(false);
+
+    // Countdown live pour la carte VS du défi
+    const [defiCountdown, setDefiCountdown] = useState<string>("");
+    const defiIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    useEffect(() => {
+        if (defiIntervalRef.current) clearInterval(defiIntervalRef.current);
+        if (!defisActif?.expiresAt || defisActif.status !== "running") {
+            setDefiCountdown("");
+            return;
+        }
+        const tick = () => {
+            const r = defisActif.expiresAt - Date.now();
+            if (r <= 0) {
+                setDefiCountdown("0:00");
+                clearInterval(defiIntervalRef.current!);
+            } else {
+                const m = Math.floor(r / 60000);
+                const s = Math.floor((r % 60000) / 1000);
+                setDefiCountdown(`${m}:${String(s).padStart(2, "0")}`);
+            }
+        };
+        tick();
+        defiIntervalRef.current = setInterval(tick, 1000);
+        return () => { if (defiIntervalRef.current) clearInterval(defiIntervalRef.current); };
+    }, [defisActif?.id, defisActif?.expiresAt]);
 
     // Toast popup pour notifications entrantes + félicitations
     const [toast, setToast] = useState<{
@@ -440,10 +466,14 @@ export default function Dashboard() {
                     <div className="relative">
                         <div className="flex items-center justify-between mb-6">
                             <p className="text-xs font-black uppercase tracking-[0.3em] text-white/60">⚔️ Défi en cours</p>
-                            <div className="rounded-2xl bg-white/10 px-4 py-2 text-center">
+                            <div className={`rounded-2xl px-4 py-2 text-center ${
+                                parseInt(defiCountdown) <= 5 ? "bg-red-500/30" : "bg-white/10"
+                            }`}>
                                 <p className="text-xs text-white/50">Temps restant</p>
-                                <p className="text-xl font-black tabular-nums">
-                                    {formatTempsRestant(defisActif.expiresAt)}
+                                <p className={`text-2xl font-black tabular-nums ${
+                                    parseInt(defiCountdown) <= 5 ? "text-red-300 animate-pulse" : "text-white"
+                                }`}>
+                                    {defiCountdown || "…"}
                                 </p>
                             </div>
                         </div>
