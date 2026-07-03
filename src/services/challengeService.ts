@@ -35,10 +35,14 @@ export async function chargerChallenge(
     const challenge = await getChallengeActif(conseillerId);
     if (!challenge) return null;
 
-    const createdAt = new Date(challenge.created_at).getTime();
-    const expiresAt = createdAt + (challenge.duree ?? 30) * 60 * 1000;
+    // started_at = quand le défi a démarré (acceptation ou création directe pour manager)
+    // Si absent (défi ancien), on utilise created_at comme fallback
+    const startMs  = challenge.started_at
+        ? new Date(challenge.started_at).getTime()
+        : new Date(challenge.created_at).getTime();
+    const expiresAt = startMs + (challenge.duree ?? 30) * 60 * 1000;
 
-    // Auto-clôture uniquement si le défi est RUNNING (pas pending en attente d'acceptation)
+    // Auto-clôture uniquement si RUNNING ET vraiment expiré depuis started_at
     if (challenge.status === "running" && Date.now() >= expiresAt) {
         await cloturerChallenge({ id: challenge.id });
         return null;

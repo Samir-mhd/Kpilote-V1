@@ -17,6 +17,9 @@ export async function creerChallenge(data: {
     duree: data.duree,
     raison: data.raison,
     status: data.statusInitial ?? "pending",
+    // started_at = now() pour les challenges "running" immédiatement (manager)
+    // Pour les défis "pending", started_at sera rempli à l'acceptation
+    ...(data.statusInitial === "running" && { started_at: new Date().toISOString() }),
   };
 
   if (data.objectif !== undefined) {

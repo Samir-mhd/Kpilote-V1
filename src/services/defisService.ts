@@ -201,9 +201,13 @@ export async function cloturerChallengesExpires(): Promise<void> {
 
     const now = Date.now();
     const expires = data.filter((c: any) => {
-        const createdAt = new Date(c.created_at).getTime();
-        const expiresAt = createdAt + (c.duree ?? 30) * 60 * 1000;
-        return now >= expiresAt;
+        // Utilise started_at si disponible, sinon created_at
+        const startMs  = c.started_at
+            ? new Date(c.started_at).getTime()
+            : new Date(c.created_at).getTime();
+        const expiresAt = startMs + (c.duree ?? 30) * 60 * 1000;
+        // N'expire que si running ET started_at renseigné (défi vraiment démarré)
+        return c.status === "running" && c.started_at && now >= expiresAt;
     });
 
     await Promise.all(expires.map((c: any) =>

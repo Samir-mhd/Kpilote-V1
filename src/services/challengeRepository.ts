@@ -12,14 +12,14 @@ export async function getInvitationsPendantes(conseillerId: string) {
     return data ?? [];
 }
 
-/** Accepter un défi → passe en "running". Réinitialise created_at à maintenant
- *  pour que le chrono parte de l'acceptation, pas de l'envoi du défi. */
+/** Accepter un défi → passe en "running".
+ *  started_at = maintenant → le chrono part de l'acceptation, pas de la création. */
 export async function accepterChallenge(id: string): Promise<void> {
     const { error } = await supabase
         .from("challenges")
         .update({
             status:     "running",
-            created_at: new Date().toISOString(), // chrono démarre à l'acceptation
+            started_at: new Date().toISOString(),
         })
         .eq("id", id);
     if (error) throw new Error(error.message);
@@ -113,7 +113,9 @@ export async function chargerDefisActifsManager(): Promise<DefiActifManager[]> {
         scoreCreateur:   c.score_createur ?? 0,
         scoreAdversaire: c.score_adversaire ?? 0,
         createdAt:       c.created_at,
-        expiresAt:       new Date(c.created_at).getTime() + (c.duree ?? 30) * 60 * 1000,
+        expiresAt:       (c.started_at
+            ? new Date(c.started_at).getTime()
+            : new Date(c.created_at).getTime()) + (c.duree ?? 30) * 60 * 1000,
         status:          c.status,
     }));
 }
