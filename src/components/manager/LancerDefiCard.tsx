@@ -8,6 +8,9 @@ type Conseiller = { id: string; prenom: string };
 type Props = { conseillers: Conseiller[] };
 
 const PRODUITS = ["Box", "Forfaits", "Téléphones", "McAfee", "Assurance"];
+
+// UUID fixe représentant le manager / KPILOTE (valide UUID v4, n'existe pas dans conseillers)
+const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
 const DUREES   = [15, 30, 45, 60];
 const VOLUMES  = [1, 2, 3, 4, 5];
 
@@ -64,7 +67,7 @@ export default function LancerDefiCard({ conseillers }: Props) {
                     return;
                 }
                 await creerChallenge({
-                    createur:  "manager",
+                    createur:  MANAGER_UUID,
                     adversaire: cible,
                     produit,
                     duree,

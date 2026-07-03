@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import { getChallengeActif, cloturerChallenge } from "./challengeRepository";
 
+const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
+
 export type ChallengeDashboard = {
     id: string;
     createdAt: string;
@@ -51,8 +53,11 @@ export async function chargerChallenge(
     const nomMap: Record<string, string> = {};
     (conseillers ?? []).forEach((c: any) => { nomMap[c.id] = c.nom; });
 
+    // Si le créateur est le manager (UUID fixe), le "challenge" vient de KPILOTE
     const adversaireNom =
-        challenge.createur === conseillerId
+        challenge.createur === MANAGER_UUID
+            ? "KPILOTE 🤖"
+            : challenge.createur === conseillerId
             ? (nomMap[challenge.adversaire] ?? "Adversaire")
             : (nomMap[challenge.createur] ?? "Adversaire");
 
