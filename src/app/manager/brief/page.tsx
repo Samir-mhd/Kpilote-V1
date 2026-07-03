@@ -2,6 +2,7 @@
 
 import CoachManagerCard from "@/components/manager/CoachManagerCard";
 import RecommandationsManager from "@/components/manager/RecommandationsManager";
+import LancerDefiCard from "@/components/manager/LancerDefiCard";
 
 import { useManagerDashboard } from "@/hooks/useManagerDashboard";
 import { construireAlertes } from "@/engine/managerAI/alertesEngine";
@@ -134,6 +135,18 @@ export default function BriefPage() {
                 </div>
 
             </div>
+
+            {/* Lancer un défi / challenge */}
+            {dashboard.classement.length >= 2 && (
+                <div className="mt-8">
+                    <LancerDefiCard
+                        conseillers={dashboard.classement.map(c => ({
+                            id: c.id,
+                            prenom: c.prenom,
+                        }))}
+                    />
+                </div>
+            )}
 
             {/* Intelligence observations */}
             {dashboard.intelligence.observations.length > 0 && (

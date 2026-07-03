@@ -7,6 +7,8 @@ export async function creerChallenge(data: {
   duree: number;
   raison: string;
   objectif?: number;
+  /** "pending" (défaut) ou "running" pour les challenges manager directs */
+  statusInitial?: "pending" | "running";
 }) {
   const payload: Record<string, unknown> = {
     createur: data.createur,
@@ -14,7 +16,7 @@ export async function creerChallenge(data: {
     produit: data.produit,
     duree: data.duree,
     raison: data.raison,
-    status: "pending",
+    status: data.statusInitial ?? "pending",
   };
 
   if (data.objectif !== undefined) {
