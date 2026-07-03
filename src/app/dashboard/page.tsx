@@ -23,6 +23,8 @@ import {
 import { chargerChallenge, formatTempsRestant, ChallengeDashboard } from "@/services/challengeService";
 import InitialesAvatar from "@/components/avatar/InitialesAvatar";
 
+const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
+
 type MissionDashboard = {
     produit: string;
     objectif: number;
@@ -77,6 +79,9 @@ export default function Dashboard() {
     const [invitations, setInvitations] = useState<any[]>([]);
     const [defisActif, setDefiActif]     = useState<ChallengeDashboard | null>(null);
     const [invitAnim, setInvitAnim]      = useState(false);
+
+    // Toast popup pour les notifications entrantes
+    const [toast, setToast] = useState<{ msg: string; type: "defi" | "challenge" } | null>(null);
 
     async function chargerMissions() {
         if (!conseillerId) return;
@@ -137,6 +142,45 @@ export default function Dashboard() {
         chargerDefis();
     }, [conseillerId]);
 
+    // Realtime : détecte tout nouveau challenge où le conseiller est adversaire
+    useEffect(() => {
+        if (!conseillerId) return;
+
+        const channel = supabase
+            .channel(`challenge-notif-${conseillerId}`)
+            .on(
+                "postgres_changes",
+                {
+                    event:  "INSERT",
+                    schema: "public",
+                    table:  "challenges",
+                    filter: `adversaire=eq.${conseillerId}`,
+                },
+                (payload: any) => {
+                    const row = payload.new;
+                    chargerDefis(); // Recharge invitations + actif
+
+                    if (row.status === "running" && row.createur === MANAGER_UUID) {
+                        // Challenge individuel lancé par le manager
+                        setToast({
+                            msg:  `🎯 Le manager vient de te lancer un challenge : ${row.produit} en ${row.duree} min !`,
+                            type: "challenge",
+                        });
+                    } else if (row.status === "pending") {
+                        // Défi entre conseillers
+                        setToast({
+                            msg:  `⚔️ Tu as reçu un défi sur ${row.produit} — ${row.duree} min !`,
+                            type: "defi",
+                        });
+                        setInvitAnim(true);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [conseillerId]);
+
     if (!morningCheckValidated) {
         return (
             <MorningCheck
@@ -188,6 +232,35 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-8">
+
+            {/* ── Toast notification challenge/défi ────────────────────── */}
+            {toast && (
+                <div
+                    className="fixed top-5 left-1/2 z-50 -translate-x-1/2"
+                    style={{ animation: "slideDown .35s ease" }}
+                >
+                    <div className={`flex items-center gap-4 rounded-2xl px-6 py-4 shadow-[0_8px_40px_rgba(0,0,0,.35)] ${
+                        toast.type === "challenge"
+                            ? "bg-gradient-to-r from-emerald-600 to-teal-600"
+                            : "bg-gradient-to-r from-violet-600 to-indigo-600"
+                    } text-white`}>
+                        <span className="text-2xl">{toast.type === "challenge" ? "🎯" : "⚔️"}</span>
+                        <p className="font-black text-sm">{toast.msg}</p>
+                        <button
+                            onClick={() => setToast(null)}
+                            className="ml-4 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-xs font-black hover:bg-white/30"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                    <style>{`
+                        @keyframes slideDown {
+                            from { opacity: 0; transform: translate(-50%, -20px); }
+                            to   { opacity: 1; transform: translate(-50%, 0); }
+                        }
+                    `}</style>
+                </div>
+            )}
 
             <HeroHeader
                 nom={nom}
