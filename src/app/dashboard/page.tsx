@@ -80,6 +80,7 @@ export default function Dashboard() {
     const [defisActif, setDefiActif]     = useState<ChallengeDashboard | null>(null);
     const [invitAnim, setInvitAnim]      = useState(false);
     const [defiJustAccepte, setDefiJustAccepte] = useState(false);
+    const [defiJustRecu,    setDefiJustRecu]    = useState(false);
 
     // Toast popup pour notifications entrantes + félicitations
     const [toast, setToast] = useState<{
@@ -118,25 +119,33 @@ export default function Dashboard() {
         } catch { /* silencieux */ }
     }
 
-    async function chargerDefis() {
+    async function chargerDefis(opts?: { blink?: "accepte" | "recu" }) {
         if (!conseillerId) return;
         try {
-            const [invits, actif] = await Promise.all([
-                getInvitationsPendantes(conseillerId),
-                chargerChallenge(conseillerId),
-            ]);
+            const invits = await getInvitationsPendantes(conseillerId).catch(() => []);
+            // Essaie plusieurs fois si le premier appel retourne null (délai de consistance DB)
+            let actif = await chargerChallenge(conseillerId).catch(() => null);
+            if (!actif) {
+                await new Promise(r => setTimeout(r, 600));
+                actif = await chargerChallenge(conseillerId).catch(() => null);
+            }
             setInvitations(invits);
             setDefiActif(actif);
             if (invits.length > 0) setInvitAnim(true);
+            if (opts?.blink === "accepte") {
+                setDefiJustAccepte(true);
+                setTimeout(() => setDefiJustAccepte(false), 6000);
+            }
+            if (opts?.blink === "recu" && actif) {
+                setDefiJustRecu(true);
+                setTimeout(() => setDefiJustRecu(false), 6000);
+            }
         } catch { /* silencieux */ }
     }
 
     async function handleAccepter(id: string) {
         await accepterChallenge(id);
-        await chargerDefis();
-        // Déclenche l'animation "clignotant" pendant 6 secondes
-        setDefiJustAccepte(true);
-        setTimeout(() => setDefiJustAccepte(false), 6000);
+        await chargerDefis({ blink: "accepte" });
     }
 
     async function handleRefuser(id: string) {
@@ -162,15 +171,17 @@ export default function Dashboard() {
                 filter: `adversaire=eq.${conseillerId}`,
             }, async (payload: any) => {
                 const row = payload.new;
-                await chargerDefis(); // await pour que la carte se charge avant l'affichage
 
                 if (row.status === "running" && row.createur === MANAGER_UUID) {
+                    // Challenge manager : charge la carte avec clignotement
+                    await chargerDefis({ blink: "recu" });
                     setToast({
                         msg:     `🎯 Challenge reçu du manager !`,
                         type:    "challenge",
                         details: { produit: row.produit, duree: row.duree, objectif: row.objectif ?? 0, adversaire: "Manager" },
                     });
                 } else if (row.status === "pending") {
+                    await chargerDefis();
                     setToast({
                         msg:     `⚔️ Défi reçu !`,
                         type:    "defi",
@@ -410,7 +421,7 @@ export default function Dashboard() {
             {/* ── Défi actif (une fois accepté = running) ─────────────── */}
             {defisActif && defisActif.status === "running" && (
                 <div className={`relative overflow-hidden rounded-[24px] bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700 p-7 text-white shadow-[0_12px_40px_rgba(109,40,217,.35)] transition-all ${
-                    defiJustAccepte ? "ring-4 ring-white/60 ring-offset-2 ring-offset-slate-50 animate-pulse" : ""
+                    (defiJustAccepte || defiJustRecu) ? "ring-4 ring-white/60 ring-offset-2 ring-offset-slate-50 animate-pulse" : ""
                 }`}>
                     <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
                     <div className="relative">
