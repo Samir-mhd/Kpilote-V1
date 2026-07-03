@@ -11,9 +11,9 @@ import { getPhotoUrl } from "@/services/photoService";
 
 const menus = [
     { label: "Accueil",       href: "/dashboard",              Icon: Home },
-    { label: "Résultats",     href: "/dashboard/resultats",     Icon: BarChart3 },
-    { label: "Challenges",    href: "/dashboard/challenges",    Icon: Swords },
     { label: "Classement",    href: "/dashboard/classement",    Icon: Trophy },
+    { label: "Mes objectifs", href: "/dashboard/resultats",     Icon: BarChart3 },
+    { label: "Challenges",    href: "/dashboard/challenges",    Icon: Swords },
     { label: "Notifications", href: "/dashboard/notifications", Icon: Bell },
     { label: "Coach IA",      href: "/dashboard/coach",         Icon: Brain },
     { label: "Profil",        href: "/dashboard/profil",        Icon: User },
