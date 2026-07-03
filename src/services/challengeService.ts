@@ -12,6 +12,7 @@ export type ChallengeDashboard = {
     produit: string;
     raison: string;
     duree: number;
+    objectif: number;
     status: string;
     scoreConseiller: number;
     scoreAdversaire: number;
@@ -80,6 +81,7 @@ export async function chargerChallenge(
         produit:        challenge.produit,
         raison:         challenge.raison ?? "",
         duree:          challenge.duree ?? 30,
+        objectif:       challenge.objectif ?? 0,
         status:         challenge.status,
         scoreConseiller,
         scoreAdversaire,

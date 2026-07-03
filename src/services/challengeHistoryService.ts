@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase";
 
+const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
+
 export type HistoriqueItem = {
     id: string;
     nomMoi: string;
@@ -41,10 +43,13 @@ export async function chargerHistoriqueChallenges(
     return data.map((c: any) => {
         const isCréateur = c.createur === conseillerId;
 
+        const autreId = isCréateur ? c.adversaire : c.createur;
         const nomAdversaire =
-            nomMap[isCréateur ? c.adversaire : c.createur] ??
-            (isCréateur ? c.adversaire_nom : c.createur_nom) ??
-            "Inconnu";
+            autreId === MANAGER_UUID
+                ? "Manager"
+                : nomMap[autreId] ??
+                  (isCréateur ? c.adversaire_nom : c.createur_nom) ??
+                  "Inconnu";
 
         const scoreMoi = isCréateur ? (c.score_createur ?? 0) : (c.score_adversaire ?? 0);
         const scoreAdversaire = isCréateur ? (c.score_adversaire ?? 0) : (c.score_createur ?? 0);

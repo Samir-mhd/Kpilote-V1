@@ -80,8 +80,12 @@ export default function Dashboard() {
     const [defisActif, setDefiActif]     = useState<ChallengeDashboard | null>(null);
     const [invitAnim, setInvitAnim]      = useState(false);
 
-    // Toast popup pour les notifications entrantes
-    const [toast, setToast] = useState<{ msg: string; type: "defi" | "challenge" } | null>(null);
+    // Toast popup pour notifications entrantes + félicitations
+    const [toast, setToast] = useState<{
+        msg: string;
+        type: "defi" | "challenge" | "congrats";
+        details?: { produit: string; duree: number; objectif: number; adversaire: string };
+    } | null>(null);
 
     async function chargerMissions() {
         if (!conseillerId) return;
@@ -142,40 +146,40 @@ export default function Dashboard() {
         chargerDefis();
     }, [conseillerId]);
 
-    // Realtime : détecte tout nouveau challenge où le conseiller est adversaire
+    // Realtime : INSERT (nouveau challenge reçu) + UPDATE (score mis à jour par l'adversaire)
     useEffect(() => {
         if (!conseillerId) return;
 
         const channel = supabase
-            .channel(`challenge-notif-${conseillerId}`)
-            .on(
-                "postgres_changes",
-                {
-                    event:  "INSERT",
-                    schema: "public",
-                    table:  "challenges",
-                    filter: `adversaire=eq.${conseillerId}`,
-                },
-                (payload: any) => {
-                    const row = payload.new;
-                    chargerDefis(); // Recharge invitations + actif
+            .channel(`challenge-rt-${conseillerId}`)
+            // Nouveau challenge reçu (conseiller est l'adversaire)
+            .on("postgres_changes", {
+                event: "INSERT", schema: "public", table: "challenges",
+                filter: `adversaire=eq.${conseillerId}`,
+            }, async (payload: any) => {
+                const row = payload.new;
+                await chargerDefis(); // await pour que la carte se charge avant l'affichage
 
-                    if (row.status === "running" && row.createur === MANAGER_UUID) {
-                        // Challenge individuel lancé par le manager
-                        setToast({
-                            msg:  `🎯 Le manager vient de te lancer un challenge : ${row.produit} en ${row.duree} min !`,
-                            type: "challenge",
-                        });
-                    } else if (row.status === "pending") {
-                        // Défi entre conseillers
-                        setToast({
-                            msg:  `⚔️ Tu as reçu un défi sur ${row.produit} — ${row.duree} min !`,
-                            type: "defi",
-                        });
-                        setInvitAnim(true);
-                    }
+                if (row.status === "running" && row.createur === MANAGER_UUID) {
+                    setToast({
+                        msg:     `🎯 Challenge reçu du manager !`,
+                        type:    "challenge",
+                        details: { produit: row.produit, duree: row.duree, objectif: row.objectif ?? 0, adversaire: "Manager" },
+                    });
+                } else if (row.status === "pending") {
+                    setToast({
+                        msg:     `⚔️ Défi reçu !`,
+                        type:    "defi",
+                        details: { produit: row.produit, duree: row.duree, objectif: row.objectif ?? 0, adversaire: row.createur_nom ?? "Un collègue" },
+                    });
+                    setInvitAnim(true);
                 }
-            )
+            })
+            // Mise à jour du score de l'adversaire (défi entre conseillers)
+            .on("postgres_changes", {
+                event: "UPDATE", schema: "public", table: "challenges",
+                filter: `createur=eq.${conseillerId}`,
+            }, async () => { await chargerDefis(); })
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
@@ -228,35 +232,117 @@ export default function Dashboard() {
                 totalVentesJour: nouveauTotal,
             })
         );
+
+        // ── Mise à jour du score du challenge/défi actif ──────────────
+        if (defisActif && defisActif.status === "running" &&
+            defisActif.produit.toLowerCase() === produit.toLowerCase()) {
+
+            const isCreateur   = defisActif.createurId === conseillerId;
+            const scoreField   = isCreateur ? "score_createur" : "score_adversaire";
+            const nouveauScore = defisActif.scoreConseiller + 1;
+
+            await supabase
+                .from("challenges")
+                .update({ [scoreField]: nouveauScore })
+                .eq("id", defisActif.id);
+
+            // Met à jour l'état local immédiatement (sans attendre le Realtime)
+            setDefiActif(prev => prev ? { ...prev, scoreConseiller: nouveauScore } : null);
+
+            // Auto-clôture si objectif atteint
+            if (defisActif.objectif > 0 && nouveauScore >= defisActif.objectif) {
+                await supabase
+                    .from("challenges")
+                    .update({ status: "finished" })
+                    .eq("id", defisActif.id);
+
+                setDefiActif(null);
+                setToast({
+                    msg:  `🏆 Challenge réussi !`,
+                    type: "congrats",
+                    details: {
+                        produit:   defisActif.produit,
+                        duree:     defisActif.duree,
+                        objectif:  defisActif.objectif,
+                        adversaire: defisActif.adversaire,
+                    },
+                });
+            }
+        }
     }
 
     return (
         <div className="space-y-8">
 
-            {/* ── Toast notification challenge/défi ────────────────────── */}
+            {/* ── Toast popup challenge/défi/félicitations ─────────────── */}
             {toast && (
                 <div
-                    className="fixed top-5 left-1/2 z-50 -translate-x-1/2"
-                    style={{ animation: "slideDown .35s ease" }}
+                    className="fixed inset-x-4 top-4 z-50 mx-auto max-w-sm"
+                    style={{ animation: "slideDown .4s cubic-bezier(.34,1.56,.64,1)" }}
                 >
-                    <div className={`flex items-center gap-4 rounded-2xl px-6 py-4 shadow-[0_8px_40px_rgba(0,0,0,.35)] ${
-                        toast.type === "challenge"
-                            ? "bg-gradient-to-r from-emerald-600 to-teal-600"
-                            : "bg-gradient-to-r from-violet-600 to-indigo-600"
+                    <div className={`relative overflow-hidden rounded-[24px] p-6 shadow-[0_16px_56px_rgba(0,0,0,.45)] ${
+                        toast.type === "congrats"  ? "bg-gradient-to-br from-amber-500 to-orange-600"
+                        : toast.type === "challenge" ? "bg-gradient-to-br from-emerald-600 to-teal-700"
+                        :                             "bg-gradient-to-br from-violet-600 to-indigo-700"
                     } text-white`}>
-                        <span className="text-2xl">{toast.type === "challenge" ? "🎯" : "⚔️"}</span>
-                        <p className="font-black text-sm">{toast.msg}</p>
-                        <button
-                            onClick={() => setToast(null)}
-                            className="ml-4 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-xs font-black hover:bg-white/30"
-                        >
-                            ✕
-                        </button>
+
+                        {/* Halo déco */}
+                        <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+
+                        <div className="relative">
+                            {/* Header */}
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-3xl">
+                                        {toast.type === "congrats" ? "🏆" : toast.type === "challenge" ? "🎯" : "⚔️"}
+                                    </span>
+                                    <div>
+                                        <p className="text-xs font-black uppercase tracking-[0.25em] text-white/60">
+                                            {toast.type === "congrats" ? "Challenge réussi" : toast.type === "challenge" ? "Challenge reçu" : "Défi reçu"}
+                                        </p>
+                                        <p className="text-xl font-black text-white leading-tight">{toast.msg}</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setToast(null)}
+                                    className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-sm font-black hover:bg-white/25 transition-all">
+                                    ✕
+                                </button>
+                            </div>
+
+                            {/* Détails */}
+                            {toast.details && (
+                                <div className="mt-4 grid grid-cols-3 gap-2">
+                                    <div className="rounded-xl bg-white/15 px-3 py-2.5 text-center">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-white/60">Produit</p>
+                                        <p className="mt-0.5 text-sm font-black">{toast.details.produit}</p>
+                                    </div>
+                                    {toast.details.objectif > 0 && (
+                                        <div className="rounded-xl bg-white/15 px-3 py-2.5 text-center">
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-white/60">Objectif</p>
+                                            <p className="mt-0.5 text-sm font-black">{toast.details.objectif} vente{toast.details.objectif > 1 ? "s" : ""}</p>
+                                        </div>
+                                    )}
+                                    <div className="rounded-xl bg-white/15 px-3 py-2.5 text-center">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-white/60">Durée</p>
+                                        <p className="mt-0.5 text-sm font-black">{toast.details.duree} min</p>
+                                    </div>
+                                    {toast.details.adversaire && (
+                                        <div className="col-span-3 rounded-xl bg-white/15 px-3 py-2.5 text-center">
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-white/60">
+                                                {toast.type === "congrats" ? "Proposé par" : "De la part de"}
+                                            </p>
+                                            <p className="mt-0.5 text-sm font-black">{toast.details.adversaire}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
+
                     <style>{`
                         @keyframes slideDown {
-                            from { opacity: 0; transform: translate(-50%, -20px); }
-                            to   { opacity: 1; transform: translate(-50%, 0); }
+                            from { opacity: 0; transform: translateY(-24px) scale(.95); }
+                            to   { opacity: 1; transform: translateY(0) scale(1); }
                         }
                     `}</style>
                 </div>
