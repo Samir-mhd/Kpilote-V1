@@ -6,6 +6,7 @@ import { construireAlertes } from "@/engine/managerAI/alertesEngine";
 import { PRODUITS_ORDRE } from "@/utils/produits";
 import { Periode, PERIODE_LABELS, proratiserObjectif, couleurTaux } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
+import { getObjectifsBoutique } from "@/services/objectifs";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { getPhotosByIds } from "@/services/photoService";
 
@@ -22,10 +23,26 @@ function dateAujourdhui() {
 
 export default function ManagerDashboard() {
     const { dashboard, loading, refresh } = useManagerDashboard();
-    const [periode, setPeriode]   = useState<Periode>("mois");
-    const [kpiData, setKpiData]   = useState<ConseillerStats[]>([]);
-    const [kpiLoad, setKpiLoad]   = useState(false);
-    const [photos, setPhotos]     = useState<Record<string, string | null>>({});
+    const [periode, setPeriode]     = useState<Periode>("mois");
+    const [kpiData, setKpiData]     = useState<ConseillerStats[]>([]);
+    const [kpiLoad, setKpiLoad]     = useState(false);
+    const [photos, setPhotos]       = useState<Record<string, string | null>>({});
+    // Objectifs mensuels configurés dans manager/objectifs (table objectifs_boutique)
+    const [objMensuels, setObjMensuels] = useState<Record<string, number>>({});
+
+    // Charge les objectifs boutique (une seule fois, pas dépendant de la période)
+    useEffect(() => {
+        getObjectifsBoutique()
+            .then(rows => {
+                const map: Record<string, number> = {};
+                rows.forEach((r: any) => {
+                    const code = r.produits?.code;
+                    if (code) map[code] = r.objectif ?? 0;
+                });
+                setObjMensuels(map);
+            })
+            .catch(() => {});
+    }, []);
 
     useEffect(() => {
         setKpiLoad(true);
@@ -38,10 +55,10 @@ export default function ManagerDashboard() {
             .finally(() => setKpiLoad(false));
     }, [periode]);
 
-    // Totaux boutique par produit
+    // Totaux boutique : realise = somme des ventes conseillers, objectif = objectifs_boutique proratisés
     const boutiqueTotaux = PRODUITS_ORDRE.map(p => {
         const realise  = kpiData.reduce((t, c) => t + c.produits[p.key], 0);
-        const objectif = Math.round(kpiData.reduce((t, c) => t + proratiserObjectif(c.objectifs[p.key], periode), 0));
+        const objectif = Math.round(proratiserObjectif(objMensuels[p.code] ?? 0, periode));
         const pct      = objectif > 0 ? Math.min(Math.round((realise / objectif) * 100), 100) : 0;
         const ct       = couleurTaux(realise, objectif);
         return { ...p, realise, objectif, pct, ct };
