@@ -15,6 +15,13 @@ import { getMissionsReelles } from "@/services/missionsReelles";
 import { analyserDashboard } from "@/engine/contextEngine";
 import { supabase } from "@/lib/supabase";
 import { checkForceActive, clearForceCheck } from "@/services/resetService";
+import {
+    getInvitationsPendantes,
+    accepterChallenge,
+    refuserChallenge,
+} from "@/services/challengeRepository";
+import { chargerChallenge, formatTempsRestant, ChallengeDashboard } from "@/services/challengeService";
+import InitialesAvatar from "@/components/avatar/InitialesAvatar";
 
 type MissionDashboard = {
     produit: string;
@@ -66,6 +73,11 @@ export default function Dashboard() {
     const [missions, setMissions] = useState<MissionDashboard[]>([]);
     const [rang, setRang] = useState(0);
 
+    // Défis : invitations reçues + défi actif
+    const [invitations, setInvitations] = useState<any[]>([]);
+    const [defisActif, setDefiActif]     = useState<ChallengeDashboard | null>(null);
+    const [invitAnim, setInvitAnim]      = useState(false);
+
     async function chargerMissions() {
         if (!conseillerId) return;
         const data = await getMissionsReelles(conseillerId);
@@ -96,9 +108,33 @@ export default function Dashboard() {
         } catch { /* silencieux */ }
     }
 
+    async function chargerDefis() {
+        if (!conseillerId) return;
+        try {
+            const [invits, actif] = await Promise.all([
+                getInvitationsPendantes(conseillerId),
+                chargerChallenge(conseillerId),
+            ]);
+            setInvitations(invits);
+            setDefiActif(actif);
+            if (invits.length > 0) setInvitAnim(true);
+        } catch { /* silencieux */ }
+    }
+
+    async function handleAccepter(id: string) {
+        await accepterChallenge(id);
+        await chargerDefis();
+    }
+
+    async function handleRefuser(id: string) {
+        await refuserChallenge(id);
+        setInvitations(prev => prev.filter(i => i.id !== id));
+    }
+
     useEffect(() => {
         chargerMissions();
         chargerRang();
+        chargerDefis();
     }, [conseillerId]);
 
     if (!morningCheckValidated) {
@@ -160,6 +196,93 @@ export default function Dashboard() {
                 progression={tauxGlobal}
                 rang={rang}
             />
+
+            {/* ── Invitations défi reçues ──────────────────────────────── */}
+            {invitations.map((inv) => (
+                <div
+                    key={inv.id}
+                    className={`relative overflow-hidden rounded-[24px] border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-indigo-50 p-6 shadow-[0_4px_24px_rgba(109,40,217,.15)] transition-all ${invitAnim ? "animate-pulse" : ""}`}
+                    onAnimationEnd={() => setInvitAnim(false)}
+                >
+                    <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-violet-400/10 blur-2xl pointer-events-none" />
+                    <div className="relative">
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-2xl">
+                                    ⚔️
+                                </div>
+                                <div>
+                                    <p className="text-xs font-black uppercase tracking-[0.25em] text-violet-500 mb-1">
+                                        Défi reçu
+                                    </p>
+                                    <p className="font-black text-slate-900">
+                                        {inv.raison || `Un défi sur ${inv.produit} t'a été lancé !`}
+                                    </p>
+                                    <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
+                                        <span>📦 {inv.produit}</span>
+                                        <span>⏱ {inv.duree} min</span>
+                                        {inv.objectif > 0 && <span>🎯 {inv.objectif} vente{inv.objectif > 1 ? "s" : ""}</span>}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex gap-2 flex-shrink-0">
+                                <button
+                                    onClick={() => handleRefuser(inv.id)}
+                                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-500 transition-all hover:border-red-300 hover:text-red-500"
+                                >
+                                    Refuser
+                                </button>
+                                <button
+                                    onClick={() => handleAccepter(inv.id)}
+                                    className="rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2 text-sm font-black text-white shadow-lg transition-all hover:scale-[1.02]"
+                                >
+                                    Accepter →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ))}
+
+            {/* ── Défi actif (une fois accepté) ───────────────────────── */}
+            {defisActif && (
+                <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700 p-7 text-white shadow-[0_12px_40px_rgba(109,40,217,.35)]">
+                    <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-6">
+                            <p className="text-xs font-black uppercase tracking-[0.3em] text-white/60">⚔️ Défi en cours</p>
+                            <div className="rounded-2xl bg-white/10 px-4 py-2 text-center">
+                                <p className="text-xs text-white/50">Temps restant</p>
+                                <p className="text-xl font-black tabular-nums">
+                                    {formatTempsRestant(defisActif.expiresAt)}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-4">
+                            <div className="flex flex-1 flex-col items-center gap-2">
+                                <InitialesAvatar nom={nom} size={52} />
+                                <p className="font-black text-white">{nom}</p>
+                                <p className="text-xs text-white/50">Toi</p>
+                                <p className="text-5xl font-black">{defisActif.scoreConseiller}</p>
+                            </div>
+                            <div className="flex flex-col items-center justify-center pt-2 flex-shrink-0 px-4">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-2xl">⚔️</div>
+                                <p className="mt-2 text-xs font-black uppercase tracking-widest text-white/40">VS</p>
+                                <p className="mt-2 text-xs text-white/50">{defisActif.produit}</p>
+                            </div>
+                            <div className="flex flex-1 flex-col items-center gap-2">
+                                <InitialesAvatar nom={defisActif.adversaire} size={52} />
+                                <p className="font-black text-white">{defisActif.adversaire}</p>
+                                <p className="text-xs text-white/50">Adversaire</p>
+                                <p className="text-5xl font-black">{defisActif.scoreAdversaire}</p>
+                            </div>
+                        </div>
+                        <div className="mt-5 rounded-2xl bg-white/10 px-5 py-3">
+                            <p className="text-sm text-white/70">{defisActif.message}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <StatsBar
                 ventes={realiseGlobal}

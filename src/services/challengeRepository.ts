@@ -1,5 +1,35 @@
 import { supabase } from "@/lib/supabase";
 
+/** Invitations en attente reçues par le conseiller (il est l'adversaire). */
+export async function getInvitationsPendantes(conseillerId: string) {
+    const { data, error } = await supabase
+        .from("challenges")
+        .select("*")
+        .eq("adversaire", conseillerId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+}
+
+/** Accepter un défi → passe en "running". */
+export async function accepterChallenge(id: string): Promise<void> {
+    const { error } = await supabase
+        .from("challenges")
+        .update({ status: "running" })
+        .eq("id", id);
+    if (error) throw new Error(error.message);
+}
+
+/** Refuser un défi → supprime la ligne. */
+export async function refuserChallenge(id: string): Promise<void> {
+    const { error } = await supabase
+        .from("challenges")
+        .delete()
+        .eq("id", id);
+    if (error) throw new Error(error.message);
+}
+
 export async function getChallengeActif(conseillerId: string) {
     const { data, error } = await supabase
         .from("challenges")

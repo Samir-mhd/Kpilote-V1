@@ -1,5 +1,5 @@
 import { getObjectifsMensuels } from "@/services/objectifs";
-import { getVentesDuMois } from "@/services/stats";
+import { getVentesDuJour, getVentesDuMois } from "@/services/stats";
 import { getJoursTravail } from "@/services/planningService";
 import { calculerObjectifs, EtatObjectif } from "@/engine/objectifEngine";
 import { supabase } from "@/lib/supabase";
@@ -76,22 +76,43 @@ async function calcul(conseillerId: string, annee: number, mois: number, ventesG
 // ─── API publique ─────────────────────────────────────────────────────────────
 
 /**
- * Vue simplifiée (dashboard principal) — cumul mensuel vs objectif mensuel.
- * Se remet à 0 automatiquement au changement de mois (filtre created_at du mois en cours).
- * Inclut les entrées cerebro_check (backdatées au 1er du mois) → dashboard mis à jour
- * immédiatement après un reset + check.
+ * Vue simplifiée (dashboard principal) :
+ * - objectif = objectifJour calculé depuis le cumul mensuel + jours restants
+ *   → adapte la cible en fonction de ce qui est déjà réalisé ce mois
+ * - realise = ventes d'AUJOURD'HUI uniquement → repart à 0 chaque matin
+ *
+ * Cela permet à Julie de commencer à 0 chaque jour, avec une cible journalière
+ * qui intègre les jours précédents et les jours restants.
  */
 export async function getMissionsReelles(conseillerId: string) {
     const now = new Date();
-    const resultats = await calcul(conseillerId, now.getFullYear(), now.getMonth() + 1, getVentesDuMois);
+    const annee = now.getFullYear();
+    const mois  = now.getMonth() + 1;
 
-    return resultats.map((m) => ({
-        produit:  m.produit,
-        objectif: m.objectifMensuel,   // objectif mensuel total
-        realise:  m.realise,           // cumul du mois (incluant cerebro_check)
-        couleur:  couleurProduit(m.produit),
-        message:  m.message,
-    }));
+    // Le moteur utilise le cumul mensuel pour calculer objectifJour correctement
+    const [resultats, ventesJour] = await Promise.all([
+        calcul(conseillerId, annee, mois, getVentesDuMois),
+        getVentesDuJour(conseillerId),
+    ]);
+
+    // Index des ventes d'aujourd'hui par code produit
+    const realiseJour: Record<string, number> = {};
+    (ventesJour as any[]).forEach((v) => {
+        const p = Array.isArray(v.produits) ? v.produits[0] : v.produits;
+        if (p?.code) realiseJour[p.code] = (realiseJour[p.code] ?? 0) + (v.quantite ?? 1);
+    });
+
+    return resultats.map((m) => {
+        // Normalise le nom produit en code : "Téléphones" → "telephones"
+        const code = m.produit.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+        return {
+            produit:  m.produit,
+            objectif: m.objectifJour,         // pace journalière calculée depuis le cumul mensuel
+            realise:  realiseJour[code] ?? 0, // ventes d'aujourd'hui = 0 au début de chaque journée
+            couleur:  couleurProduit(m.produit),
+            message:  m.message,
+        };
+    });
 }
 
 /** Vue complète (page Résultats : projections, état, historique) — ventes du MOIS entier */
