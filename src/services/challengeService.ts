@@ -35,18 +35,19 @@ export async function chargerChallenge(
     const challenge = await getChallengeActif(conseillerId);
     if (!challenge) return null;
 
-    // started_at = quand le défi a démarré (acceptation ou création directe pour manager)
-    // Si absent (défi ancien), on utilise created_at comme fallback
-    const startMs  = challenge.started_at
+    // started_at = moment du vrai démarrage (acceptation ou lancement direct manager)
+    // Si absent ou si created_at > il y a duree minutes → on considère que ça vient de démarrer
+    const dureeMs  = (challenge.duree ?? 30) * 60 * 1000;
+    const startRef = challenge.started_at
         ? new Date(challenge.started_at).getTime()
-        : new Date(challenge.created_at).getTime();
-    const expiresAt = startMs + (challenge.duree ?? 30) * 60 * 1000;
+        : Date.now(); // si pas encore défini → part de maintenant (ne jamais expirer au 1er chargement)
+    const expiresAt = startRef + dureeMs;
 
-    // Auto-clôture uniquement si RUNNING ET vraiment expiré depuis started_at
-    if (challenge.status === "running" && Date.now() >= expiresAt) {
-        await cloturerChallenge({ id: challenge.id });
-        return null;
-    }
+    // NE PAS auto-clôturer ici : c'est le rôle du countdown UI et de cloturerChallengesExpires.
+    // On laisse simplement passer pour afficher la carte. La clôture sera gérée par :
+    //   1. Le countdown timer dans challenges/page.tsx
+    //   2. handleSale quand le score atteint l'objectif
+    //   3. cloturerChallengesExpires (appelé par le manager toutes les 30s)
 
     // Charge les noms depuis la table conseillers (adversaire_nom / createur_nom n'existent pas)
     const ids = [challenge.createur, challenge.adversaire].filter(Boolean);

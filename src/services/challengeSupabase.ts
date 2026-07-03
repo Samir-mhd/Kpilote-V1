@@ -28,9 +28,9 @@ export async function creerChallenge(data: {
 
   let result = await supabase.from("challenges").insert(payload).select().single();
 
-  // Si la colonne objectif n'existe pas encore, on réessaie sans elle
-  if (result.error?.message?.includes("objectif")) {
-    const { objectif: _o, ...payloadSans } = payload;
+  // Fallback si objectif ou started_at absent du schema cache
+  if (result.error?.message?.includes("objectif") || result.error?.message?.includes("started_at")) {
+    const { objectif: _o, started_at: _s, ...payloadSans } = payload;
     result = await supabase.from("challenges").insert(payloadSans).select().single();
   }
 

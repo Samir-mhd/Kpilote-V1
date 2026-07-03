@@ -13,16 +13,27 @@ export async function getInvitationsPendantes(conseillerId: string) {
 }
 
 /** Accepter un défi → passe en "running".
- *  started_at = maintenant → le chrono part de l'acceptation, pas de la création. */
+ *  Essaie de setter started_at (nécessite la colonne + schema cache rechargé).
+ *  Fallback sans started_at si la colonne n'est pas reconnue. */
 export async function accepterChallenge(id: string): Promise<void> {
+    // Tentative avec started_at
     const { error } = await supabase
         .from("challenges")
-        .update({
-            status:     "running",
-            started_at: new Date().toISOString(),
-        })
+        .update({ status: "running", started_at: new Date().toISOString() })
         .eq("id", id);
-    if (error) throw new Error(error.message);
+
+    if (error) {
+        // Schema cache pas à jour → fallback sans started_at
+        if (error.message?.includes("started_at") || error.message?.includes("schema")) {
+            const { error: e2 } = await supabase
+                .from("challenges")
+                .update({ status: "running" })
+                .eq("id", id);
+            if (e2) throw new Error(e2.message);
+        } else {
+            throw new Error(error.message);
+        }
+    }
 }
 
 /** Refuser un défi → supprime la ligne. */
