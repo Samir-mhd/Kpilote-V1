@@ -96,9 +96,12 @@ export default function Dashboard() {
             return;
         }
 
-        // Capture expiresAt une seule fois par challenge (pas aux polls suivants)
-        // Si started_at est null, expiresAt = maintenant + duree → correct pour le 1er chargement
-        defiExpiresAtRef.current = defisActif.expiresAt;
+        // Si expiresAt est déjà dans le passé (challenge ancien sans started_at),
+        // on repart de maintenant + duree pour que le chrono soit toujours valide
+        const dureeMs = (defisActif.duree ?? 30) * 60 * 1000;
+        defiExpiresAtRef.current = defisActif.expiresAt > Date.now()
+            ? defisActif.expiresAt
+            : Date.now() + dureeMs;
 
         const tick = () => {
             const r = defiExpiresAtRef.current - Date.now();
