@@ -159,21 +159,20 @@ export default function Dashboard() {
         chargerDefis();
     }, [conseillerId]);
 
-    // Realtime : INSERT (nouveau challenge reçu) + UPDATE (score mis à jour par l'adversaire)
+    // Realtime : toutes les modifications sur challenges impliquant ce conseiller
     useEffect(() => {
         if (!conseillerId) return;
 
         const channel = supabase
             .channel(`challenge-rt-${conseillerId}`)
-            // Nouveau challenge reçu (conseiller est l'adversaire)
+
+            // INSERT : nouveau challenge reçu (je suis l'adversaire)
             .on("postgres_changes", {
                 event: "INSERT", schema: "public", table: "challenges",
                 filter: `adversaire=eq.${conseillerId}`,
             }, async (payload: any) => {
                 const row = payload.new;
-
                 if (row.status === "running" && row.createur === MANAGER_UUID) {
-                    // Challenge manager : charge la carte avec clignotement
                     await chargerDefis({ blink: "recu" });
                     setToast({
                         msg:     `🎯 Challenge reçu du manager !`,
@@ -185,19 +184,33 @@ export default function Dashboard() {
                     setToast({
                         msg:     `⚔️ Défi reçu !`,
                         type:    "defi",
-                        details: { produit: row.produit, duree: row.duree, objectif: row.objectif ?? 0, adversaire: row.createur_nom ?? "Un collègue" },
+                        details: { produit: row.produit, duree: row.duree, objectif: row.objectif ?? 0, adversaire: "" },
                     });
                     setInvitAnim(true);
                 }
             })
-            // Mise à jour du score de l'adversaire (défi entre conseillers)
+
+            // UPDATE créateur : acceptation, score adversaire, clôture — vu par le créateur
             .on("postgres_changes", {
                 event: "UPDATE", schema: "public", table: "challenges",
                 filter: `createur=eq.${conseillerId}`,
             }, async () => { await chargerDefis(); })
+
+            // UPDATE adversaire : score créateur mis à jour, clôture — vu par l'adversaire
+            .on("postgres_changes", {
+                event: "UPDATE", schema: "public", table: "challenges",
+                filter: `adversaire=eq.${conseillerId}`,
+            }, async () => { await chargerDefis(); })
+
             .subscribe();
 
-        return () => { supabase.removeChannel(channel); };
+        // Polling de sécurité toutes les 30s (fallback si Realtime rate un event)
+        const poll = setInterval(() => { chargerDefis(); }, 30_000);
+
+        return () => {
+            supabase.removeChannel(channel);
+            clearInterval(poll);
+        };
     }, [conseillerId]);
 
     if (!morningCheckValidated) {

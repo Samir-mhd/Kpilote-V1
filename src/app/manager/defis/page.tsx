@@ -15,6 +15,7 @@ import {
     DefiActifManager,
     cloturerChallenge,
 } from "@/services/challengeRepository";
+import { supabase } from "@/lib/supabase";
 import { formatTempsRestant } from "@/services/challengeService";
 import InitialesAvatar from "@/components/avatar/InitialesAvatar";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
@@ -183,8 +184,22 @@ export default function DefisPage() {
 
     useEffect(() => {
         charger();
-        const interval = setInterval(charger, 60_000);
-        return () => clearInterval(interval);
+
+        // Realtime : toute modification sur challenges → recharge immédiatement
+        const channel = supabase
+            .channel("manager-defis-rt")
+            .on("postgres_changes", {
+                event: "*", schema: "public", table: "challenges",
+            }, () => { charger(); })
+            .subscribe();
+
+        // Polling de sécurité toutes les 30s
+        const poll = setInterval(charger, 30_000);
+
+        return () => {
+            supabase.removeChannel(channel);
+            clearInterval(poll);
+        };
     }, []);
 
     if (loading) {
