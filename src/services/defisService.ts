@@ -57,7 +57,7 @@ function statutDefi(status: string): DefiRow["statut"] {
 }
 
 function resultatChallenge(row: any): ResultatChallenge {
-    if (row.status !== "done") return "en cours";
+    if (row.status !== "finished" && row.status !== "done") return "en cours";
     return row.vainqueur === row.createur ? "réussi" : "échoué";
 }
 
@@ -71,7 +71,19 @@ async function tousLesChallenges(): Promise<any[]> {
         .limit(100);
 
     if (error) throw err(error, "challenges");
-    return data ?? [];
+    if (!data?.length) return [];
+
+    // Charge les vrais noms depuis conseillers (adversaire_nom / createur_nom absents en base)
+    const ids = [...new Set(data.flatMap((c: any) => [c.createur, c.adversaire].filter(Boolean)))];
+    const { data: cons } = await supabase.from("conseillers").select("id, nom").in("id", ids);
+    const nomMap: Record<string, string> = {};
+    (cons ?? []).forEach((c: any) => { nomMap[c.id] = c.nom; });
+
+    return data.map((c: any) => ({
+        ...c,
+        createur_nom:  nomMap[c.createur]  ?? c.createur_nom  ?? "?",
+        adversaire_nom: nomMap[c.adversaire] ?? c.adversaire_nom ?? "?",
+    }));
 }
 
 // ─── API publique ──────────────────────────────────────────────────────────────
@@ -141,7 +153,7 @@ export async function chargerClassementDefisEtChallenges(): Promise<StatsConseil
     }
 
     rows.forEach((row) => {
-        const termine = row.status === "done";
+        const termine = row.status === "finished" || row.status === "done";
 
         if (isChallenge(row)) {
             const c = getOrCreate(row.createur, row.createur_nom);

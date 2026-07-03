@@ -244,8 +244,8 @@ export default function Dashboard() {
                 </div>
             ))}
 
-            {/* ── Défi actif (une fois accepté) ───────────────────────── */}
-            {defisActif && (
+            {/* ── Défi actif (une fois accepté = running) ─────────────── */}
+            {defisActif && defisActif.status === "running" && (
                 <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700 p-7 text-white shadow-[0_12px_40px_rgba(109,40,217,.35)]">
                     <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
                     <div className="relative">

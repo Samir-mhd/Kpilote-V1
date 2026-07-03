@@ -17,6 +17,8 @@ import {
 } from "@/services/challengeRepository";
 import { formatTempsRestant } from "@/services/challengeService";
 import InitialesAvatar from "@/components/avatar/InitialesAvatar";
+import PhotoAvatar from "@/components/avatar/PhotoAvatar";
+import { getPhotosByIds } from "@/services/photoService";
 
 // ─── Chrono live ──────────────────────────────────────────────────────────────
 
@@ -155,6 +157,7 @@ export default function DefisPage() {
     const [defis, setDefis]               = useState<DefiRow[]>([]);
     const [challenges, setChallenges]     = useState<ChallengeRow[]>([]);
     const [classement, setClassement]     = useState<StatsConseiller[]>([]);
+    const [photos, setPhotos]             = useState<Record<string, string | null>>({});
     const [loading, setLoading]           = useState(true);
     const [onglet, setOnglet]             = useState<"boutique" | "classement">("boutique");
 
@@ -171,6 +174,9 @@ export default function DefisPage() {
             setDefis(d);
             setChallenges(c);
             setClassement(cl);
+            // Charge les photos des conseillers du classement
+            const ids = cl.map(c => c.id).filter(Boolean);
+            if (ids.length) getPhotosByIds(ids).then(setPhotos).catch(() => {});
         } catch { /* silencieux */ }
         finally { setLoading(false); }
     }
@@ -335,56 +341,104 @@ export default function DefisPage() {
                 </div>
             )}
 
-            {/* ── Vue Classement ─────────────────────────────────────────── */}
+            {/* ── Vue Classement détaillé ────────────────────────────────── */}
             {onglet === "classement" && (
-                <div className="rounded-[24px] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,.08)]">
-                    <h2 className="mb-6 text-2xl font-black text-slate-900">Classement global</h2>
+                <div className="space-y-4">
+                    <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">
+                        Classement défis & challenges
+                    </p>
 
                     {classement.length === 0 ? (
-                        <p className="text-slate-400">Aucune donnée disponible.</p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full border-separate border-spacing-y-2">
-                                <thead>
-                                    <tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-300">
-                                        <th className="px-4 pb-3">#</th>
-                                        <th className="px-4 pb-3">Conseiller</th>
-                                        <th className="px-4 pb-3 text-center">⚔️ Gagnés</th>
-                                        <th className="px-4 pb-3 text-center">Perdus</th>
-                                        <th className="px-4 pb-3 text-center">Égalités</th>
-                                        <th className="px-4 pb-3 text-center">🎯 Réussis</th>
-                                        <th className="px-4 pb-3 text-center">Échoués</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {classement.map((c, idx) => {
-                                        const totalD = c.defis.gagne + c.defis.perdu + c.defis.egalite;
-                                        const tauxD  = totalD > 0 ? Math.round((c.defis.gagne / totalD) * 100) : null;
-                                        return (
-                                            <tr key={c.id} className="bg-slate-50 hover:bg-slate-100 transition-all">
-                                                <td className="rounded-l-2xl px-4 py-4">
-                                                    <span className="text-sm font-black text-slate-300">
-                                                        {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-4 font-black text-slate-800">{c.nom}</td>
-                                                <td className="px-4 py-4 text-center">
-                                                    <p className="text-lg font-black text-violet-600">{c.defis.gagne}</p>
-                                                    {tauxD !== null && <p className="text-xs text-slate-300">{tauxD}%</p>}
-                                                </td>
-                                                <td className="px-4 py-4 text-center font-semibold text-slate-400">{c.defis.perdu}</td>
-                                                <td className="px-4 py-4 text-center font-semibold text-slate-400">{c.defis.egalite}</td>
-                                                <td className="px-4 py-4 text-center">
-                                                    <p className="text-lg font-black text-emerald-600">{c.challenges.reussi}</p>
-                                                    {c.challenges.enCours > 0 && <p className="text-xs text-amber-500">+{c.challenges.enCours} en cours</p>}
-                                                </td>
-                                                <td className="rounded-r-2xl px-4 py-4 text-center font-semibold text-slate-400">{c.challenges.echoue}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                        <div className="rounded-[24px] bg-white p-10 text-center shadow-[0_4px_24px_rgba(15,23,42,.07)]">
+                            <p className="text-3xl">⚔️</p>
+                            <p className="mt-3 font-black text-slate-400">Aucune donnée disponible</p>
                         </div>
+                    ) : (
+                        classement.map((c, idx) => {
+                            const totalD  = c.defis.gagne + c.defis.perdu + c.defis.egalite;
+                            const totalCh = c.challenges.reussi + c.challenges.echoue;
+                            const tauxD   = totalD  > 0 ? Math.round((c.defis.gagne  / totalD)  * 100) : 0;
+                            const tauxCh  = totalCh > 0 ? Math.round((c.challenges.reussi / totalCh) * 100) : 0;
+                            const medals  = ["🥇", "🥈", "🥉"];
+                            const isTop3  = idx < 3;
+
+                            return (
+                                <div key={c.id}
+                                    className={`relative overflow-hidden rounded-[22px] bg-white p-6 shadow-[0_4px_20px_rgba(15,23,42,.07)] transition-all hover:shadow-[0_8px_32px_rgba(15,23,42,.12)] ${
+                                        idx === 0 ? "ring-2 ring-amber-400/40" : ""
+                                    }`}>
+                                    {idx === 0 && (
+                                        <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-amber-400/10 blur-2xl" />
+                                    )}
+                                    <div className="relative flex items-center gap-5">
+
+                                        {/* Rang + avatar */}
+                                        <div className="flex items-center gap-3 flex-shrink-0">
+                                            <span className="text-xl w-8 text-center">
+                                                {isTop3 ? medals[idx] : <span className="text-sm font-black text-slate-300">{idx + 1}</span>}
+                                            </span>
+                                            <PhotoAvatar nom={c.nom} photoUrl={photos[c.id]} size={48} />
+                                        </div>
+
+                                        {/* Nom */}
+                                        <div className="w-28 flex-shrink-0">
+                                            <p className="font-black text-slate-900 truncate">{c.nom}</p>
+                                            {c.challenges.enCours > 0 && (
+                                                <p className="text-xs text-amber-500 font-semibold">{c.challenges.enCours} en cours</p>
+                                            )}
+                                        </div>
+
+                                        {/* Défis */}
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <p className="text-xs font-black uppercase tracking-[0.15em] text-violet-500">⚔️ Défis</p>
+                                                <div className="flex items-center gap-3 text-xs text-slate-400">
+                                                    <span className="text-violet-600 font-black">{c.defis.gagne}G</span>
+                                                    <span>{c.defis.egalite}E</span>
+                                                    <span className="text-red-400">{c.defis.perdu}P</span>
+                                                    {totalD > 0 && <span className="font-black text-violet-700">{tauxD}%</span>}
+                                                </div>
+                                            </div>
+                                            <div className="flex h-2.5 overflow-hidden rounded-full bg-slate-100">
+                                                {totalD > 0 && (
+                                                    <>
+                                                        <div className="bg-violet-500 transition-all" style={{ width: `${(c.defis.gagne / totalD) * 100}%` }} />
+                                                        <div className="bg-slate-300 transition-all" style={{ width: `${(c.defis.egalite / totalD) * 100}%` }} />
+                                                        <div className="bg-red-300 transition-all" style={{ width: `${(c.defis.perdu / totalD) * 100}%` }} />
+                                                    </>
+                                                )}
+                                            </div>
+                                            <p className="mt-0.5 text-[10px] text-slate-300">{totalD} défi{totalD !== 1 ? "s" : ""} joué{totalD !== 1 ? "s" : ""}</p>
+                                        </div>
+
+                                        {/* Séparateur */}
+                                        <div className="h-12 w-px bg-slate-100 flex-shrink-0" />
+
+                                        {/* Challenges */}
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-500">🎯 Challenges</p>
+                                                <div className="flex items-center gap-3 text-xs text-slate-400">
+                                                    <span className="text-emerald-600 font-black">{c.challenges.reussi}✓</span>
+                                                    <span className="text-red-400">{c.challenges.echoue}✗</span>
+                                                    {totalCh > 0 && <span className="font-black text-emerald-700">{tauxCh}%</span>}
+                                                </div>
+                                            </div>
+                                            <div className="flex h-2.5 overflow-hidden rounded-full bg-slate-100">
+                                                {totalCh > 0 && (
+                                                    <>
+                                                        <div className="bg-emerald-500 transition-all" style={{ width: `${(c.challenges.reussi / totalCh) * 100}%` }} />
+                                                        <div className="bg-red-300 transition-all" style={{ width: `${(c.challenges.echoue / totalCh) * 100}%` }} />
+                                                    </>
+                                                )}
+                                            </div>
+                                            <p className="mt-0.5 text-[10px] text-slate-300">{totalCh} challenge{totalCh !== 1 ? "s" : ""}</p>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            );
+                        })
                     )}
                 </div>
             )}
