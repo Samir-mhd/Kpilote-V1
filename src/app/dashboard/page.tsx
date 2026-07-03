@@ -79,6 +79,7 @@ export default function Dashboard() {
     const [invitations, setInvitations] = useState<any[]>([]);
     const [defisActif, setDefiActif]     = useState<ChallengeDashboard | null>(null);
     const [invitAnim, setInvitAnim]      = useState(false);
+    const [defiJustAccepte, setDefiJustAccepte] = useState(false);
 
     // Toast popup pour notifications entrantes + félicitations
     const [toast, setToast] = useState<{
@@ -133,6 +134,9 @@ export default function Dashboard() {
     async function handleAccepter(id: string) {
         await accepterChallenge(id);
         await chargerDefis();
+        // Déclenche l'animation "clignotant" pendant 6 secondes
+        setDefiJustAccepte(true);
+        setTimeout(() => setDefiJustAccepte(false), 6000);
     }
 
     async function handleRefuser(id: string) {
@@ -405,7 +409,9 @@ export default function Dashboard() {
 
             {/* ── Défi actif (une fois accepté = running) ─────────────── */}
             {defisActif && defisActif.status === "running" && (
-                <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700 p-7 text-white shadow-[0_12px_40px_rgba(109,40,217,.35)]">
+                <div className={`relative overflow-hidden rounded-[24px] bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700 p-7 text-white shadow-[0_12px_40px_rgba(109,40,217,.35)] transition-all ${
+                    defiJustAccepte ? "ring-4 ring-white/60 ring-offset-2 ring-offset-slate-50 animate-pulse" : ""
+                }`}>
                     <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
                     <div className="relative">
                         <div className="flex items-center justify-between mb-6">

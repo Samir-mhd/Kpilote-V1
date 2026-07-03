@@ -12,11 +12,15 @@ export async function getInvitationsPendantes(conseillerId: string) {
     return data ?? [];
 }
 
-/** Accepter un défi → passe en "running". */
+/** Accepter un défi → passe en "running". Réinitialise created_at à maintenant
+ *  pour que le chrono parte de l'acceptation, pas de l'envoi du défi. */
 export async function accepterChallenge(id: string): Promise<void> {
     const { error } = await supabase
         .from("challenges")
-        .update({ status: "running" })
+        .update({
+            status:     "running",
+            created_at: new Date().toISOString(), // chrono démarre à l'acceptation
+        })
         .eq("id", id);
     if (error) throw new Error(error.message);
 }
