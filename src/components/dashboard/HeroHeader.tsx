@@ -153,7 +153,7 @@ export default function HeroHeader({
                         <CartoonAvatar
                             prenom={nom}
                             etat={avatarEtat}
-                            size={420}
+                            size={630}
                             className="drop-shadow-[0_20px_40px_rgba(139,92,246,.4)]"
                         />
                     </div>
