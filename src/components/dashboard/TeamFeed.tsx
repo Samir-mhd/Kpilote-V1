@@ -81,8 +81,6 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
         return () => { supabase.removeChannel(channel); };
     }, []);
 
-    if (entries.length === 0) return null;
-
     return (
         <div className="rounded-[24px] bg-white p-6 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
             <div className="mb-5 flex items-center gap-3">
@@ -93,6 +91,10 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
                 </div>
                 <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
             </div>
+
+            {entries.length === 0 ? (
+                <p className="py-6 text-center text-sm text-slate-300">Pas encore de vente aujourd'hui — soyez le premier ! 🚀</p>
+            ) : null}
 
             <div className="space-y-2">
                 {entries.map((e) => {
