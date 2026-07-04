@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import {
-    Home, BarChart3, Swords, Trophy, Bell, Brain, User,
+    Home, BarChart3, Swords, Trophy, Bell, Brain, User, LineChart,
 } from "lucide-react";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { getPhotoUrl } from "@/services/photoService";
@@ -12,6 +12,7 @@ import { getPhotoUrl } from "@/services/photoService";
 const menus = [
     { label: "Accueil",       href: "/dashboard",              Icon: Home },
     { label: "Classement",    href: "/dashboard/classement",    Icon: Trophy },
+    { label: "Mes stats",     href: "/dashboard/stats",          Icon: LineChart },
     { label: "Mes objectifs", href: "/dashboard/resultats",     Icon: BarChart3 },
     { label: "Challenges",    href: "/dashboard/challenges",    Icon: Swords },
     { label: "Notifications", href: "/dashboard/notifications", Icon: Bell },
