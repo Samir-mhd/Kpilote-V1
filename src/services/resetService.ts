@@ -101,12 +101,100 @@ export async function sauvegarderCheckCerebro(
     if (error) throw new Error(error.message ?? "Erreur sauvegarde check Cerebro");
 }
 
+/**
+ * Ajuste les entrées cerebro_check en mode normal (sans reset préalable).
+ * Calcule la différence entre le total désiré et les ventes réelles existantes,
+ * puis remplace les anciennes entrées cerebro_check par le delta.
+ * Si le delta est nul ou négatif (ventes réelles suffisantes), rien n'est inséré.
+ */
+export async function ajusterCheckCerebro(
+    conseillerId: string,
+    desiredTotals: Record<string, number> // { produitCode: total_désiré }
+): Promise<void> {
+    const debut = debutMois();
+    const fin   = finMois();
+
+    const codes = Object.keys(desiredTotals);
+    if (codes.length === 0) return;
+
+    // 1. Résoudre les codes en IDs produit
+    const { data: produits, error: errP } = await supabase
+        .from("produits")
+        .select("id, code")
+        .in("code", codes);
+    if (errP) throw new Error(errP.message ?? "Erreur récupération produits");
+
+    const produitsMap: Record<string, string> = {};
+    (produits ?? []).forEach((p: any) => { produitsMap[p.code] = p.id; });
+
+    // 2. Récupérer les ventes réelles (hors cerebro_check) du mois par produit
+    const { data: actualVentes } = await supabase
+        .from("ventes")
+        .select("produit_id, quantite")
+        .eq("conseiller_id", conseillerId)
+        .or("source.neq.cerebro_check,source.is.null")
+        .gte("created_at", debut)
+        .lte("created_at", fin);
+
+    const actualByProduitId: Record<string, number> = {};
+    (actualVentes ?? []).forEach((v: any) => {
+        actualByProduitId[v.produit_id] = (actualByProduitId[v.produit_id] ?? 0) + v.quantite;
+    });
+
+    // 3. Supprimer les anciennes entrées cerebro_check du mois
+    await supabase
+        .from("ventes")
+        .delete()
+        .eq("conseiller_id", conseillerId)
+        .eq("source", "cerebro_check")
+        .gte("created_at", debut)
+        .lte("created_at", fin);
+
+    // 4. Insérer les nouveaux ajustements (delta = désiré - réel, si > 0)
+    const now = new Date();
+    const premierMois = new Date(now.getFullYear(), now.getMonth(), 1, 12, 0, 0).toISOString();
+
+    const inserts = codes
+        .map(code => {
+            const produitId = produitsMap[code];
+            if (!produitId) return null;
+            const actual  = actualByProduitId[produitId] ?? 0;
+            const desired = desiredTotals[code] ?? 0;
+            const delta   = desired - actual;
+            return { conseiller_id: conseillerId, produit_id: produitId, quantite: delta, source: "cerebro_check", created_at: premierMois };
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null && r.quantite > 0);
+
+    if (inserts.length === 0) return;
+    const { error } = await supabase.from("ventes").insert(inserts);
+    if (error) throw new Error(error.message ?? "Erreur ajustement check Cerebro");
+}
+
 // ── Garde l'ancien nom pour compatibilité (délègue au nouveau) ─────────────────
 export async function resetVentesDuJour(
     conseillerId: string,
     produitCodes: string[] | null
 ): Promise<void> {
     return resetVentesDuMois(conseillerId, produitCodes);
+}
+
+/** Retourne la date du dernier check complété (format YYYY-MM-DD), ou null si jamais fait. */
+export async function getLastCheckDate(conseillerId: string): Promise<string | null> {
+    const { data, error } = await supabase
+        .from("conseillers")
+        .select("last_check_date")
+        .eq("id", conseillerId)
+        .maybeSingle();
+    if (error || !data) return null;
+    return data.last_check_date ?? null;
+}
+
+/** Marque le check du matin comme fait aujourd'hui (persisté en base, multi-appareils). */
+export async function marquerCheckFait(conseillerId: string): Promise<void> {
+    await supabase
+        .from("conseillers")
+        .update({ last_check_date: dateLocale() })
+        .eq("id", conseillerId);
 }
 
 export async function forcerCerebroCheck(conseillerId: string): Promise<void> {

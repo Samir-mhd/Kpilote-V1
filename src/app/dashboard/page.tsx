@@ -14,7 +14,7 @@ import { traiterVente } from "@/engine/venteEngine";
 import { getMissionsReelles } from "@/services/missionsReelles";
 import { analyserDashboard } from "@/engine/contextEngine";
 import { supabase } from "@/lib/supabase";
-import { checkForceActive, clearForceCheck } from "@/services/resetService";
+import { checkForceActive, clearForceCheck, getLastCheckDate, marquerCheckFait } from "@/services/resetService";
 import {
     getInvitationsPendantes,
     accepterChallenge,
@@ -22,6 +22,8 @@ import {
 } from "@/services/challengeRepository";
 import { chargerChallenge, formatTempsRestant, ChallengeDashboard } from "@/services/challengeService";
 import InitialesAvatar from "@/components/avatar/InitialesAvatar";
+import { useAvatarEtat } from "@/hooks/useAvatarEtat";
+import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 
 const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
 
@@ -44,29 +46,34 @@ export default function Dashboard() {
     const nom = searchParams.get("nom") || "Conseiller";
     const conseillerId = searchParams.get("id") || "";
 
-    // Clé unique par conseiller et par jour local — calculée une seule fois
-    const cleCheck = conseillerId ? `morning-check-${conseillerId}-${dateLocale()}` : null;
-
-    const [morningCheckValidated, setMorningCheckValidated] = useState(() => {
-        if (!conseillerId || !cleCheck) return true;
-        try {
-            return localStorage.getItem(cleCheck) === "done";
-        } catch { return false; }
-    });
-
+    // checkLoading : true pendant la vérification DB (évite un flash du check avant la réponse)
+    const [checkLoading,          setCheckLoading]          = useState(!!conseillerId);
+    const [morningCheckValidated, setMorningCheckValidated] = useState(!conseillerId);
     // checkForced = true uniquement si le manager a déclenché un reset → active la sauvegarde des valeurs
-    const [checkForced, setCheckForced] = useState(false);
+    const [checkForced,           setCheckForced]           = useState(false);
 
     useEffect(() => {
         if (!conseillerId) return;
-        checkForceActive(conseillerId)
-            .then((forced) => {
+        // Vérifie en DB si le check a déjà été fait aujourd'hui (multi-appareils)
+        Promise.all([
+            checkForceActive(conseillerId),
+            getLastCheckDate(conseillerId),
+        ])
+            .then(([forced, lastCheckDate]) => {
                 if (forced) {
+                    // Reset manager → check obligatoire même si déjà fait aujourd'hui
                     setCheckForced(true);
-                    setMorningCheckValidated(false); // force l'affichage du check même si déjà fait aujourd'hui
+                    setMorningCheckValidated(false);
+                } else {
+                    // Check normal : skip si déjà validé aujourd'hui sur n'importe quel appareil
+                    setMorningCheckValidated(lastCheckDate === dateLocale());
                 }
             })
-            .catch(() => {});
+            .catch(() => {
+                // En cas d'erreur DB, on ne bloque pas le conseiller
+                setMorningCheckValidated(true);
+            })
+            .finally(() => setCheckLoading(false));
     }, [conseillerId]);
 
     const [totalVentesJour, setTotalVentesJour] = useState(0);
@@ -75,12 +82,19 @@ export default function Dashboard() {
     const [missions, setMissions] = useState<MissionDashboard[]>([]);
     const [rang, setRang] = useState(0);
 
+    // Avatar cartoon — état calculé automatiquement selon les ventes du jour
+    const { etat: avatarEtat, refresh: refreshAvatar } = useAvatarEtat(conseillerId);
+    const [challengeResult, setChallengeResult] = useState<"gagne" | "perdu" | null>(null);
+
     // Défis : invitations reçues + défi actif
     const [invitations, setInvitations] = useState<any[]>([]);
     const [defisActif, setDefiActif]     = useState<ChallengeDashboard | null>(null);
     const [invitAnim, setInvitAnim]      = useState(false);
     const [defiJustAccepte, setDefiJustAccepte] = useState(false);
     const [defiJustRecu,    setDefiJustRecu]    = useState(false);
+
+    // Ref pour détecter la fin d'un défi via Realtime (victoire ou défaite)
+    const prevDefiRef = useRef<typeof defisActif>(null);
 
     // Countdown live pour la carte VS du défi
     const [defiCountdown, setDefiCountdown] = useState<string>("");
@@ -169,6 +183,25 @@ export default function Dashboard() {
                 actif = await chargerChallenge(conseillerId).catch(() => null);
             }
             setInvitations(invits);
+
+            // Détecter fin de challenge via Realtime (adversaire a gagné)
+            if (prevDefiRef.current?.status === "running" && !actif) {
+                const { data: fini } = await supabase
+                    .from("challenges")
+                    .select("score_createur, score_adversaire, createur, vainqueur")
+                    .eq("id", prevDefiRef.current.id)
+                    .eq("status", "finished")
+                    .maybeSingle();
+                if (fini) {
+                    const jeGagne = fini.vainqueur === conseillerId ||
+                        (fini.createur === conseillerId
+                            ? fini.score_createur > fini.score_adversaire
+                            : fini.score_adversaire > fini.score_createur);
+                    setChallengeResult(jeGagne ? "gagne" : "perdu");
+                }
+            }
+
+            prevDefiRef.current = actif;
             setDefiActif(actif);
             if (invits.length > 0) setInvitAnim(true);
             if (opts?.blink === "accepte") {
@@ -252,6 +285,14 @@ export default function Dashboard() {
         };
     }, [conseillerId]);
 
+    if (checkLoading) {
+        return (
+            <div className="fixed inset-0 flex items-center justify-center" style={{ background: "#060612" }}>
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-500 border-t-transparent" />
+            </div>
+        );
+    }
+
     if (!morningCheckValidated) {
         return (
             <MorningCheck
@@ -259,8 +300,10 @@ export default function Dashboard() {
                 conseillerId={conseillerId}
                 isReset={checkForced}
                 onValidated={() => {
-                    if (cleCheck) { try { localStorage.setItem(cleCheck, "done"); } catch {} }
-                    if (conseillerId) clearForceCheck(conseillerId).catch(() => {});
+                    if (conseillerId) {
+                        marquerCheckFait(conseillerId).catch(() => {});
+                        clearForceCheck(conseillerId).catch(() => {});
+                    }
                     setCheckForced(false);
                     setMorningCheckValidated(true);
                     // Recharge les missions après le check (les valeurs viennent d'être sauvées)
@@ -282,6 +325,7 @@ export default function Dashboard() {
             await traiterVente({ conseillerId, produit });
             await chargerMissions();
             await chargerRang();
+            refreshAvatar();
         }
         const nouveauTotal = totalVentesJour + 1;
         setTotalVentesJour(nouveauTotal);
@@ -324,6 +368,7 @@ export default function Dashboard() {
                     .eq("id", defisActif.id);
 
                 setDefiActif(null);
+                setChallengeResult("gagne");
                 setToast({
                     msg:  `🏆 Challenge réussi !`,
                     type: "congrats",
@@ -340,6 +385,40 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-8">
+
+            {/* ── Overlay résultat challenge (gagné / perdu) ────────────── */}
+            {challengeResult && (
+                <div
+                    className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+                    style={{ background: "rgba(6,6,18,.85)", backdropFilter: "blur(12px)" }}
+                >
+                    <div className="flex flex-col items-center gap-6 text-center px-8">
+                        <CartoonAvatar
+                            prenom={nom}
+                            etat={challengeResult === "gagne" ? "heureux_gagne" : "malheureux_perdu"}
+                            size={260}
+                            className="drop-shadow-2xl"
+                        />
+                        <p className="text-xs font-black uppercase tracking-[0.4em] text-violet-400">
+                            Résultat du challenge
+                        </p>
+                        <p className="text-4xl font-black text-white">
+                            {challengeResult === "gagne" ? "🏆 Tu as gagné !" : "😔 Challenge perdu"}
+                        </p>
+                        <p className="text-white/50 text-sm max-w-xs">
+                            {challengeResult === "gagne"
+                                ? "Bravo ! Continue sur cette lancée."
+                                : "Pas de panique, le prochain est pour toi !"}
+                        </p>
+                        <button
+                            onClick={() => setChallengeResult(null)}
+                            className="mt-2 rounded-2xl bg-violet-600 px-8 py-3 text-sm font-black text-white shadow-lg hover:bg-violet-500 transition-all"
+                        >
+                            Continuer →
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* ── Toast popup challenge/défi/félicitations ─────────────── */}
             {toast && (
@@ -421,6 +500,7 @@ export default function Dashboard() {
                 coachMessage={coachMessage}
                 progression={tauxGlobal}
                 rang={rang}
+                avatarEtat={avatarEtat}
             />
 
             {/* ── Invitations défi reçues ──────────────────────────────── */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import CartoonAvatar, { type AvatarEtat } from "@/components/avatar/CartoonAvatar";
 
 type Props = {
     nom: string;
@@ -9,6 +10,16 @@ type Props = {
     progression?: number;
     rang?: number;
     defi?: boolean;
+    avatarEtat?: AvatarEtat;
+};
+
+const AVATAR_CONTEXTE: Record<AvatarEtat, string> = {
+    souriant_main:       "Bonne journée ! Lance-toi, chaque vente compte.",
+    en_feu:              "T'es en feu ! Continue sur cette lancée, rien ne t'arrête.",
+    glacon:              "Tu refroidis... Une vente pour relancer la machine !",
+    endormi:             "C'est l'heure de se réveiller ! L'objectif t'attend.",
+    heureux_gagne:       "Belle victoire ! Profite de cette énergie pour enchaîner.",
+    malheureux_perdu:    "Pas grave, la prochaine victoire est pour toi. Remonte !",
 };
 
 export default function HeroHeader({
@@ -18,17 +29,15 @@ export default function HeroHeader({
     progression = 0,
     rang = 0,
     defi = false,
+    avatarEtat = "souriant_main",
 }: Props) {
     const [displayed, setDisplayed] = useState(coachMessage);
-    const [visible, setVisible] = useState(true);
+    const [visible,   setVisible]   = useState(true);
 
     useEffect(() => {
         if (!coachMessage || coachMessage === displayed) return;
         setVisible(false);
-        const t = setTimeout(() => {
-            setDisplayed(coachMessage);
-            setVisible(true);
-        }, 250);
+        const t = setTimeout(() => { setDisplayed(coachMessage); setVisible(true); }, 250);
         return () => clearTimeout(t);
     }, [coachMessage]);
 
@@ -41,7 +50,7 @@ export default function HeroHeader({
             <div className="relative">
                 <div className="flex flex-col gap-10 xl:flex-row xl:items-center xl:justify-between">
 
-                    {/* Gauche */}
+                    {/* ── Gauche : infos conseiller ─────────────────────── */}
                     <div className="max-w-3xl">
                         <p className="text-sm uppercase tracking-[0.45em] text-violet-300">KPILOTE</p>
                         <h1 className="mt-4 text-6xl font-black">Bonjour {nom} 👋</h1>
@@ -64,31 +73,25 @@ export default function HeroHeader({
                         </div>
                     </div>
 
-                    {/* Droite : message coach dynamique */}
-                    <div
-                        className="w-full max-w-md rounded-[30px] border border-white/10 bg-white/10 p-8 backdrop-blur-xl transition-all duration-300"
-                        style={{ opacity: visible ? 1 : 0, transform: visible ? "scale(1)" : "scale(0.97)" }}
-                    >
-                        <div className="flex items-center gap-3 mb-5">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-500/30 text-xl">
-                                🤖
-                            </div>
-                            <p className="text-xs font-bold uppercase tracking-[0.3em] text-violet-300">
-                                Coach IA
-                            </p>
-                        </div>
+                    {/* ── Droite : avatar + message coach ───────────────── */}
+                    <div className="flex flex-col items-center gap-5 w-full max-w-xs mx-auto xl:mx-0">
 
-                        <p className="text-lg leading-8 text-white/90 min-h-[4rem]">
-                            {displayed || "🎯 Commence par ta mission prioritaire du jour."}
+                        {/* Avatar grand format */}
+                        <CartoonAvatar
+                            prenom={nom}
+                            etat={avatarEtat}
+                            size={340}
+                            className="drop-shadow-[0_20px_40px_rgba(139,92,246,.4)]"
+                        />
+
+                        {/* Phrase contextualisée selon l'état */}
+                        <p
+                            className="text-center text-base font-bold text-white/80 leading-7 px-2 transition-all duration-300"
+                            style={{ opacity: visible ? 1 : 0 }}
+                        >
+                            {AVATAR_CONTEXTE[avatarEtat]}
                         </p>
 
-                        <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-white/10">
-                            <div
-                                className="h-full rounded-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500 transition-all duration-700"
-                                style={{ width: `${Math.min(progression, 100)}%` }}
-                            />
-                        </div>
-                        <p className="mt-2 text-xs text-white/40">{progression}% de l'objectif du jour</p>
                     </div>
 
                 </div>

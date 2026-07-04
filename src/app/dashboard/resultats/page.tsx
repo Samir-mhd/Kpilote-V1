@@ -9,10 +9,18 @@ const MOIS_LABELS = ["", "Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Ao
 const MOIS_NOMS  = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 
 function tauxColor(p: number) {
-    if (p >= 100) return { bar: "from-violet-500 to-fuchsia-500",    text: "text-violet-600", badge: "bg-violet-100 text-violet-700",   dot: "bg-violet-500" };
-    if (p >= 80)  return { bar: "from-emerald-500 to-green-400",     text: "text-emerald-600",badge: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500" };
-    if (p >= 50)  return { bar: "from-amber-400 to-orange-400",      text: "text-amber-600",  badge: "bg-amber-100 text-amber-700",    dot: "bg-amber-400" };
-    return             { bar: "from-red-500 to-rose-400",            text: "text-red-600",    badge: "bg-red-100 text-red-700",        dot: "bg-red-500" };
+    if (p >= 100) return { bar: "from-violet-500 to-fuchsia-500", badge: "bg-violet-100 text-violet-700", dot: "bg-violet-500" };
+    if (p >= 80)  return { bar: "from-emerald-500 to-green-400",  badge: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500" };
+    if (p >= 50)  return { bar: "from-amber-400 to-orange-400",   badge: "bg-amber-100 text-amber-700",    dot: "bg-amber-400" };
+    return             { bar: "from-red-500 to-rose-400",         badge: "bg-red-100 text-red-700",        dot: "bg-red-500" };
+}
+
+// Couleur du score/% basée sur la pace réelle (avance vs retard) — pas sur le % mensuel brut
+function etatTextColor(etat: string): string {
+    if (etat === "termine") return "text-violet-400";
+    if (etat === "avance")  return "text-emerald-400";
+    if (etat === "rythme")  return "text-amber-400";
+    return "text-red-400";
 }
 
 function etatLabel(etat: string) {
@@ -79,6 +87,7 @@ function ResultatsInner() {
     const progressionGlob = totalObjectif > 0 ? Math.round((totalRealise / totalObjectif) * 100) : 0;
     const projection      = missions.reduce((t, m) => t + m.projectionFinMois, 0);
     const cGlob           = tauxColor(progressionGlob);
+    const etatGlob        = progressionGlob >= 100 ? "termine" : progressionGlob >= 80 ? "avance" : progressionGlob >= 50 ? "rythme" : "retard";
 
     return (
         <div className="space-y-7">
@@ -93,7 +102,7 @@ function ResultatsInner() {
                     <div className="relative flex-shrink-0">
                         <ArcGlobal pct={progressionGlob} />
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <p className={`text-3xl font-black ${cGlob.text}`}>{progressionGlob}%</p>
+                            <p className={`text-3xl font-black ${etatTextColor(etatGlob)}`}>{progressionGlob}%</p>
                             <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">global</p>
                         </div>
                     </div>
@@ -166,7 +175,7 @@ function ResultatsInner() {
                                                 {etat}
                                             </span>
                                         </div>
-                                        <p className={`text-lg font-black ${c.text}`}>{m.progression}%</p>
+                                        <p className={`text-lg font-black ${etatTextColor(m.etat)}`}>{m.progression}%</p>
                                     </div>
 
                                     <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
@@ -215,7 +224,7 @@ function ResultatsInner() {
                                         </span>
                                     </div>
 
-                                    <p className={`text-5xl font-black ${c.text}`}>{m.progression}%</p>
+                                    <p className={`text-5xl font-black ${etatTextColor(m.etat)}`}>{m.progression}%</p>
 
                                     <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/8">
                                         <div className={`h-full rounded-full bg-gradient-to-r ${c.bar} transition-all duration-700`}
