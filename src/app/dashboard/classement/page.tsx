@@ -8,6 +8,7 @@ import { construireClassementPeriode, ConseillerStats } from "@/services/classem
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { supabase } from "@/lib/supabase";
+import { envoyerReaction } from "@/services/reactionService";
 
 const medals = ["🥇", "🥈", "🥉"];
 
@@ -20,6 +21,16 @@ function ClassementInner() {
     const [photos, setPhotos]     = useState<Record<string, string | null>>({});
     const [loading, setLoading]   = useState(true);
     const [maj, setMaj]           = useState("");
+    const [sentReactions, setSentReactions] = useState<Record<string, string>>({});
+
+    const monNom = classement.find(c => c.id === conseillerId)?.nom ?? "";
+
+    async function handleReaction(toId: string, emoji: string) {
+        if (!conseillerId || sentReactions[toId]) return;
+        await envoyerReaction(conseillerId, monNom, toId, emoji);
+        setSentReactions(prev => ({ ...prev, [toId]: emoji }));
+        setTimeout(() => setSentReactions(prev => { const n = { ...prev }; delete n[toId]; return n; }), 8000);
+    }
 
     async function charger(p: Periode) {
         setLoading(true);
@@ -152,6 +163,7 @@ function ClassementInner() {
                                         ))}
                                         <th className="px-4 pb-2 text-right">Total</th>
                                         <th className="px-5 pb-2 text-right">Taux</th>
+                                        <th className="px-4 pb-2 text-center">React</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -200,13 +212,33 @@ function ClassementInner() {
                                                 <td className="px-4 py-3 text-right">
                                                     <p className={`text-lg font-black ${isMoi ? "text-green-700" : "text-slate-800"}`}>{c.total}</p>
                                                 </td>
-                                                <td className="rounded-r-2xl px-5 py-3 text-right">
+                                                <td className="px-5 py-3 text-right">
                                                     <div className="flex flex-col items-end gap-1">
                                                         <span className={`text-sm font-black ${ct.text}`}>{taux}%</span>
                                                         <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-200">
                                                             <div className={`h-full rounded-full ${ct.bar}`} style={{ width: `${Math.min(taux, 100)}%` }} />
                                                         </div>
                                                     </div>
+                                                </td>
+                                                <td className="rounded-r-2xl px-4 py-3 text-center">
+                                                    {isMoi ? (
+                                                        <span className="text-xs text-slate-300">—</span>
+                                                    ) : sentReactions[c.id] ? (
+                                                        <span className="text-xl" style={{ animation: "reactPop .3s ease" }}>{sentReactions[c.id]}</span>
+                                                    ) : (
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            {["🔥", "💪", "👏"].map(emoji => (
+                                                                <button
+                                                                    key={emoji}
+                                                                    onClick={() => handleReaction(c.id, emoji)}
+                                                                    className="text-base hover:scale-125 transition-transform leading-none"
+                                                                    title={`Envoyer ${emoji}`}
+                                                                >
+                                                                    {emoji}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
@@ -216,6 +248,13 @@ function ClassementInner() {
                         </div>
                         <div className="px-7 pb-5 pt-2 text-xs text-slate-300">Objectifs proratisés selon la période sélectionnée</div>
                     </div>
+                    <style>{`
+                        @keyframes reactPop {
+                            0%   { transform: scale(0.4); opacity: 0; }
+                            70%  { transform: scale(1.3); opacity: 1; }
+                            100% { transform: scale(1); }
+                        }
+                    `}</style>
                 </>
             )}
         </div>

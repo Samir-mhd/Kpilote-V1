@@ -23,6 +23,7 @@ import {
 import { chargerChallenge, formatTempsRestant, ChallengeDashboard } from "@/services/challengeService";
 import { useAvatarEtat } from "@/hooks/useAvatarEtat";
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
+import TeamFeed from "@/components/dashboard/TeamFeed";
 
 const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
 
@@ -84,6 +85,7 @@ export default function Dashboard() {
     // Avatar cartoon — état calculé automatiquement selon les ventes du jour
     const { etat: avatarEtat, refresh: refreshAvatar } = useAvatarEtat(conseillerId);
     const [challengeResult, setChallengeResult] = useState<"gagne" | "perdu" | null>(null);
+    const [reactionToast, setReactionToast] = useState<{ from: string; emoji: string } | null>(null);
 
     // Défis : invitations reçues + défi actif
     const [invitations, setInvitations] = useState<any[]>([]);
@@ -284,6 +286,23 @@ export default function Dashboard() {
         };
     }, [conseillerId]);
 
+    // Réactions reçues des collègues
+    useEffect(() => {
+        if (!conseillerId) return;
+        const channel = supabase
+            .channel(`reactions-${conseillerId}`)
+            .on("postgres_changes", {
+                event: "INSERT", schema: "public", table: "reactions",
+                filter: `to_id=eq.${conseillerId}`,
+            }, (payload: any) => {
+                const r = payload.new;
+                setReactionToast({ from: r.from_nom, emoji: r.emoji });
+                setTimeout(() => setReactionToast(null), 5000);
+            })
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [conseillerId]);
+
     if (checkLoading) {
         return (
             <div className="fixed inset-0 flex items-center justify-center" style={{ background: "#060612" }}>
@@ -443,6 +462,31 @@ export default function Dashboard() {
                         @keyframes resultPulse {
                             0%,100% { opacity:.15; transform:translate(-50%,-50%) scale(1); }
                             50%     { opacity:.3;  transform:translate(-50%,-50%) scale(1.15); }
+                        }
+                    `}</style>
+                </div>
+            )}
+
+            {/* ── Toast réaction collègue ──────────────────────────────── */}
+            {reactionToast && (
+                <div
+                    className="fixed bottom-6 right-6 z-50 flex items-center gap-4 rounded-[20px] bg-white px-6 py-4 shadow-[0_12px_40px_rgba(0,0,0,.18)]"
+                    style={{ animation: "slideUp .4s cubic-bezier(.34,1.56,.64,1)" }}
+                >
+                    <span className="text-4xl" style={{ animation: "reactPop .4s ease" }}>{reactionToast.emoji}</span>
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Réaction d'équipe</p>
+                        <p className="text-sm font-black text-slate-900">
+                            {reactionToast.from.split(" ")[0]} t'a envoyé {reactionToast.emoji}
+                        </p>
+                    </div>
+                    <style>{`
+                        @keyframes slideUp {
+                            from { opacity:0; transform:translateY(20px) scale(.95); }
+                            to   { opacity:1; transform:translateY(0) scale(1); }
+                        }
+                        @keyframes reactPop {
+                            0%  { transform:scale(.4); } 70% { transform:scale(1.3); } 100% { transform:scale(1); }
                         }
                     `}</style>
                 </div>
@@ -658,6 +702,8 @@ export default function Dashboard() {
                 taux={tauxGlobal}
                 rang={rang}
             />
+
+            <TeamFeed conseillerId={conseillerId} />
 
             <section>
                 <div className="flex items-end justify-between mb-5">

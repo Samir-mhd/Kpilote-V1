@@ -61,9 +61,23 @@ function ArcProgress({ pct, stroke }: { pct: number; stroke: string }) {
     );
 }
 
+type Particle = { id: number; angle: number; dist: number; color: string; size: number; delay: number; };
+const P_COLORS = ["#fbbf24","#34d399","#60a5fa","#a78bfa","#f87171","#fb923c","#f472b6","#4ade80"];
+function genParticles(): Particle[] {
+    return Array.from({ length: 16 }, (_, i) => ({
+        id: i,
+        angle: (i / 16) * 360 + (Math.random() - .5) * 18,
+        dist: 55 + Math.random() * 75,
+        color: P_COLORS[i % P_COLORS.length],
+        size: 5 + Math.random() * 7,
+        delay: Math.random() * 0.08,
+    }));
+}
+
 export default function MissionCard({ titre, realise, objectif, couleur, onSale }: Props) {
     const [celebrating, setCelebrating] = useState(false);
     const [celebEmoji, setCelebEmoji] = useState("🎉");
+    const [particles,  setParticles]  = useState<Particle[]>([]);
 
     const pal   = PALETTE[couleur] ?? DEFAULT_PAL;
     const pct   = objectif > 0 ? Math.min(Math.round((realise / objectif) * 100), 100) : 0;
@@ -74,7 +88,9 @@ export default function MissionCard({ titre, realise, objectif, couleur, onSale 
         if (celebrating) return;
         setCelebEmoji(CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)]);
         setCelebrating(true);
+        setParticles(genParticles());
         onSale(titre);
+        setTimeout(() => setParticles([]), 750);
         setTimeout(() => setCelebrating(false), 1600);
     }
 
@@ -107,6 +123,24 @@ export default function MissionCard({ titre, realise, objectif, couleur, onSale 
                     </span>
                 </div>
             )}
+
+            {/* Confetti particles */}
+            {particles.map(p => (
+                <div
+                    key={p.id}
+                    className="pointer-events-none absolute z-20 rounded-full"
+                    style={{
+                        width: p.size,
+                        height: p.size,
+                        background: p.color,
+                        top: "50%",
+                        left: "50%",
+                        ["--tx" as any]: `${Math.cos(p.angle * Math.PI / 180) * p.dist}px`,
+                        ["--ty" as any]: `${Math.sin(p.angle * Math.PI / 180) * p.dist}px`,
+                        animation: `particleBurst 0.65s ease-out ${p.delay}s forwards`,
+                    }}
+                />
+            ))}
 
             <div className="relative p-7">
 
@@ -196,6 +230,10 @@ export default function MissionCard({ titre, realise, objectif, couleur, onSale 
                     0%   { transform: scale(.4) translateY(20px); opacity: 0; }
                     60%  { transform: scale(1.2) translateY(-4px); opacity: 1; }
                     100% { transform: scale(1) translateY(0); }
+                }
+                @keyframes particleBurst {
+                    0%   { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+                    100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0.2); opacity: 0; }
                 }
             `}</style>
         </section>
