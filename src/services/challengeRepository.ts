@@ -13,18 +13,25 @@ export async function getInvitationsPendantes(conseillerId: string) {
 }
 
 /** Accepter un défi → passe en "running".
- *  Essaie de setter started_at (nécessite la colonne + schema cache rechargé).
- *  Fallback sans started_at si la colonne n'est pas reconnue. */
+ *  Stocke started_at = maintenant (source de vérité pour le chrono inter-appareils).
+ *  Efface le cache sessionStorage pour repartir du vrai started_at. */
 export async function accepterChallenge(id: string): Promise<void> {
-    // Tentative avec started_at
+    const now = new Date().toISOString();
+
+    // Efface le cache local AVANT l'update DB pour que chargerChallenge recharge started_at
+    try { sessionStorage.removeItem(`kpilote-challenge-start-${id}`); } catch {}
+
     const { error } = await supabase
         .from("challenges")
-        .update({ status: "running", started_at: new Date().toISOString() })
+        .update({ status: "running", started_at: now })
         .eq("id", id);
 
     if (error) {
         // Schema cache pas à jour → fallback sans started_at
         if (error.message?.includes("started_at") || error.message?.includes("schema")) {
+            const startMs = Date.now();
+            // Cache local = source de vérité pour cette session
+            try { sessionStorage.setItem(`kpilote-challenge-start-${id}`, String(startMs)); } catch {}
             const { error: e2 } = await supabase
                 .from("challenges")
                 .update({ status: "running" })
@@ -124,9 +131,20 @@ export async function chargerDefisActifsManager(): Promise<DefiActifManager[]> {
         scoreCreateur:   c.score_createur ?? 0,
         scoreAdversaire: c.score_adversaire ?? 0,
         createdAt:       c.created_at,
-        expiresAt:       (c.started_at
-            ? new Date(c.started_at).getTime()
-            : new Date(c.created_at).getTime()) + (c.duree ?? 30) * 60 * 1000,
+        expiresAt:       (() => {
+            const dureeMs  = (c.duree ?? 30) * 60 * 1000;
+            const cacheKey = `kpilote-challenge-start-${c.id}`;
+            if (c.started_at) {
+                const ms = new Date(c.started_at).getTime();
+                try { sessionStorage.setItem(cacheKey, String(ms)); } catch {}
+                return ms + dureeMs;
+            }
+            const cached = (() => { try { return sessionStorage.getItem(cacheKey); } catch { return null; } })();
+            if (cached) return parseInt(cached) + dureeMs;
+            const ms = Date.now();
+            try { sessionStorage.setItem(cacheKey, String(ms)); } catch {}
+            return ms + dureeMs;
+        })(),
         status:          c.status,
     }));
 }

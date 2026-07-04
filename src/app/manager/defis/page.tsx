@@ -99,7 +99,7 @@ function CarteDefiActif({ defi, onCloture }: { defi: DefiActifManager; onCloture
                         {!estPending && (
                             <div className="text-center">
                                 <p className="text-xs text-white/30">Temps</p>
-                                <Chrono expiresAt={defi.expiresAt} duree={defi.duree} />
+                                <Chrono key={defi.id} expiresAt={defi.expiresAt} duree={defi.duree} />
                             </div>
                         )}
                         <button

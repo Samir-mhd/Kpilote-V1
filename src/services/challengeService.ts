@@ -35,13 +35,29 @@ export async function chargerChallenge(
     const challenge = await getChallengeActif(conseillerId);
     if (!challenge) return null;
 
-    // started_at = moment du vrai démarrage (acceptation ou lancement direct manager)
-    // Si absent ou si created_at > il y a duree minutes → on considère que ça vient de démarrer
     const dureeMs  = (challenge.duree ?? 30) * 60 * 1000;
-    const startRef = challenge.started_at
-        ? new Date(challenge.started_at).getTime()
-        : Date.now(); // si pas encore défini → part de maintenant (ne jamais expirer au 1er chargement)
-    const expiresAt = startRef + dureeMs;
+    const cacheKey = `kpilote-challenge-start-${challenge.id}`;
+
+    let startMs: number;
+
+    if (challenge.started_at) {
+        // Source de vérité DB — synchronisé entre tous les appareils
+        startMs = new Date(challenge.started_at).getTime();
+        // Cache local pour stabiliser le timer entre changements d'onglet
+        try { sessionStorage.setItem(cacheKey, String(startMs)); } catch {}
+    } else {
+        // Fallback : lit le cache de session si disponible
+        const cached = (() => { try { return sessionStorage.getItem(cacheKey); } catch { return null; } })();
+        if (cached) {
+            startMs = parseInt(cached);
+        } else {
+            // Première fois dans cette session → démarre maintenant et mémorise
+            startMs = Date.now();
+            try { sessionStorage.setItem(cacheKey, String(startMs)); } catch {}
+        }
+    }
+
+    const expiresAt = startMs + dureeMs;
 
     // NE PAS auto-clôturer ici : c'est le rôle du countdown UI et de cloturerChallengesExpires.
     // On laisse simplement passer pour afficher la carte. La clôture sera gérée par :
