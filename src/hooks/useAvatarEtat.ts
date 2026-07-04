@@ -54,7 +54,7 @@ function computeEtat(timestamps: number[], sessionStart: number): AvatarEtat {
     if (timestamps.filter(t => t >= il30min).length >= 2) return "en_feu";
     if (lastSale < il2h) return "endormi";
     if (lastSale < il1h) return "glacon";
-    return "souriant_main";
+    return "souriant_actif";
 }
 
 export function useAvatarEtat(conseillerId: string): { etat: AvatarEtat; refresh: () => void } {

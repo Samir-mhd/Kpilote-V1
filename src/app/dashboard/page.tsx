@@ -21,7 +21,6 @@ import {
     refuserChallenge,
 } from "@/services/challengeRepository";
 import { chargerChallenge, formatTempsRestant, ChallengeDashboard } from "@/services/challengeService";
-import InitialesAvatar from "@/components/avatar/InitialesAvatar";
 import { useAvatarEtat } from "@/hooks/useAvatarEtat";
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 
@@ -138,7 +137,7 @@ export default function Dashboard() {
     // Toast popup pour notifications entrantes + félicitations
     const [toast, setToast] = useState<{
         msg: string;
-        type: "defi" | "challenge" | "congrats";
+        type: "defi" | "challenge";
         details?: { produit: string; duree: number; objectif: number; adversaire: string };
     } | null>(null);
 
@@ -369,16 +368,6 @@ export default function Dashboard() {
 
                 setDefiActif(null);
                 setChallengeResult("gagne");
-                setToast({
-                    msg:  `🏆 Challenge réussi !`,
-                    type: "congrats",
-                    details: {
-                        produit:   defisActif.produit,
-                        duree:     defisActif.duree,
-                        objectif:  defisActif.objectif,
-                        adversaire: defisActif.adversaire,
-                    },
-                });
             }
         }
     }
@@ -389,34 +378,73 @@ export default function Dashboard() {
             {/* ── Overlay résultat challenge (gagné / perdu) ────────────── */}
             {challengeResult && (
                 <div
-                    className="fixed inset-0 z-50 flex flex-col items-center justify-center"
-                    style={{ background: "rgba(6,6,18,.85)", backdropFilter: "blur(12px)" }}
+                    className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden"
+                    style={{ background: "rgba(4,4,16,.95)", backdropFilter: "blur(20px)" }}
                 >
-                    <div className="flex flex-col items-center gap-6 text-center px-8">
-                        <CartoonAvatar
-                            prenom={nom}
-                            etat={challengeResult === "gagne" ? "heureux_gagne" : "malheureux_perdu"}
-                            size={260}
-                            className="drop-shadow-2xl"
-                        />
-                        <p className="text-xs font-black uppercase tracking-[0.4em] text-violet-400">
+                    {/* Halos de fond selon résultat */}
+                    {challengeResult === "gagne" ? (
+                        <>
+                            <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[700px] w-[700px] rounded-full bg-amber-400/10 blur-3xl" />
+                            <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[400px] w-[400px] rounded-full bg-yellow-500/15 blur-2xl" style={{ animation: "resultPulse 2s ease-in-out infinite" }} />
+                        </>
+                    ) : (
+                        <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-indigo-900/40 blur-3xl" />
+                    )}
+
+                    <div
+                        className="relative flex flex-col items-center gap-8 text-center px-8"
+                        style={{ animation: "resultIn .55s cubic-bezier(.34,1.56,.64,1)" }}
+                    >
+                        {/* Badge */}
+                        <p className="text-xs font-black uppercase tracking-[0.5em] text-violet-400">
                             Résultat du challenge
                         </p>
-                        <p className="text-4xl font-black text-white">
-                            {challengeResult === "gagne" ? "🏆 Tu as gagné !" : "😔 Challenge perdu"}
-                        </p>
-                        <p className="text-white/50 text-sm max-w-xs">
-                            {challengeResult === "gagne"
-                                ? "Bravo ! Continue sur cette lancée."
-                                : "Pas de panique, le prochain est pour toi !"}
-                        </p>
+
+                        {/* Avatar avec rebond */}
+                        <div style={{ animation: "avatarFloat 2.4s ease-in-out infinite" }}>
+                            <CartoonAvatar
+                                prenom={nom}
+                                etat="souriant_main"
+                                size={340}
+                                className="drop-shadow-[0_30px_60px_rgba(139,92,246,.5)]"
+                            />
+                        </div>
+
+                        {/* Résultat */}
+                        <div className="flex flex-col items-center gap-3">
+                            <p className={`text-7xl font-black ${challengeResult === "gagne" ? "text-amber-300" : "text-white"}`}>
+                                {challengeResult === "gagne" ? "🏆 Tu as gagné !" : "😔 Challenge perdu"}
+                            </p>
+                            <p className="text-white/50 text-lg max-w-md leading-8">
+                                {challengeResult === "gagne"
+                                    ? "Impressionnant ! Cette victoire, c'est ton énergie pour la suite."
+                                    : "Pas grave — les meilleurs rebondissent. La prochaine est pour toi."}
+                            </p>
+                        </div>
+
                         <button
                             onClick={() => setChallengeResult(null)}
-                            className="mt-2 rounded-2xl bg-violet-600 px-8 py-3 text-sm font-black text-white shadow-lg hover:bg-violet-500 transition-all"
+                            className="mt-2 rounded-3xl px-12 py-5 text-base font-black text-white shadow-[0_8px_32px_rgba(109,40,217,.5)] transition-all hover:scale-105"
+                            style={{ background: "linear-gradient(135deg,#7c3aed,#4f46e5)" }}
                         >
                             Continuer →
                         </button>
                     </div>
+
+                    <style>{`
+                        @keyframes resultIn {
+                            from { opacity:0; transform:scale(.75) translateY(60px); }
+                            to   { opacity:1; transform:scale(1) translateY(0); }
+                        }
+                        @keyframes avatarFloat {
+                            0%,100% { transform:translateY(0); }
+                            50%     { transform:translateY(-18px); }
+                        }
+                        @keyframes resultPulse {
+                            0%,100% { opacity:.15; transform:translate(-50%,-50%) scale(1); }
+                            50%     { opacity:.3;  transform:translate(-50%,-50%) scale(1.15); }
+                        }
+                    `}</style>
                 </div>
             )}
 
@@ -427,9 +455,8 @@ export default function Dashboard() {
                     style={{ animation: "slideDown .4s cubic-bezier(.34,1.56,.64,1)" }}
                 >
                     <div className={`relative overflow-hidden rounded-[24px] p-6 shadow-[0_16px_56px_rgba(0,0,0,.45)] ${
-                        toast.type === "congrats"  ? "bg-gradient-to-br from-amber-500 to-orange-600"
-                        : toast.type === "challenge" ? "bg-gradient-to-br from-emerald-600 to-teal-700"
-                        :                             "bg-gradient-to-br from-violet-600 to-indigo-700"
+                        toast.type === "challenge" ? "bg-gradient-to-br from-emerald-600 to-teal-700"
+                        :                           "bg-gradient-to-br from-violet-600 to-indigo-700"
                     } text-white`}>
 
                         {/* Halo déco */}
@@ -440,11 +467,11 @@ export default function Dashboard() {
                             <div className="flex items-start justify-between gap-3">
                                 <div className="flex items-center gap-3">
                                     <span className="text-3xl">
-                                        {toast.type === "congrats" ? "🏆" : toast.type === "challenge" ? "🎯" : "⚔️"}
+                                        {toast.type === "challenge" ? "🎯" : "⚔️"}
                                     </span>
                                     <div>
                                         <p className="text-xs font-black uppercase tracking-[0.25em] text-white/60">
-                                            {toast.type === "congrats" ? "Challenge réussi" : toast.type === "challenge" ? "Challenge reçu" : "Défi reçu"}
+                                            {toast.type === "challenge" ? "Challenge reçu" : "Défi reçu"}
                                         </p>
                                         <p className="text-xl font-black text-white leading-tight">{toast.msg}</p>
                                     </div>
@@ -475,7 +502,7 @@ export default function Dashboard() {
                                     {toast.details.adversaire && (
                                         <div className="col-span-3 rounded-xl bg-white/15 px-3 py-2.5 text-center">
                                             <p className="text-[10px] font-bold uppercase tracking-wider text-white/60">
-                                                {toast.type === "congrats" ? "Proposé par" : "De la part de"}
+                                                De la part de
                                             </p>
                                             <p className="mt-0.5 text-sm font-black">{toast.details.adversaire}</p>
                                         </div>
@@ -552,47 +579,76 @@ export default function Dashboard() {
 
             {/* ── Défi actif (une fois accepté = running) ─────────────── */}
             {defisActif && defisActif.status === "running" && (
-                <div className={`relative overflow-hidden rounded-[24px] bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700 p-7 text-white shadow-[0_12px_40px_rgba(109,40,217,.35)] transition-all ${
-                    (defiJustAccepte || defiJustRecu) ? "ring-4 ring-white/60 ring-offset-2 ring-offset-slate-50 animate-pulse" : ""
+                <div className={`relative overflow-hidden rounded-[32px] bg-gradient-to-br from-violet-700 via-indigo-700 to-purple-800 px-7 pt-6 pb-7 text-white shadow-[0_20px_60px_rgba(109,40,217,.5)] transition-all ${
+                    (defiJustAccepte || defiJustRecu) ? "ring-4 ring-white/60 ring-offset-2 ring-offset-slate-50" : ""
                 }`}>
-                    <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+                    {/* Halos déco */}
+                    <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-fuchsia-400/20 blur-3xl" />
+                    <div className="pointer-events-none absolute -left-16 bottom-0 h-56 w-56 rounded-full bg-indigo-400/20 blur-3xl" />
+
                     <div className="relative">
-                        <div className="flex items-center justify-between mb-6">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-4">
                             <p className="text-xs font-black uppercase tracking-[0.3em] text-white/60">⚔️ Défi en cours</p>
-                            <div className={`rounded-2xl px-4 py-2 text-center ${
-                                parseInt(defiCountdown) <= 5 ? "bg-red-500/30" : "bg-white/10"
+                            <div className={`rounded-2xl px-5 py-2 text-center ${
+                                parseInt(defiCountdown) <= 5 ? "bg-red-500/40" : "bg-white/10"
                             }`}>
-                                <p className="text-xs text-white/50">Temps restant</p>
-                                <p className={`text-2xl font-black tabular-nums ${
+                                <p className="text-[10px] text-white/50 uppercase tracking-wider">Temps restant</p>
+                                <p className={`text-3xl font-black tabular-nums ${
                                     parseInt(defiCountdown) <= 5 ? "text-red-300 animate-pulse" : "text-white"
                                 }`}>
                                     {defiCountdown || "…"}
                                 </p>
                             </div>
                         </div>
-                        <div className="flex items-start gap-4">
-                            <div className="flex flex-1 flex-col items-center gap-2">
-                                <InitialesAvatar nom={nom} size={52} />
-                                <p className="font-black text-white">{nom}</p>
-                                <p className="text-xs text-white/50">Toi</p>
-                                <p className="text-5xl font-black">{defisActif.scoreConseiller}</p>
+
+                        {/* Avatars VS */}
+                        <div className="flex items-end gap-0">
+                            {/* Conseiller */}
+                            <div className="flex flex-1 flex-col items-center">
+                                <div style={{ animation: "defiFloat 3s ease-in-out infinite" }}>
+                                    <CartoonAvatar prenom={nom} etat="souriant_main" size={130}
+                                        className="drop-shadow-[0_12px_24px_rgba(0,0,0,.4)]" />
+                                </div>
+                                <p className="mt-2 font-black text-white text-sm">{nom.split(" ")[0]}</p>
+                                <p className="text-[10px] text-white/40 uppercase tracking-wider">Toi</p>
+                                <p className="mt-1 text-6xl font-black tabular-nums">{defisActif.scoreConseiller}</p>
                             </div>
-                            <div className="flex flex-col items-center justify-center pt-2 flex-shrink-0 px-4">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-2xl">⚔️</div>
-                                <p className="mt-2 text-xs font-black uppercase tracking-widest text-white/40">VS</p>
-                                <p className="mt-2 text-xs text-white/50">{defisActif.produit}</p>
+
+                            {/* Centre VS */}
+                            <div className="flex flex-col items-center pb-10 flex-shrink-0 px-3">
+                                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-3xl shadow-inner">
+                                    ⚔️
+                                </div>
+                                <p className="mt-2 text-sm font-black uppercase tracking-widest text-white/30">VS</p>
+                                <p className="mt-1 text-[10px] text-white/40">{defisActif.produit}</p>
                             </div>
-                            <div className="flex flex-1 flex-col items-center gap-2">
-                                <InitialesAvatar nom={defisActif.adversaire} size={52} />
-                                <p className="font-black text-white">{defisActif.adversaire}</p>
-                                <p className="text-xs text-white/50">Adversaire</p>
-                                <p className="text-5xl font-black">{defisActif.scoreAdversaire}</p>
+
+                            {/* Adversaire */}
+                            <div className="flex flex-1 flex-col items-center">
+                                <div style={{ animation: "defiFloat 3s ease-in-out infinite", animationDelay: "1.2s" }}>
+                                    <CartoonAvatar prenom={defisActif.adversaire} etat="souriant_main" size={130}
+                                        className="drop-shadow-[0_12px_24px_rgba(0,0,0,.4)]" />
+                                </div>
+                                <p className="mt-2 font-black text-white text-sm">{defisActif.adversaire.split(" ")[0]}</p>
+                                <p className="text-[10px] text-white/40 uppercase tracking-wider">Adversaire</p>
+                                <p className="mt-1 text-6xl font-black tabular-nums">{defisActif.scoreAdversaire}</p>
                             </div>
                         </div>
-                        <div className="mt-5 rounded-2xl bg-white/10 px-5 py-3">
-                            <p className="text-sm text-white/70">{defisActif.message}</p>
-                        </div>
+
+                        {defisActif.message && (
+                            <div className="mt-5 rounded-2xl bg-white/10 px-5 py-3">
+                                <p className="text-sm text-white/70">{defisActif.message}</p>
+                            </div>
+                        )}
                     </div>
+
+                    <style>{`
+                        @keyframes defiFloat {
+                            0%,100% { transform:translateY(0) rotate(-1deg); }
+                            50%     { transform:translateY(-10px) rotate(1deg); }
+                        }
+                    `}</style>
                 </div>
             )}
 

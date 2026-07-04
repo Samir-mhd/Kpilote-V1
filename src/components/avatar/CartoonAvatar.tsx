@@ -5,6 +5,7 @@ import InitialesAvatar from "./InitialesAvatar";
 
 export type AvatarEtat =
     | "souriant_main"
+    | "souriant_actif"
     | "en_feu"
     | "glacon"
     | "endormi"
@@ -37,8 +38,9 @@ interface Props {
 
 export default function CartoonAvatar({ prenom, etat = "souriant_main", className = "", size }: Props) {
     const [error, setError] = useState(false);
-    const dossier = prenomDossier(prenom);  // "Andréa"
-    const prefix  = normPrenom(prenom);     // "andrea"
+    const dossier   = prenomDossier(prenom);
+    const prefix    = normPrenom(prenom);
+    const imageEtat = etat === "souriant_actif" ? "souriant_main" : etat;
 
     if (error) {
         return <InitialesAvatar nom={prenom} size={size ?? 64} />;
@@ -46,7 +48,7 @@ export default function CartoonAvatar({ prenom, etat = "souriant_main", classNam
 
     return (
         <img
-            src={`/avatar/${dossier}/${prefix}_${etat}.png`}
+            src={`/avatar/${dossier}/${prefix}_${imageEtat}.png`}
             alt={prenom}
             className={className}
             style={size ? { width: size, height: size, objectFit: "contain" } : undefined}
