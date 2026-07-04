@@ -36,28 +36,26 @@ export async function chargerChallenge(
     if (!challenge) return null;
 
     const dureeMs  = (challenge.duree ?? 30) * 60 * 1000;
-    const cacheKey = `kpilote-challenge-start-${challenge.id}`;
+    // localStorage = partagé entre onglets + persiste aux rechargements (contrairement à sessionStorage)
+    const lsKey    = `kpilote-expires-${challenge.id}`;
 
-    let startMs: number;
+    let expiresAt: number;
 
     if (challenge.started_at) {
-        // Source de vérité DB — synchronisé entre tous les appareils
-        startMs = new Date(challenge.started_at).getTime();
-        // Cache local pour stabiliser le timer entre changements d'onglet
-        try { sessionStorage.setItem(cacheKey, String(startMs)); } catch {}
+        // Source de vérité DB → calculée une fois, mise en cache localStorage
+        expiresAt = new Date(challenge.started_at).getTime() + dureeMs;
+        try { localStorage.setItem(lsKey, String(expiresAt)); } catch {}
     } else {
-        // Fallback : lit le cache de session si disponible
-        const cached = (() => { try { return sessionStorage.getItem(cacheKey); } catch { return null; } })();
+        // Lit le cache localStorage si dispo (stable entre onglets et rechargements)
+        const cached = (() => { try { return localStorage.getItem(lsKey); } catch { return null; } })();
         if (cached) {
-            startMs = parseInt(cached);
+            expiresAt = parseInt(cached);
         } else {
-            // Première fois dans cette session → démarre maintenant et mémorise
-            startMs = Date.now();
-            try { sessionStorage.setItem(cacheKey, String(startMs)); } catch {}
+            // Première fois : mémorise maintenant + durée
+            expiresAt = Date.now() + dureeMs;
+            try { localStorage.setItem(lsKey, String(expiresAt)); } catch {}
         }
     }
-
-    const expiresAt = startMs + dureeMs;
 
     // NE PAS auto-clôturer ici : c'est le rôle du countdown UI et de cloturerChallengesExpires.
     // On laisse simplement passer pour afficher la carte. La clôture sera gérée par :

@@ -18,8 +18,8 @@ export async function getInvitationsPendantes(conseillerId: string) {
 export async function accepterChallenge(id: string): Promise<void> {
     const now = new Date().toISOString();
 
-    // Efface le cache local AVANT l'update DB pour que chargerChallenge recharge started_at
-    try { sessionStorage.removeItem(`kpilote-challenge-start-${id}`); } catch {}
+    // Efface le cache localStorage AVANT l'update DB → chargerChallenge recalcule depuis started_at
+    try { localStorage.removeItem(`kpilote-expires-${id}`); } catch {}
 
     const { error } = await supabase
         .from("challenges")
@@ -30,8 +30,7 @@ export async function accepterChallenge(id: string): Promise<void> {
         // Schema cache pas à jour → fallback sans started_at
         if (error.message?.includes("started_at") || error.message?.includes("schema")) {
             const startMs = Date.now();
-            // Cache local = source de vérité pour cette session
-            try { sessionStorage.setItem(`kpilote-challenge-start-${id}`, String(startMs)); } catch {}
+            // Le cache sera créé par chargerChallenge au prochain chargement
             const { error: e2 } = await supabase
                 .from("challenges")
                 .update({ status: "running" })
@@ -81,6 +80,8 @@ export async function cloturerChallenge(challenge: {
         .from("challenges")
         .update({ status: "finished" })
         .eq("id", challenge.id);
+    // Nettoie le cache localStorage du chrono
+    try { localStorage.removeItem(`kpilote-expires-${challenge.id}`); } catch {}
 }
 
 /** Tous les défis actifs (pending/running) — pour la vue manager. */
@@ -132,18 +133,18 @@ export async function chargerDefisActifsManager(): Promise<DefiActifManager[]> {
         scoreAdversaire: c.score_adversaire ?? 0,
         createdAt:       c.created_at,
         expiresAt:       (() => {
-            const dureeMs  = (c.duree ?? 30) * 60 * 1000;
-            const cacheKey = `kpilote-challenge-start-${c.id}`;
+            const dureeMs = (c.duree ?? 30) * 60 * 1000;
+            const lsKey   = `kpilote-expires-${c.id}`;
             if (c.started_at) {
-                const ms = new Date(c.started_at).getTime();
-                try { sessionStorage.setItem(cacheKey, String(ms)); } catch {}
-                return ms + dureeMs;
+                const exp = new Date(c.started_at).getTime() + dureeMs;
+                try { localStorage.setItem(lsKey, String(exp)); } catch {}
+                return exp;
             }
-            const cached = (() => { try { return sessionStorage.getItem(cacheKey); } catch { return null; } })();
-            if (cached) return parseInt(cached) + dureeMs;
-            const ms = Date.now();
-            try { sessionStorage.setItem(cacheKey, String(ms)); } catch {}
-            return ms + dureeMs;
+            const cached = (() => { try { return localStorage.getItem(lsKey); } catch { return null; } })();
+            if (cached) return parseInt(cached);
+            const exp = Date.now() + dureeMs;
+            try { localStorage.setItem(lsKey, String(exp)); } catch {}
+            return exp;
         })(),
         status:          c.status,
     }));
