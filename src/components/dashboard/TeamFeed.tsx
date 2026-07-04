@@ -30,37 +30,39 @@ function feedEmoji(produit: string) {
 }
 
 export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
-    const [entries,  setEntries]  = useState<Entry[]>([]);
+    const [entries, setEntries] = useState<Entry[]>([]);
     const namesRef = useRef<Record<string, string>>({});
 
     useEffect(() => {
-        supabase.from("conseillers").select("id, nom").then(({ data }) => {
-            if (!data) return;
-            const map: Record<string, string> = {};
-            data.forEach((c: any) => { map[c.id] = c.nom; });
-            namesRef.current = map;
+        const debut = new Date();
+        debut.setHours(0, 0, 0, 0);
 
-            const debut = new Date();
-            debut.setHours(0, 0, 0, 0);
-
+        // Les deux requêtes partent en parallèle — indépendantes l'une de l'autre
+        Promise.all([
+            supabase.from("conseillers").select("id, nom"),
             supabase
                 .from("ventes")
                 .select("id, conseiller_id, produit, created_at")
                 .or("source.neq.cerebro_check,source.is.null")
                 .gte("created_at", debut.toISOString())
                 .order("created_at", { ascending: false })
-                .limit(12)
-                .then(({ data: ventes }) => {
-                    if (!ventes) return;
-                    setEntries(ventes.map((v: any) => ({
-                        ...v,
-                        nom: map[v.conseiller_id] ?? "Équipe",
-                        isNew: false,
-                    })));
-                });
+                .limit(15),
+        ]).then(([resC, resV]) => {
+            // Construire la map des noms (peut être vide si RLS bloque conseillers)
+            const map: Record<string, string> = {};
+            (resC.data ?? []).forEach((c: any) => { map[c.id] = c.nom; });
+            namesRef.current = map;
+
+            const ventes = resV.data ?? [];
+            setEntries(ventes.map((v: any) => ({
+                ...v,
+                nom: map[v.conseiller_id] ?? "Équipe",
+                isNew: false,
+            })));
         });
     }, []);
 
+    // Realtime : nouvelles ventes en direct
     useEffect(() => {
         const channel = supabase
             .channel("team-feed-rt")
@@ -75,7 +77,7 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
                     created_at: v.created_at,
                     isNew: true,
                 };
-                setEntries(prev => [entry, ...prev].slice(0, 12));
+                setEntries(prev => [entry, ...prev].slice(0, 15));
             })
             .subscribe();
         return () => { supabase.removeChannel(channel); };
@@ -93,37 +95,39 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
             </div>
 
             {entries.length === 0 ? (
-                <p className="py-6 text-center text-sm text-slate-300">Pas encore de vente aujourd'hui — soyez le premier ! 🚀</p>
-            ) : null}
-
-            <div className="space-y-2">
-                {entries.map((e) => {
-                    const isMoi = e.conseiller_id === conseillerId;
-                    return (
-                        <div
-                            key={e.id}
-                            className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 transition-all ${
-                                isMoi ? "bg-violet-50 border border-violet-100" : "bg-slate-50"
-                            } ${e.isNew ? "animate-feedIn" : ""}`}
-                        >
-                            <CartoonAvatar prenom={e.nom} etat="souriant_main" size={32} />
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-black text-slate-900 truncate">
-                                    {e.nom.split(" ")[0]}
-                                    {isMoi && <span className="ml-1 text-[10px] font-bold text-violet-500">(toi)</span>}
-                                </p>
-                                <p className="text-xs text-slate-400 truncate">
-                                    {feedEmoji(e.produit)} {e.produit}
-                                </p>
+                <p className="py-6 text-center text-sm text-slate-300">
+                    Pas encore de vente aujourd'hui — soyez le premier ! 🚀
+                </p>
+            ) : (
+                <div className="space-y-2">
+                    {entries.map((e) => {
+                        const isMoi = e.conseiller_id === conseillerId;
+                        return (
+                            <div
+                                key={e.id}
+                                className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 transition-all ${
+                                    isMoi ? "bg-violet-50 border border-violet-100" : "bg-slate-50"
+                                } ${e.isNew ? "animate-feedIn" : ""}`}
+                            >
+                                <CartoonAvatar prenom={e.nom} etat="souriant_main" size={32} />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-black text-slate-900 truncate">
+                                        {e.nom.split(" ")[0]}
+                                        {isMoi && <span className="ml-1 text-[10px] font-bold text-violet-500">(toi)</span>}
+                                    </p>
+                                    <p className="text-xs text-slate-400 truncate">
+                                        {feedEmoji(e.produit)} {e.produit}
+                                    </p>
+                                </div>
+                                <div className="flex-shrink-0 text-right">
+                                    <p className="text-xs font-black text-green-600">+1</p>
+                                    <p className="text-[10px] text-slate-300">{timeAgo(e.created_at)}</p>
+                                </div>
                             </div>
-                            <div className="flex-shrink-0 text-right">
-                                <p className="text-xs font-black text-green-600">+1</p>
-                                <p className="text-[10px] text-slate-300">{timeAgo(e.created_at)}</p>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             <style>{`
                 @keyframes feedIn {
