@@ -201,13 +201,21 @@ export async function cloturerChallengesExpires(): Promise<void> {
 
     const now = Date.now();
     const expires = data.filter((c: any) => {
-        // Utilise started_at si disponible, sinon created_at
-        const startMs  = c.started_at
-            ? new Date(c.started_at).getTime()
-            : new Date(c.created_at).getTime();
-        const expiresAt = startMs + (c.duree ?? 30) * 60 * 1000;
-        // N'expire que si running ET started_at renseigné (défi vraiment démarré)
-        return c.status === "running" && c.started_at && now >= expiresAt;
+        if (c.status !== "running") return false;
+        const dureeMs = (c.duree ?? 30) * 60 * 1000;
+
+        // 1. started_at DB (source de vérité)
+        if (c.started_at) {
+            return now >= new Date(c.started_at).getTime() + dureeMs;
+        }
+
+        // 2. Cache localStorage (stable entre onglets)
+        const lsKey  = `kpilote-expires-${c.id}`;
+        const cached = (() => { try { return localStorage.getItem(lsKey); } catch { return null; } })();
+        if (cached) return now >= parseInt(cached);
+
+        // 3. Fallback created_at (meilleure approximation)
+        return now >= new Date(c.created_at).getTime() + dureeMs;
     });
 
     await Promise.all(expires.map((c: any) =>

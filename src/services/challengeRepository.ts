@@ -76,11 +76,26 @@ export async function cloturerChallenge(challenge: {
     score_createur?: number | null;
     score_adversaire?: number | null;
 }): Promise<void> {
-    await supabase
+    // Détermine le vainqueur selon les scores
+    const sc = challenge.score_createur ?? 0;
+    const sa = challenge.score_adversaire ?? 0;
+    const vainqueur = sc > sa ? challenge.createur
+        : sa > sc ? challenge.adversaire
+        : null; // null = égalité
+
+    const update: Record<string, unknown> = { status: "finished" };
+    if (vainqueur !== undefined) update.vainqueur = vainqueur;
+
+    const { error } = await supabase
         .from("challenges")
-        .update({ status: "finished" })
+        .update(update)
         .eq("id", challenge.id);
-    // Nettoie le cache localStorage du chrono
+
+    // Si vainqueur échoue (colonne absente), retry sans
+    if (error?.message?.includes("vainqueur")) {
+        await supabase.from("challenges").update({ status: "finished" }).eq("id", challenge.id);
+    }
+
     try { localStorage.removeItem(`kpilote-expires-${challenge.id}`); } catch {}
 }
 
