@@ -15,6 +15,7 @@ import {
     DefiActifManager,
     cloturerChallenge,
 } from "@/services/challengeRepository";
+import { useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { formatTempsRestant } from "@/services/challengeService";
 import InitialesAvatar from "@/components/avatar/InitialesAvatar";
@@ -24,23 +25,25 @@ import { getPhotosByIds } from "@/services/photoService";
 // ─── Chrono live ──────────────────────────────────────────────────────────────
 
 function Chrono({ expiresAt, duree }: { expiresAt: number; duree: number }) {
-    // Si expiresAt est dans le passé (challenge ancien sans started_at),
-    // on repart de maintenant + durée pour ne pas afficher 0:00 immédiatement
-    const targetExpiry = expiresAt > Date.now()
-        ? expiresAt
-        : Date.now() + (duree ?? 30) * 60 * 1000;
+    // useRef pour stabiliser la valeur cible — ne redémarre PAS l'intervalle
+    // quand le parent re-rend (polling 30s), contrairement à useEffect([targetExpiry])
+    const targetRef = useRef(
+        expiresAt > Date.now()
+            ? expiresAt
+            : Date.now() + (duree ?? 30) * 60 * 1000
+    );
 
-    const [label, setLabel] = useState(formatTempsRestant(targetExpiry));
+    const [label, setLabel] = useState(formatTempsRestant(targetRef.current));
 
     useEffect(() => {
-        setLabel(formatTempsRestant(targetExpiry));
+        // Lance une seule fois, l'intervalle utilise la ref stable
         const t = setInterval(() => {
-            const r = targetExpiry - Date.now();
-            setLabel(r <= 0 ? "0:00" : formatTempsRestant(targetExpiry));
+            const r = targetRef.current - Date.now();
+            setLabel(r <= 0 ? "0:00" : formatTempsRestant(targetRef.current));
             if (r <= 0) clearInterval(t);
         }, 1000);
         return () => clearInterval(t);
-    }, [targetExpiry]);
+    }, []); // Dépendances vides = run once
 
     const mins = parseInt(label.split(":")[0]);
     return (
@@ -65,10 +68,7 @@ function CarteDefiActif({ defi, onCloture }: { defi: DefiActifManager; onCloture
         } finally { setCloturing(false); }
     }
 
-    const targetExpiry = defi.expiresAt > Date.now()
-        ? defi.expiresAt
-        : Date.now() + (defi.duree ?? 30) * 60 * 1000;
-    const estExpire = Date.now() >= targetExpiry;
+    const estExpire = defi.expiresAt <= Date.now() && defi.expiresAt > 0;
     const estPending = defi.status === "pending";
 
     return (
