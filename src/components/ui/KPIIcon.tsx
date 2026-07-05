@@ -22,6 +22,8 @@ import {
 
     Users,
 
+    Settings,
+
 } from "lucide-react";
 
 type Props = {
@@ -36,7 +38,8 @@ type Props = {
         | "bell"
         | "trend"
         | "box"
-        | "users";
+        | "users"
+        | "settings";
 
     size?: number;
 
@@ -99,6 +102,10 @@ export default function KPIIcon({
         case "users":
 
             return <Users {...props}/>;
+
+        case "settings":
+
+            return <Settings {...props}/>;
 
         default:
 

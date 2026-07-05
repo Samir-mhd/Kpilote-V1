@@ -21,6 +21,7 @@ import { formatTempsRestant } from "@/services/challengeService";
 import InitialesAvatar from "@/components/avatar/InitialesAvatar";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { getPhotosByIds } from "@/services/photoService";
+import LancerDefiCard from "@/components/manager/LancerDefiCard";
 
 // ─── Chrono live ──────────────────────────────────────────────────────────────
 
@@ -168,23 +169,27 @@ export default function DefisPage() {
     const [challenges, setChallenges]     = useState<ChallengeRow[]>([]);
     const [classement, setClassement]     = useState<StatsConseiller[]>([]);
     const [photos, setPhotos]             = useState<Record<string, string | null>>({});
+    const [conseillers, setConseillers]   = useState<{ id: string; prenom: string }[]>([]);
     const [loading, setLoading]           = useState(true);
     const [onglet, setOnglet]             = useState<"boutique" | "classement">("boutique");
 
     async function charger() {
         try {
             await cloturerChallengesExpires().catch(() => {});
-            const [actifs, d, c, cl] = await Promise.all([
+            const [actifs, d, c, cl, resC] = await Promise.all([
                 chargerDefisActifsManager(),
                 chargerDefis(),
                 chargerChallenges(),
                 chargerClassementDefisEtChallenges(),
+                supabase.from("conseillers").select("id, nom"),
             ]);
             setDefisActifs(actifs);
             setDefis(d);
             setChallenges(c);
             setClassement(cl);
-            // Charge les photos des conseillers du classement
+            setConseillers(
+                (resC.data ?? []).map((c: any) => ({ id: c.id, prenom: c.nom.split(" ")[0] }))
+            );
             const ids = cl.map(c => c.id).filter(Boolean);
             if (ids.length) getPhotosByIds(ids).then(setPhotos).catch(() => {});
         } catch { /* silencieux */ }
@@ -226,9 +231,7 @@ export default function DefisPage() {
             <div className="flex items-start justify-between">
                 <div>
                     <h1 className="text-4xl font-black text-slate-900">Défis & Challenges</h1>
-                    <p className="mt-2 text-slate-400">
-                        Défis entre conseillers · Challenges individuels
-                    </p>
+                    <p className="mt-2 text-slate-400">Défis entre conseillers · Challenges individuels</p>
                 </div>
                 {defisActifs.length > 0 && (
                     <div className="flex items-center gap-2 rounded-2xl bg-violet-50 px-4 py-2.5">
@@ -239,6 +242,11 @@ export default function DefisPage() {
                     </div>
                 )}
             </div>
+
+            {/* ── Lancer un défi / challenge ───────────────────────────── */}
+            {conseillers.length >= 2 && (
+                <LancerDefiCard conseillers={conseillers} />
+            )}
 
             {/* ── Défis actifs en haut ──────────────────────────────────── */}
             {defisActifs.length > 0 && (

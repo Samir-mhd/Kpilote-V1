@@ -66,7 +66,6 @@ function CarteHistorique({ item, nom }: { item: HistoriqueItem; nom: string }) {
 
     return (
         <div className={`rounded-[20px] border ${cfg.bg} ${cfg.border} p-5 transition-all hover:shadow-md`}>
-            {/* Ligne du haut : résultat + date */}
             <div className="flex items-center justify-between mb-4">
                 <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${cfg.badge}`}>
                     {cfg.icon} {cfg.label}
@@ -74,10 +73,7 @@ function CarteHistorique({ item, nom }: { item: HistoriqueItem; nom: string }) {
                 <span className="text-xs text-slate-400">{item.date}</span>
             </div>
 
-            {/* Face à face */}
             <div className="flex items-center gap-3">
-
-                {/* Joueur 1 — moi */}
                 <div className="flex flex-1 items-center gap-2 min-w-0">
                     <InitialesAvatar nom={item.nomMoi} size={40} />
                     <div className="min-w-0">
@@ -86,7 +82,6 @@ function CarteHistorique({ item, nom }: { item: HistoriqueItem; nom: string }) {
                     </div>
                 </div>
 
-                {/* Scores */}
                 <div className="flex-shrink-0 text-center px-3">
                     <p className="text-2xl font-black tabular-nums text-slate-800 leading-none">
                         <span className={item.resultat === "victory" ? "text-green-600" : ""}>{item.scoreMoi}</span>
@@ -97,7 +92,6 @@ function CarteHistorique({ item, nom }: { item: HistoriqueItem; nom: string }) {
                     <p className="text-xs text-slate-300">{item.duree}</p>
                 </div>
 
-                {/* Joueur 2 — adversaire */}
                 <div className="flex flex-1 items-center gap-2 justify-end min-w-0">
                     <div className="min-w-0 text-right">
                         <p className="font-black text-slate-800 text-sm truncate">{item.nomAdversaire}</p>
@@ -105,7 +99,6 @@ function CarteHistorique({ item, nom }: { item: HistoriqueItem; nom: string }) {
                     </div>
                     <InitialesAvatar nom={item.nomAdversaire} size={40} />
                 </div>
-
             </div>
         </div>
     );
@@ -113,7 +106,7 @@ function CarteHistorique({ item, nom }: { item: HistoriqueItem; nom: string }) {
 
 // ─── Page principale ─────────────────────────────────────────────────────────
 
-export default function ChallengesPage() {
+function ChallengesInner() {
     const searchParams = useSearchParams();
     const conseillerId = searchParams.get("id") ?? "";
     const nom = searchParams.get("nom") ?? "Conseiller";
@@ -139,7 +132,6 @@ export default function ChallengesPage() {
             try {
                 const enCours = await chargerChallenge(conseillerId);
                 if (!enCours) {
-                    // Le défi a été clôturé (par l'adversaire, par le serveur, etc.)
                     setActif(null);
                     const hist = await chargerHistoriqueChallenges(conseillerId, nom).catch(() => []);
                     setHistorique(hist);
@@ -155,8 +147,6 @@ export default function ChallengesPage() {
         if (countdownRef.current) clearInterval(countdownRef.current);
         if (!actif?.id || actif.status !== "running") return;
 
-        // Si expiresAt est dans le passé (challenge ancien sans started_at),
-        // on repart de maintenant + duree pour ne pas clôturer immédiatement
         const dureeMs     = (actif.duree ?? 30) * 60 * 1000;
         const targetExpiry = actif.expiresAt > Date.now()
             ? actif.expiresAt
@@ -257,7 +247,6 @@ export default function ChallengesPage() {
         }
     }
 
-    // Temps restant en minutes pour la couleur du chrono
     const minutesRestantes = countdown ? parseInt(countdown.split(":")[0]) : 99;
 
     if (loading) {
@@ -278,12 +267,10 @@ export default function ChallengesPage() {
                 <div className={`relative overflow-hidden rounded-[28px] p-8 text-white shadow-[0_12px_48px_rgba(109,40,217,.35)] transition-all ${
                     termine ? "bg-gradient-to-br from-slate-700 to-slate-800" : "bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700"
                 }`}>
-                    {/* Halos déco */}
                     <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
                     <div className="absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-fuchsia-500/20 blur-3xl pointer-events-none" />
 
                     <div className="relative">
-                        {/* Chrono + label */}
                         <div className="flex items-center justify-between mb-8">
                             <p className="text-xs font-bold uppercase tracking-[0.3em] text-white/60">
                                 {termine ? "⏱ Défi terminé — résultat en cours…" : "⚔️ Défi en cours"}
@@ -300,9 +287,7 @@ export default function ChallengesPage() {
                             </div>
                         </div>
 
-                        {/* Face à face */}
                         <div className="flex items-start gap-4">
-
                             <JoueurVS
                                 nom={nom}
                                 score={actif.scoreConseiller}
@@ -310,32 +295,24 @@ export default function ChallengesPage() {
                                 isWinner={actif.scoreConseiller > actif.scoreAdversaire}
                                 isLoser={actif.scoreConseiller < actif.scoreAdversaire}
                             />
-
-                            {/* Centre */}
                             <div className="flex flex-col items-center justify-center pt-4 flex-shrink-0">
-                                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-3xl">
-                                    ⚔️
-                                </div>
+                                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-3xl">⚔️</div>
                                 <p className="mt-2 text-xs font-black uppercase tracking-widest text-white/40">VS</p>
                                 <p className="mt-3 text-xs text-white/50 font-semibold">{actif.produit}</p>
                                 <p className="text-xs text-white/30">{actif.duree} min</p>
                             </div>
-
                             <JoueurVS
                                 nom={actif.adversaire}
                                 score={actif.scoreAdversaire}
                                 isWinner={actif.scoreAdversaire > actif.scoreConseiller}
                                 isLoser={actif.scoreAdversaire < actif.scoreConseiller}
                             />
-
                         </div>
 
-                        {/* Message coach */}
                         <div className="mt-6 rounded-2xl bg-white/10 px-5 py-4 backdrop-blur">
                             <p className="text-sm leading-6 text-white/80">{actif.message}</p>
                         </div>
 
-                        {/* Bouton forcer actualisation si chrono = 0 */}
                         {(termine || countdown === "0:00") && (
                             <button
                                 onClick={async () => {
@@ -529,4 +506,8 @@ export default function ChallengesPage() {
 
         </div>
     );
+}
+
+export default function ChallengesPage() {
+    return <Suspense><ChallengesInner /></Suspense>;
 }

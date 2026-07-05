@@ -3,8 +3,9 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { PRODUITS_ORDRE } from "@/utils/produits";
-import { Periode, PERIODE_LABELS, proratiserObjectif, couleurTaux } from "@/utils/periodes";
+import { Periode, PERIODE_LABELS, couleurTaux } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
+import type { ProduitCode } from "@/utils/produits";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { supabase } from "@/lib/supabase";
@@ -12,15 +13,27 @@ import { envoyerReaction } from "@/services/reactionService";
 
 const medals = ["🥇", "🥈", "🥉"];
 
+// Jours ouvrés restants dans le mois (aujourd'hui inclus, dimanches exclus)
+function workingDaysRemaining(): number {
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    let count = 0;
+    for (const d = new Date(now); d <= end; d.setDate(d.getDate() + 1)) {
+        if (d.getDay() !== 0) count++;
+    }
+    return Math.max(count, 1);
+}
+
 function ClassementInner() {
     const searchParams  = useSearchParams();
     const conseillerId  = searchParams.get("id") ?? "";
 
-    const [periode, setPeriode]   = useState<Periode>("mois");
-    const [classement, setClassement] = useState<ConseillerStats[]>([]);
-    const [photos, setPhotos]     = useState<Record<string, string | null>>({});
-    const [loading, setLoading]   = useState(true);
-    const [maj, setMaj]           = useState("");
+    const [periode, setPeriode]             = useState<Periode>("mois");
+    const [classement, setClassement]       = useState<ConseillerStats[]>([]);
+    const [moisMap, setMoisMap]             = useState(new Map<string, ConseillerStats>());
+    const [photos, setPhotos]               = useState<Record<string, string | null>>({});
+    const [loading, setLoading]             = useState(true);
+    const [maj, setMaj]                     = useState("");
     const [sentReactions, setSentReactions] = useState<Record<string, string>>({});
 
     const monNom = classement.find(c => c.id === conseillerId)?.nom ?? "";
@@ -35,8 +48,13 @@ function ClassementInner() {
     async function charger(p: Periode) {
         setLoading(true);
         try {
-            const data = await construireClassementPeriode(p);
+            const fetches = p === "mois"
+                ? [construireClassementPeriode("mois"), Promise.resolve([] as ConseillerStats[])]
+                : [construireClassementPeriode(p), construireClassementPeriode("mois")];
+
+            const [data, moisData] = await Promise.all(fetches);
             setClassement(data);
+            setMoisMap(new Map((p === "mois" ? data : moisData).map(c => [c.id, c])));
             setMaj(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
             const ids = data.map(c => c.id);
             const avs = await getPhotosByIds(ids).catch(() => ({}));
@@ -58,6 +76,20 @@ function ClassementInner() {
 
         return () => { supabase.removeChannel(channel); };
     }, [periode]);
+
+    // Objectif dynamique par conseiller × produit
+    function getObjDynamic(c: ConseillerStats, key: ProduitCode): number {
+        const objMois   = c.objectifs[key] ?? 0;
+        if (periode === "mois") return objMois;
+        const moisStats = moisMap.get(c.id);
+        const monthVal  = moisStats?.produits[key] ?? 0;
+        const periodVal = c.produits[key] ?? 0;
+        const doneBeforePeriod = Math.max(monthVal - periodVal, 0);
+        const remaining        = Math.max(objMois - doneBeforePeriod, 0);
+        const daysLeft         = workingDaysRemaining();
+        if (periode === "jour") return Math.ceil(remaining / daysLeft);
+        return Math.ceil(remaining / daysLeft * 6); // semaine : taux × 6 jours ouvrés
+    }
 
     const monRang = classement.findIndex(c => c.id === conseillerId) + 1;
     const top3    = classement.slice(0, 3);
@@ -169,7 +201,7 @@ function ClassementInner() {
                                 <tbody>
                                     {classement.map((c, idx) => {
                                         const isMoi   = c.id === conseillerId;
-                                        const totalObj = PRODUITS_ORDRE.reduce((t, p) => t + proratiserObjectif(c.objectifs[p.key], periode), 0);
+                                        const totalObj = PRODUITS_ORDRE.reduce((t, p) => t + getObjDynamic(c, p.key), 0);
                                         const taux    = totalObj > 0 ? Math.round((c.total / totalObj) * 100) : 0;
                                         const ct      = couleurTaux(c.total, totalObj);
                                         return (
@@ -189,7 +221,7 @@ function ClassementInner() {
                                                 </td>
                                                 {PRODUITS_ORDRE.map(p => {
                                                     const val = c.produits[p.key];
-                                                    const obj = Math.round(proratiserObjectif(c.objectifs[p.key], periode));
+                                                    const obj = getObjDynamic(c, p.key);
                                                     const col = couleurTaux(val, obj);
                                                     return (
                                                         <td key={p.code} className="px-3 py-3 text-center">
@@ -246,7 +278,7 @@ function ClassementInner() {
                                 </tbody>
                             </table>
                         </div>
-                        <div className="px-7 pb-5 pt-2 text-xs text-slate-300">Objectifs proratisés selon la période sélectionnée</div>
+                        <div className="px-7 pb-5 pt-2 text-xs text-slate-300">Objectifs en rythme dynamique — ajustés selon l'avancement du mois</div>
                     </div>
                     <style>{`
                         @keyframes reactPop {

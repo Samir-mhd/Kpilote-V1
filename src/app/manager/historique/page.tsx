@@ -7,7 +7,7 @@ import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 
 /* ─── Types ───────────────────────────────────────────────── */
 type Conseiller = { id: string; nom: string; };
-type Vente = { id: string; conseiller_id: string; produit: string; created_at: string; };
+type Vente = { id: string; conseiller_id: string; produits: any; created_at: string; };
 
 type Insight = {
     meilleureHeure: number | null;
@@ -72,7 +72,8 @@ function computeInsights(ventes30j: Vente[], ventesSemC: number, ventesSemP: num
         const j = jourSemaine(v.created_at);
         parHeure[h]          = (parHeure[h] ?? 0) + 1;
         parJour[j]           = (parJour[j] ?? 0) + 1;
-        parProduit[v.produit]= (parProduit[v.produit] ?? 0) + 1;
+        const pNom = v.produits?.nom ?? v.produits?.code ?? "Produit";
+        parProduit[pNom] = (parProduit[pNom] ?? 0) + 1;
         if (nomMap) parPersonne[v.conseiller_id] = (parPersonne[v.conseiller_id] ?? 0) + 1;
     }
 
@@ -153,10 +154,10 @@ export default function HistoriquePage() {
 
             const filtre = selectedId === "boutique" ? {} : { conseiller_id: selectedId };
 
-            let q30j  = supabase.from("ventes").select("id,conseiller_id,produit,created_at")
+            let q30j  = supabase.from("ventes").select("id,conseiller_id,created_at,produits(nom,code)")
                 .or("source.neq.cerebro_check,source.is.null")
                 .gte("created_at", debut30j.toISOString());
-            let qauj  = supabase.from("ventes").select("id,conseiller_id,produit,created_at")
+            let qauj  = supabase.from("ventes").select("id,conseiller_id,created_at,produits(nom,code)")
                 .or("source.neq.cerebro_check,source.is.null")
                 .gte("created_at", debutJour.toISOString())
                 .order("created_at", { ascending: true });
@@ -367,28 +368,38 @@ export default function HistoriquePage() {
                         {ventesAujourd.length === 0 ? (
                             <p className="py-8 text-center text-sm text-slate-300">Pas encore de vente aujourd'hui</p>
                         ) : (
-                            <div className="space-y-2">
-                                {[...ventesAujourd].reverse().map((v, i) => {
-                                    const hm = new Date(v.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-                                    const nom = nomMap[v.conseiller_id] ?? "—";
-                                    return (
-                                        <div key={v.id} className="flex items-center gap-4" style={{ animation: `fadeIn .3s ease ${i * 0.03}s both` }}>
-                                            <span className="w-12 flex-shrink-0 text-right text-xs font-black text-slate-400 tabular-nums">{hm}</span>
-                                            <div className="h-3 w-3 flex-shrink-0 rounded-full bg-violet-500" />
-                                            <div className="flex flex-1 items-center justify-between rounded-2xl bg-slate-50 px-4 py-2.5">
-                                                <span className="text-sm font-black text-slate-800">{v.produit}</span>
-                                                {selectedId === "boutique" && (
-                                                    <div className="flex items-center gap-2">
-                                                        <CartoonAvatar prenom={nom} etat="souriant_main" size={24} />
-                                                        <span className="text-xs font-bold text-slate-400">{nom.split(" ")[0]}</span>
-                                                    </div>
-                                                )}
-                                                <span className="text-[10px] text-slate-300">{timeAgo(v.created_at)}</span>
+                            <>
+                                <div
+                                    className="space-y-2 overflow-y-auto pr-1"
+                                    style={{ maxHeight: "calc(5 * 54px + 4 * 8px)" }}
+                                >
+                                    {[...ventesAujourd].reverse().map((v, i) => {
+                                        const hm = new Date(v.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+                                        const nom = nomMap[v.conseiller_id] ?? "—";
+                                        return (
+                                            <div key={v.id} className="flex items-center gap-4" style={{ animation: `fadeIn .3s ease ${i * 0.03}s both` }}>
+                                                <span className="w-12 flex-shrink-0 text-right text-xs font-black text-slate-400 tabular-nums">{hm}</span>
+                                                <div className="h-3 w-3 flex-shrink-0 rounded-full bg-violet-500" />
+                                                <div className="flex flex-1 items-center justify-between rounded-2xl bg-slate-50 px-4 py-2.5">
+                                                    <span className="text-sm font-black text-slate-800">{v.produits?.nom ?? v.produits?.code ?? "—"}</span>
+                                                    {selectedId === "boutique" && (
+                                                        <div className="flex items-center gap-2">
+                                                            <CartoonAvatar prenom={nom} etat="souriant_main" size={24} />
+                                                            <span className="text-xs font-bold text-slate-400">{nom.split(" ")[0]}</span>
+                                                        </div>
+                                                    )}
+                                                    <span className="text-[10px] text-slate-300">{timeAgo(v.created_at)}</span>
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                                        );
+                                    })}
+                                </div>
+                                {ventesAujourd.length > 5 && (
+                                    <p className="mt-3 text-center text-[10px] text-slate-300">
+                                        {ventesAujourd.length} ventes aujourd'hui · défiler pour tout voir
+                                    </p>
+                                )}
+                            </>
                         )}
                     </div>
 

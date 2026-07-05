@@ -22,11 +22,6 @@ const menu = [
         icon: "trophy" as const,
     },
     {
-        label: "Équipe",
-        href: "/manager/equipe",
-        icon: "users" as const,
-    },
-    {
         label: "Objectifs",
         href: "/manager/objectifs",
         icon: "target" as const,
@@ -40,6 +35,11 @@ const menu = [
         label: "Historique",
         href: "/manager/historique",
         icon: "bell" as const,
+    },
+    {
+        label: "Gestion équipe",
+        href: "/manager/gestion",
+        icon: "settings" as const,
     },
 ];
 

@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 /* ─── Types ──────────────────────────────────────────────── */
-type Vente = { id: string; produit: string; created_at: string; };
+type Vente = { id: string; produits: any; created_at: string; };
 
 type Insight = {
     meilleureHeure: number | null;
@@ -52,7 +52,8 @@ function computeInsights(ventes30j: Vente[], ventesSemCourante: number, ventesSe
         const j = jourSemaine(v.created_at);
         parHeure[h]         = (parHeure[h] ?? 0) + 1;
         parJour[j]          = (parJour[j] ?? 0) + 1;
-        parProduit[v.produit] = (parProduit[v.produit] ?? 0) + 1;
+        const pNom = v.produits?.nom ?? v.produits?.code ?? "Produit";
+        parProduit[pNom] = (parProduit[pNom] ?? 0) + 1;
     }
 
     const meilleureHeure = Object.keys(parHeure).length
@@ -115,13 +116,13 @@ function StatsInner() {
             lundiPrec.setDate(lundi.getDate() - 7);
 
             const [resAujourd, res30j, resSemCour, resSemPrec] = await Promise.all([
-                supabase.from("ventes").select("id,produit,created_at")
+                supabase.from("ventes").select("id,created_at,produits(nom,code)")
                     .eq("conseiller_id", conseillerId)
                     .or("source.neq.cerebro_check,source.is.null")
                     .gte("created_at", debutJour.toISOString())
                     .order("created_at", { ascending: true }),
 
-                supabase.from("ventes").select("id,produit,created_at")
+                supabase.from("ventes").select("id,created_at,produits(nom,code)")
                     .eq("conseiller_id", conseillerId)
                     .or("source.neq.cerebro_check,source.is.null")
                     .gte("created_at", debut30j.toISOString()),
@@ -278,7 +279,7 @@ function StatsInner() {
                                         <div className="h-3 w-3 rounded-full bg-violet-500" />
                                     </div>
                                     <div className="flex-1 rounded-2xl bg-violet-50 px-4 py-2.5">
-                                        <span className="text-sm font-black text-violet-700">{v.produit}</span>
+                                        <span className="text-sm font-black text-violet-700">{v.produits?.nom ?? v.produits?.code ?? "—"}</span>
                                     </div>
                                 </div>
                             );
