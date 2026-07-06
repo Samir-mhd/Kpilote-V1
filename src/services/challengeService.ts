@@ -73,10 +73,10 @@ export async function chargerChallenge(
     const nomMap: Record<string, string> = {};
     (conseillers ?? []).forEach((c: any) => { nomMap[c.id] = c.nom; });
 
-    // Si le créateur est le manager (UUID fixe), le "challenge" vient de KPILOTE
+    // Si le créateur est le manager (UUID fixe), le "challenge" vient du manager
     const adversaireNom =
         challenge.createur === MANAGER_UUID
-            ? "KPILOTE 🤖"
+            ? "Votre manager"
             : challenge.createur === conseillerId
             ? (nomMap[challenge.adversaire] ?? "Adversaire")
             : (nomMap[challenge.createur] ?? "Adversaire");

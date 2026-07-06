@@ -34,6 +34,9 @@ export type StatsConseiller = {
     challenges: { reussi: number; echoue: number; enCours: number };
 };
 
+// UUID fixe du manager — absent de la table conseillers
+const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
+
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function err(e: unknown, context: string): Error {
@@ -44,12 +47,17 @@ function err(e: unknown, context: string): Error {
 }
 
 function isDefi(row: any): boolean {
-    // Défi si type = "defi" OU si type absent mais adversaire présent
-    return row.type === "defi" || (!row.type && !!row.adversaire);
+    if (row.type === "defi")      return true;
+    if (row.type === "challenge") return false;
+    // Sans colonne type : c'est un défi si le créateur est un vrai conseiller (pas le manager)
+    return row.createur !== MANAGER_UUID;
 }
 
 function isChallenge(row: any): boolean {
-    return row.type === "challenge";
+    if (row.type === "challenge") return true;
+    if (row.type === "defi")      return false;
+    // Sans colonne type : c'est un challenge individuel si le créateur est le manager
+    return row.createur === MANAGER_UUID;
 }
 
 function statutDefi(status: string): DefiRow["statut"] {
@@ -58,7 +66,12 @@ function statutDefi(status: string): DefiRow["statut"] {
 
 function resultatChallenge(row: any): ResultatChallenge {
     if (row.status !== "finished" && row.status !== "done") return "en cours";
-    return row.vainqueur === row.createur ? "réussi" : "échoué";
+    // Challenge réussi si le conseiller (adversaire) a atteint l'objectif
+    if (row.vainqueur === row.adversaire) return "réussi";
+    const realise = row.score_adversaire ?? 0;
+    const objectif = row.objectif ?? 1;
+    if (realise >= objectif) return "réussi";
+    return "échoué";
 }
 
 // ─── Requête commune ──────────────────────────────────────────────────────────
@@ -81,8 +94,8 @@ async function tousLesChallenges(): Promise<any[]> {
 
     return data.map((c: any) => ({
         ...c,
-        createur_nom:  nomMap[c.createur]  ?? c.createur_nom  ?? "?",
-        adversaire_nom: nomMap[c.adversaire] ?? c.adversaire_nom ?? "?",
+        createur_nom:   c.createur  === MANAGER_UUID ? "Votre manager" : nomMap[c.createur]   ?? c.createur_nom   ?? "?",
+        adversaire_nom: c.adversaire === MANAGER_UUID ? "Votre manager" : nomMap[c.adversaire] ?? c.adversaire_nom ?? "?",
     }));
 }
 
@@ -102,12 +115,16 @@ export async function chargerDefis(): Promise<DefiRow[]> {
             produit: row.produit,
             scoreCreateur: row.score_createur ?? 0,
             scoreAdversaire: row.score_adversaire ?? 0,
-            vainqueur:
-                row.vainqueur === row.createur
-                    ? row.createur_nom
-                    : row.vainqueur === row.adversaire
-                    ? row.adversaire_nom
-                    : null,
+            vainqueur: (() => {
+                if (row.vainqueur === row.createur)   return row.createur_nom;
+                if (row.vainqueur === row.adversaire) return row.adversaire_nom;
+                // Fallback sur les scores si la colonne vainqueur est absente
+                const sc = row.score_createur ?? 0;
+                const sa = row.score_adversaire ?? 0;
+                if (sc > sa) return row.createur_nom;
+                if (sa > sc) return row.adversaire_nom;
+                return null;
+            })(),
             date: new Date(row.created_at).toLocaleDateString("fr-FR"),
             statut: statutDefi(row.status),
         }));

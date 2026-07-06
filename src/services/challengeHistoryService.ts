@@ -46,18 +46,25 @@ export async function chargerHistoriqueChallenges(
         const autreId = isCréateur ? c.adversaire : c.createur;
         const nomAdversaire =
             autreId === MANAGER_UUID
-                ? "Manager"
+                ? "Votre manager"
                 : nomMap[autreId] ??
                   (isCréateur ? c.adversaire_nom : c.createur_nom) ??
                   "Inconnu";
 
-        const scoreMoi = isCréateur ? (c.score_createur ?? 0) : (c.score_adversaire ?? 0);
+        const scoreMoi        = isCréateur ? (c.score_createur ?? 0) : (c.score_adversaire ?? 0);
         const scoreAdversaire = isCréateur ? (c.score_adversaire ?? 0) : (c.score_createur ?? 0);
 
-        let resultat: HistoriqueItem["resultat"] = "draw";
-        if (c.vainqueur === conseillerId) resultat = "victory";
-        else if (c.vainqueur === null || c.vainqueur === undefined) resultat = "draw";
-        else resultat = "defeat";
+        let resultat: HistoriqueItem["resultat"];
+        if (c.vainqueur === conseillerId) {
+            resultat = "victory";
+        } else if (c.vainqueur != null) {
+            resultat = "defeat";
+        } else {
+            // Fallback sur les scores si la colonne vainqueur est absente
+            if (scoreMoi > scoreAdversaire)        resultat = "victory";
+            else if (scoreAdversaire > scoreMoi)   resultat = "defeat";
+            else                                    resultat = "draw";
+        }
 
         return {
             id: c.id,

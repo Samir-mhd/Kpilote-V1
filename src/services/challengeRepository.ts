@@ -135,12 +135,13 @@ export async function chargerDefisActifsManager(): Promise<DefiActifManager[]> {
     const nomMap: Record<string, string> = {};
     (conseillers ?? []).forEach((c: any) => { nomMap[c.id] = c.nom; });
 
+    const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
     return data.map((c: any) => ({
         id:              c.id,
         createurId:      c.createur,
         adversaireId:    c.adversaire,
-        createurNom:     nomMap[c.createur] ?? "?",
-        adversaireNom:   nomMap[c.adversaire] ?? "?",
+        createurNom:     c.createur  === MANAGER_UUID ? "Votre manager" : nomMap[c.createur]  ?? "?",
+        adversaireNom:   c.adversaire === MANAGER_UUID ? "Votre manager" : nomMap[c.adversaire] ?? "?",
         produit:         c.produit ?? "—",
         duree:           c.duree ?? 30,
         objectif:        c.objectif ?? 0,
