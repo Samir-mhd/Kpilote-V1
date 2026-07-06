@@ -65,7 +65,9 @@ function buildMessage(
     codeCountToday: number,
     rankAfter: number,
     rankBefore: number,
+    genre?: string | null,
 ): string {
+    const il = genre === "F" ? "elle" : genre === "H" ? "il" : "il/elle";
     const e = feedEmoji(produitCode);
     const label = produitLabel(produitCode, produitNom);
 
@@ -133,7 +135,7 @@ function buildMessage(
             `${prenom} remet ça avec un ${label} ! ${e}`,
             `2ème ${label} pour ${prenom} aujourd'hui — ça colle bien ! ${e}`,
             `${prenom} confirme sur le ${label}, 2 dans la journée ! ${e}`,
-            `${label} x2 pour ${prenom} — il/elle maîtrise ! ${e}`,
+            `${label} x2 pour ${prenom} — ${il} maîtrise ! ${e}`,
             `${prenom} double la mise sur le ${label} ! ${e}`,
         ]);
     }
@@ -193,16 +195,17 @@ function extractProduit(v: any): { produitNom: string; produitCode: string } {
 export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
     const [entries, setEntries] = useState<Entry[]>([]);
     const [dbError, setDbError] = useState<string | null>(null);
-    const namesRef = useRef<Record<string, string>>({});
+    const namesRef  = useRef<Record<string, string>>({});
+    const genresRef = useRef<Record<string, string | null>>({});
     const countsRef = useRef<Counts>({});
-    const ranksRef = useRef<Record<string, number>>({});
+    const ranksRef  = useRef<Record<string, number>>({});
 
     useEffect(() => {
         const debut = new Date();
         debut.setHours(0, 0, 0, 0);
 
         Promise.all([
-            supabase.from("conseillers").select("id, nom"),
+            supabase.from("conseillers").select("id, nom, genre"),
             supabase
                 .from("ventes")
                 .select("id, conseiller_id, created_at, source, produits(nom, code)")
@@ -216,8 +219,10 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
             }
 
             const map: Record<string, string> = {};
-            (resC.data ?? []).forEach((c: any) => { map[c.id] = c.nom; });
-            namesRef.current = map;
+            const gmap: Record<string, string | null> = {};
+            (resC.data ?? []).forEach((c: any) => { map[c.id] = c.nom; gmap[c.id] = c.genre ?? null; });
+            namesRef.current  = map;
+            genresRef.current = gmap;
 
             const rawVentes = (resV.data ?? []).filter((v: any) => v.source !== "cerebro_check");
 
@@ -227,10 +232,12 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
             const tempRanks: Record<string, number> = {};
             const built: Entry[] = [];
 
+            const nbConseillers = Object.keys(map).length;
+
             ventesAsc.forEach((v: any) => {
                 const cid = v.conseiller_id;
                 const { produitNom, produitCode } = extractProduit(v);
-                const rankBefore = tempRanks[cid] ?? 999;
+                const rankBefore = tempRanks[cid] ?? nbConseillers;
 
                 if (!tempCounts[cid]) tempCounts[cid] = { total: 0, byCode: {} };
                 tempCounts[cid].total++;
@@ -257,6 +264,7 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
                         tempCounts[cid].byCode[produitCode],
                         rankAfter,
                         rankBefore,
+                        gmap[cid],
                     ),
                 });
             });
@@ -277,7 +285,8 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
                 if (v.source === "cerebro_check") return;
 
                 const cid = v.conseiller_id;
-                const rankBefore = ranksRef.current[cid] ?? 999;
+                const nbTotal = Object.keys(namesRef.current).length;
+                const rankBefore = ranksRef.current[cid] ?? nbTotal;
 
                 // Le Realtime ne retourne pas les jointures — on utilise produit_id comme code de secours
                 const produitCode = v.produit_code ?? "";
@@ -307,6 +316,7 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
                         countsRef.current[cid].byCode[produitCode],
                         rankAfter,
                         rankBefore,
+                        genresRef.current[cid],
                     ),
                 };
                 setEntries(prev => [entry, ...prev].slice(0, 15));

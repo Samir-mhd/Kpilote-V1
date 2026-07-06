@@ -13,6 +13,7 @@ type Conseiller = {
     prenom: string | null;
     avatar: string | null;
     ordre: number;
+    genre: "H" | "F" | null;
 };
 
 type DeleteMode = "archive" | "full";
@@ -89,6 +90,13 @@ export default function GestionEquipePage() {
         } finally {
             setUploadingId(null);
         }
+    }
+
+    async function toggleGenre(id: string, actuel: "H" | "F" | null) {
+        const next = actuel === "H" ? "F" : actuel === "F" ? null : "H";
+        const { error } = await supabase.from("conseillers").update({ genre: next }).eq("id", id);
+        if (error) { afficherToast("Erreur mise à jour genre.", false); return; }
+        setConseillers(prev => prev.map(c => c.id === id ? { ...c, genre: next } : c));
     }
 
     async function supprimerAvatar(id: string) {
@@ -292,6 +300,19 @@ export default function GestionEquipePage() {
                                                 </svg>
                                             </button>
                                         )}
+
+                                        {/* Genre H/F */}
+                                        <button
+                                            onClick={() => toggleGenre(c.id, c.genre)}
+                                            className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-black transition-all ${
+                                                c.genre === "H" ? "bg-blue-100 text-blue-600"
+                                                : c.genre === "F" ? "bg-pink-100 text-pink-600"
+                                                : "bg-slate-100 text-slate-400 hover:bg-slate-200"
+                                            }`}
+                                            title={`Genre : ${c.genre ?? "non défini"} — cliquer pour changer`}
+                                        >
+                                            {c.genre ?? "?"}
+                                        </button>
 
                                         {/* Renommer */}
                                         <button

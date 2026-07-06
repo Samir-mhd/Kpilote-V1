@@ -113,10 +113,8 @@ export default function Dashboard() {
 
         // Si expiresAt est déjà dans le passé (challenge ancien sans started_at),
         // on repart de maintenant + duree pour que le chrono soit toujours valide
-        const dureeMs = (defisActif.duree ?? 30) * 60 * 1000;
-        defiExpiresAtRef.current = defisActif.expiresAt > Date.now()
-            ? defisActif.expiresAt
-            : Date.now() + dureeMs;
+        // Si expiresAt est déjà passé, on ne relance pas à 0 — le challenge est terminé
+        defiExpiresAtRef.current = defisActif.expiresAt > Date.now() ? defisActif.expiresAt : 0;
 
         const tick = () => {
             const r = defiExpiresAtRef.current - Date.now();

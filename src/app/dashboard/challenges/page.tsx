@@ -147,10 +147,8 @@ function ChallengesInner() {
         if (countdownRef.current) clearInterval(countdownRef.current);
         if (!actif?.id || actif.status !== "running") return;
 
-        const dureeMs     = (actif.duree ?? 30) * 60 * 1000;
-        const targetExpiry = actif.expiresAt > Date.now()
-            ? actif.expiresAt
-            : Date.now() + dureeMs;
+        // Si expiresAt est déjà passé, on considère le challenge terminé — pas de relance à 0
+        const targetExpiry = actif.expiresAt > Date.now() ? actif.expiresAt : 0;
 
         setCountdown(formatTempsRestant(targetExpiry));
         setTermine(false);
