@@ -53,7 +53,7 @@ export default function CartoonAvatar({ prenom, etat = "souriant_main", classNam
             alt={prenom}
             className={className}
             style={size ? { width: size, height: size, objectFit: "contain" } : undefined}
-            onError={() => setError(true)}
+            onError={() => { console.warn(`[CartoonAvatar] 404 → /avatar/${dossier}/${prefix}_${imageEtat}.png`); setError(true); }}
         />
     );
 }
