@@ -204,15 +204,17 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
         const debut = new Date();
         debut.setHours(0, 0, 0, 0);
 
-        Promise.all([
-            supabase.from("conseillers").select("id, nom"),
-            supabase
-                .from("ventes")
-                .select("id, conseiller_id, created_at, source, produits(nom, code)")
-                .gte("created_at", debut.toISOString())
-                .order("created_at", { ascending: false })
-                .limit(50),
-        ]).then(async ([resC, resV]) => {
+        (async () => {
+            const [resC, resV] = await Promise.all([
+                supabase.from("conseillers").select("id, nom"),
+                supabase
+                    .from("ventes")
+                    .select("id, conseiller_id, created_at, source, produits(nom, code)")
+                    .gte("created_at", debut.toISOString())
+                    .order("created_at", { ascending: false })
+                    .limit(50),
+            ]);
+
             if (resV.error) {
                 setDbError(`Erreur ventes: ${resV.error.message} (${resV.error.code})`);
                 return;
@@ -224,10 +226,12 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
 
             // Fetch genre séparément — résistant si la colonne n'existe pas encore
             const gmap: Record<string, string | null> = {};
-            const resG = await supabase.from("conseillers").select("id, genre");
-            if (!resG.error && resG.data) {
-                resG.data.forEach((c: any) => { gmap[c.id] = c.genre ?? null; });
-            }
+            try {
+                const resG = await supabase.from("conseillers").select("id, genre");
+                if (!resG.error && resG.data) {
+                    resG.data.forEach((c: any) => { gmap[c.id] = c.genre ?? null; });
+                }
+            } catch { /* colonne absente ou erreur réseau — on ignore */ }
             genresRef.current = gmap;
 
             const rawVentes = (resV.data ?? []).filter((v: any) => v.source !== "cerebro_check");
@@ -279,7 +283,7 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
             ranksRef.current = computeRanks(tempCounts);
 
             setEntries(built.reverse().slice(0, 15));
-        });
+        })();
     }, []);
 
     // Realtime : nouvelles ventes en direct
