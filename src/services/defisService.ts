@@ -173,19 +173,30 @@ export async function chargerClassementDefisEtChallenges(): Promise<StatsConseil
         const termine = row.status === "finished" || row.status === "done";
 
         if (isChallenge(row)) {
-            const c = getOrCreate(row.createur, row.createur_nom);
-            if (!termine) c.challenges.enCours++;
-            else if (row.vainqueur === row.createur) c.challenges.reussi++;
-            else c.challenges.echoue++;
+            // Le challenge porte sur l'adversaire (conseiller challengé) — pas le créateur (manager)
+            const c = getOrCreate(row.adversaire, row.adversaire_nom);
+            if (!termine) {
+                c.challenges.enCours++;
+            } else {
+                const sc = row.score_createur ?? 0;
+                const sa = row.score_adversaire ?? 0;
+                const vainqueur = row.vainqueur ?? (sa > sc ? row.adversaire : sa < sc ? row.createur : null);
+                if (vainqueur === row.adversaire) c.challenges.reussi++;
+                else c.challenges.echoue++;
+            }
         } else {
-            // défi
+            // défi entre conseillers
             if (!termine) return;
-            const createur = getOrCreate(row.createur, row.createur_nom);
+            const createur  = getOrCreate(row.createur,  row.createur_nom);
             const adversaire = getOrCreate(row.adversaire, row.adversaire_nom);
-            if (row.vainqueur === null) {
+            // Vainqueur : depuis DB, sinon fallback scores (si colonne absente)
+            const sc = row.score_createur ?? 0;
+            const sa = row.score_adversaire ?? 0;
+            const vainqueur = row.vainqueur ?? (sc > sa ? row.createur : sa > sc ? row.adversaire : null);
+            if (vainqueur == null) {
                 createur.defis.egalite++;
                 adversaire.defis.egalite++;
-            } else if (row.vainqueur === row.createur) {
+            } else if (vainqueur === row.createur) {
                 createur.defis.gagne++;
                 adversaire.defis.perdu++;
             } else {
