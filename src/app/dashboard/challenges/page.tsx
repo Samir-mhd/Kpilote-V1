@@ -9,7 +9,10 @@ import { chargerChallenge, formatTempsRestant } from "@/services/challengeServic
 import { cloturerChallenge } from "@/services/challengeRepository";
 import { creerChallenge } from "@/services/challengeSupabase";
 import { getConseillers, getChallengeSuggestion } from "@/services/conseillers";
+import { chargerClassementDefisEtChallenges, StatsConseiller } from "@/services/defisService";
+import { getPhotosByIds } from "@/services/photoService";
 import InitialesAvatar from "@/components/avatar/InitialesAvatar";
+import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 
 const PRODUITS = ["Box", "Forfaits", "Téléphones", "McAfee", "Assurance"];
 const DUREES = [15, 30, 45, 60];
@@ -123,7 +126,9 @@ function ChallengesInner() {
     const [form, setForm] = useState({ adversaires: [] as string[], produit: "Box", duree: 30, objectif: 5 });
     const [envoi, setEnvoi] = useState(false);
     const [succes, setSucces] = useState<string | null>(null);
-    const [onglet, setOnglet] = useState<"historique" | "envoyer">("historique");
+    const [onglet, setOnglet] = useState<"historique" | "classement" | "envoyer">("historique");
+    const [classement, setClassement] = useState<StatsConseiller[]>([]);
+    const [photos, setPhotos] = useState<Record<string, string | null>>({});
 
     // Re-check toutes les 30s : si le défi n'est plus actif en DB → efface le bloc
     useEffect(() => {
@@ -188,16 +193,20 @@ function ChallengesInner() {
         async function charger() {
             setLoading(true);
             try {
-                const [hist, actifData, consData, suggData] = await Promise.all([
+                const [hist, actifData, consData, suggData, cl] = await Promise.all([
                     chargerHistoriqueChallenges(conseillerId, nom),
                     chargerChallenge(conseillerId),
                     getConseillers(),
                     getChallengeSuggestion(conseillerId),
+                    chargerClassementDefisEtChallenges(),
                 ]);
                 setHistorique(hist);
                 setActif(actifData);
                 setConseillers(consData.filter((c: any) => c.id !== conseillerId));
                 setSuggestion(suggData);
+                setClassement(cl);
+                const ids = cl.map((c: StatsConseiller) => c.id).filter(Boolean);
+                if (ids.length) getPhotosByIds(ids).then(setPhotos).catch(() => {});
                 if (suggData?.adversaire && consData.length > 0) {
                     const adv = consData.find((c: any) => c.nom === suggData.adversaire || c.prenom === suggData.adversaire);
                     if (adv) setForm((f) => ({ ...f, adversaires: [adv.id], produit: suggData.produit ?? "Box" }));
@@ -333,7 +342,7 @@ function ChallengesInner() {
 
             {/* ── Onglets ─────────────────────────────────────────────────────── */}
             <div className="flex gap-2">
-                {([["historique", "Historique"], ["envoyer", "Lancer un défi"]] as const).map(([v, label]) => (
+                {([["historique", "Historique"], ["classement", "Classement"], ["envoyer", "Lancer un défi"]] as const).map(([v, label]) => (
                     <button
                         key={v}
                         onClick={() => setOnglet(v)}
@@ -366,6 +375,134 @@ function ChallengesInner() {
                             ))}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ── Classement ──────────────────────────────────────────────────── */}
+            {onglet === "classement" && (
+                <div className="space-y-3">
+                    {classement.length === 0 ? (
+                        <div className="rounded-[24px] bg-white p-10 text-center shadow-[0_4px_24px_rgba(15,23,42,.07)]">
+                            <p className="text-4xl">⚔️</p>
+                            <p className="mt-4 font-black text-slate-600">Pas encore de classement</p>
+                            <p className="mt-2 text-sm text-slate-400">Lance un défi pour figurer ici !</p>
+                        </div>
+                    ) : classement.map((c, idx) => {
+                        const estMoi  = c.id === conseillerId;
+                        const totalD  = c.defis.gagne + c.defis.perdu + c.defis.egalite;
+                        const totalCh = c.challenges.reussi + c.challenges.echoue;
+                        const tauxD   = totalD  > 0 ? Math.round((c.defis.gagne  / totalD)  * 100) : 0;
+                        const tauxCh  = totalCh > 0 ? Math.round((c.challenges.reussi / totalCh) * 100) : 0;
+                        const score   = c.defis.gagne * 3 + c.defis.egalite + c.challenges.reussi * 2;
+                        const medals  = ["🥇", "🥈", "🥉"];
+
+                        return (
+                            <div key={c.id} className={`relative overflow-hidden rounded-[22px] bg-white shadow-[0_2px_16px_rgba(15,23,42,.06)] transition-all ${
+                                estMoi
+                                    ? "ring-2 ring-violet-400/60 shadow-[0_4px_24px_rgba(109,40,217,.12)]"
+                                    : idx === 0
+                                    ? "ring-2 ring-amber-300/60"
+                                    : ""
+                            }`}>
+                                {estMoi && (
+                                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-violet-50/70 via-transparent to-transparent" />
+                                )}
+                                {!estMoi && idx === 0 && (
+                                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-amber-50/60 via-transparent to-transparent" />
+                                )}
+
+                                <div className="relative flex items-stretch">
+
+                                    {/* Rang + identité */}
+                                    <div className="flex items-center gap-3 px-4 py-4 flex-shrink-0 w-48">
+                                        <span className="w-7 text-center flex-shrink-0">
+                                            {idx < 3
+                                                ? <span className="text-lg">{medals[idx]}</span>
+                                                : <span className="text-sm font-black text-slate-300">{idx + 1}</span>
+                                            }
+                                        </span>
+                                        <PhotoAvatar nom={c.nom} photoUrl={photos[c.id]} size={38} />
+                                        <div className="min-w-0">
+                                            <p className={`font-black truncate text-sm ${estMoi ? "text-violet-700" : "text-slate-900"}`}>
+                                                {c.nom.split(" ")[0]}
+                                            </p>
+                                            {estMoi && <p className="text-[10px] font-bold text-violet-400">Toi</p>}
+                                            {c.challenges.enCours > 0 && !estMoi && (
+                                                <p className="text-[10px] text-amber-500 font-bold">⏳ en cours</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="w-px bg-slate-100 my-3 flex-shrink-0" />
+
+                                    {/* Défis */}
+                                    <div className="flex-1 px-4 py-3 flex flex-col justify-center gap-1.5">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-400">⚔️ Défis</span>
+                                            {totalD > 0 && <span className="text-xs font-black text-violet-600">{tauxD}%</span>}
+                                        </div>
+                                        <div className="flex gap-1 flex-wrap">
+                                            {c.defis.gagne > 0 && (
+                                                <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-black text-violet-700">🏆{c.defis.gagne}</span>
+                                            )}
+                                            {c.defis.egalite > 0 && (
+                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">🤝{c.defis.egalite}</span>
+                                            )}
+                                            {c.defis.perdu > 0 && (
+                                                <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-400">💪{c.defis.perdu}</span>
+                                            )}
+                                            {totalD === 0 && <span className="text-[10px] text-slate-300">—</span>}
+                                        </div>
+                                        {totalD > 0 && (
+                                            <div className="flex h-1 overflow-hidden rounded-full bg-slate-100">
+                                                <div className="bg-violet-500" style={{ width: `${(c.defis.gagne / totalD) * 100}%` }} />
+                                                <div className="bg-slate-300" style={{ width: `${(c.defis.egalite / totalD) * 100}%` }} />
+                                                <div className="bg-red-200" style={{ width: `${(c.defis.perdu / totalD) * 100}%` }} />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="w-px bg-slate-100 my-3 flex-shrink-0" />
+
+                                    {/* Challenges */}
+                                    <div className="flex-1 px-4 py-3 flex flex-col justify-center gap-1.5">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">🎯 Challenges</span>
+                                            {totalCh > 0 && <span className="text-xs font-black text-emerald-600">{tauxCh}%</span>}
+                                        </div>
+                                        <div className="flex gap-1 flex-wrap">
+                                            {c.challenges.reussi > 0 && (
+                                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black text-emerald-700">✅{c.challenges.reussi}</span>
+                                            )}
+                                            {c.challenges.echoue > 0 && (
+                                                <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-400">❌{c.challenges.echoue}</span>
+                                            )}
+                                            {c.challenges.enCours > 0 && (
+                                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-500">⏳{c.challenges.enCours}</span>
+                                            )}
+                                            {totalCh === 0 && c.challenges.enCours === 0 && <span className="text-[10px] text-slate-300">—</span>}
+                                        </div>
+                                        {totalCh > 0 && (
+                                            <div className="flex h-1 overflow-hidden rounded-full bg-slate-100">
+                                                <div className="bg-emerald-500" style={{ width: `${(c.challenges.reussi / totalCh) * 100}%` }} />
+                                                <div className="bg-red-200" style={{ width: `${(c.challenges.echoue / totalCh) * 100}%` }} />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="w-px bg-slate-100 my-3 flex-shrink-0" />
+
+                                    {/* Score */}
+                                    <div className="flex flex-col items-center justify-center px-5 flex-shrink-0 w-20">
+                                        <p className={`text-2xl font-black tabular-nums ${estMoi ? "text-violet-600" : idx === 0 ? "text-amber-500" : "text-slate-800"}`}>
+                                            {score}
+                                        </p>
+                                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-300">pts</p>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
 
