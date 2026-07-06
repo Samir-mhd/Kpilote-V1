@@ -140,7 +140,7 @@ export async function chargerChallenges(): Promise<ChallengeRow[]> {
         .filter((r) => isChallenge(r))
         .map((row): ChallengeRow => ({
             id: row.id,
-            conseiller: row.createur_nom ?? "—",
+            conseiller: row.adversaire_nom ?? "—",
             produit: row.produit,
             objectif: row.objectif ?? 0,
             realise: row.score_createur ?? 0,
