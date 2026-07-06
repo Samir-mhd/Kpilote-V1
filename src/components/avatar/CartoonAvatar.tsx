@@ -18,7 +18,8 @@ export type AvatarEtat =
  * Chemin final : /avatar/Andréa/andrea_souriant_main.png
  */
 function prenomDossier(nom: string): string {
-    return nom.split(" ")[0];
+    const p = nom.split(" ")[0];
+    return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
 }
 
 export function normPrenom(nom: string): string {
