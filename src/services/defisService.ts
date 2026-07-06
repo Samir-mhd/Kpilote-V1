@@ -143,7 +143,7 @@ export async function chargerChallenges(): Promise<ChallengeRow[]> {
             conseiller: row.adversaire_nom ?? "—",
             produit: row.produit,
             objectif: row.objectif ?? 0,
-            realise: row.score_createur ?? 0,
+            realise: row.score_adversaire ?? 0,
             resultat: resultatChallenge(row),
             date: new Date(row.created_at).toLocaleDateString("fr-FR"),
         }));
