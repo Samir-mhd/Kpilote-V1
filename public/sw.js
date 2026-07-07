@@ -1,7 +1,7 @@
 // KPILOTE Service Worker
 // Stratégie : cache-first pour les assets statiques, network-first pour les données
 
-const CACHE_VERSION = 'kpilote-v1';
+const CACHE_VERSION = 'kpilote-v3';
 
 const STATIC_ASSETS = [
   '/',
@@ -64,8 +64,10 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.match(event.request).then(
         (cached) => cached || fetch(event.request).then((resp) => {
-          const clone = resp.clone();
-          caches.open(CACHE_VERSION).then((c) => c.put(event.request, clone));
+          if (resp.ok) {
+            const clone = resp.clone();
+            caches.open(CACHE_VERSION).then((c) => c.put(event.request, clone));
+          }
           return resp;
         })
       )
@@ -77,8 +79,10 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((resp) => {
-        const clone = resp.clone();
-        caches.open(CACHE_VERSION).then((c) => c.put(event.request, clone));
+        if (resp.ok) {
+          const clone = resp.clone();
+          caches.open(CACHE_VERSION).then((c) => c.put(event.request, clone));
+        }
         return resp;
       })
       .catch(() => caches.match(event.request))
