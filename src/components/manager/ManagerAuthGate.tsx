@@ -1,23 +1,36 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import ManagerMorningCheck from "./ManagerMorningCheck";
 
 const NOM_MANAGER = process.env.NEXT_PUBLIC_MANAGER_NAME ?? "Manager";
-const SESSION_KEY = "kpilote_manager_auth";
+const SESSION_KEY  = "kpilote_manager_auth";
+const CHECK_KEY    = "kpilote_manager_check_date";
+
+function dateLocale(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function checkFaitAujourdhui(): boolean {
+    try { return localStorage.getItem(CHECK_KEY) === dateLocale(); } catch { return false; }
+}
 
 type Props = { children: React.ReactNode };
 
 export default function ManagerAuthGate({ children }: Props) {
-    const [etat, setEtat]     = useState<"loading" | "locked" | "unlocked">("loading");
+    const [etat, setEtat]     = useState<"loading" | "locked" | "check" | "unlocked">("loading");
     const [code, setCode]     = useState("");
     const [erreur, setErreur] = useState(false);
     const [checking, setChecking] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        // Vérifie si déjà auth dans cette session
+        // Déjà auth dans cette session ?
         const ok = sessionStorage.getItem(SESSION_KEY) === "ok";
-        setEtat(ok ? "unlocked" : "locked");
+        if (!ok) { setEtat("locked"); return; }
+        // Auth OK : check morning fait aujourd'hui ?
+        setEtat(checkFaitAujourdhui() ? "unlocked" : "check");
     }, []);
 
     useEffect(() => {
@@ -41,7 +54,7 @@ export default function ManagerAuthGate({ children }: Props) {
 
             if (res.ok) {
                 sessionStorage.setItem(SESSION_KEY, "ok");
-                setEtat("unlocked");
+                setEtat(checkFaitAujourdhui() ? "unlocked" : "check");
             } else {
                 setErreur(true);
                 setCode("");
@@ -60,6 +73,10 @@ export default function ManagerAuthGate({ children }: Props) {
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-500 border-t-transparent" />
             </div>
         );
+    }
+
+    if (etat === "check") {
+        return <ManagerMorningCheck onValidated={() => setEtat("unlocked")} />;
     }
 
     if (etat === "unlocked") {

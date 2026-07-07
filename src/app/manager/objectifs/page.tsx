@@ -13,6 +13,8 @@ import {
     updateObjectifMensuel,
     ObjectifManagerRow,
 } from "@/services/objectifs";
+import { exporterObjectifsPDF } from "@/utils/exportObjectifsPDF";
+import Link from "next/link";
 
 const colonnesProduits: { label: string; code: string }[] = [
     { label: "Box", code: "box" },
@@ -104,13 +106,29 @@ export default function ObjectifsPage() {
                 KPILOTE MANAGER
             </p>
 
-            <h1 className="mt-4 text-5xl font-black text-slate-900">
-                Objectifs
-            </h1>
+            <div className="mt-4 flex items-end justify-between gap-4">
+                <div>
+                    <h1 className="text-5xl font-black text-slate-900">Objectifs</h1>
+                    <p className="mt-4 max-w-2xl text-lg text-slate-500">
+                        Saisis ou ajuste les objectifs mensuels de chaque conseiller, produit par produit.
+                    </p>
+                </div>
 
-            <p className="mt-4 max-w-2xl text-lg text-slate-500">
-                Saisis ou ajuste les objectifs mensuels de chaque conseiller, produit par produit.
-            </p>
+                {lignes.length > 0 && (
+                    <button
+                        onClick={() => exporterObjectifsPDF(lignes, colonnesProduits)}
+                        className="group flex flex-shrink-0 items-center gap-2.5 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-5 py-3 text-sm font-black text-violet-700 shadow-sm transition-all hover:border-violet-400 hover:from-violet-100 hover:to-fuchsia-100 hover:shadow-md active:scale-[0.97]"
+                    >
+                        <svg className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="12" y1="18" x2="12" y2="12"/>
+                            <polyline points="9 15 12 18 15 15"/>
+                        </svg>
+                        Exporter PDF
+                    </button>
+                )}
+            </div>
 
             {/* ── Objectifs Boutique ── */}
             <div className="mt-8">
@@ -140,6 +158,7 @@ export default function ObjectifsPage() {
                                                 {colonne.label}
                                             </th>
                                         ))}
+                                        <th className="px-4 pb-2 text-center">Bilan</th>
                                     </tr>
                                 </thead>
 
@@ -150,14 +169,13 @@ export default function ObjectifsPage() {
                                                 {ligne.nom}
                                             </td>
 
-                                            {colonnesProduits.map((colonne, index) => {
+                                            {colonnesProduits.map((colonne) => {
                                                 const cellule = ligne.cellules[colonne.code];
-                                                const estDerniere = index === colonnesProduits.length - 1;
 
                                                 return (
                                                     <td
                                                         key={colonne.code}
-                                                        className={`px-4 py-4 text-center ${estDerniere ? "rounded-r-2xl" : ""}`}
+                                                        className="px-4 py-4 text-center"
                                                     >
                                                         {cellule ? (
                                                             <input
@@ -178,6 +196,18 @@ export default function ObjectifsPage() {
                                                     </td>
                                                 );
                                             })}
+                                            <td className="rounded-r-2xl px-4 py-4 text-center">
+                                                <Link
+                                                    href={`/manager/entretien/${ligne.conseillerId}`}
+                                                    className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-black text-violet-600 transition-all hover:border-violet-400 hover:bg-violet-100"
+                                                >
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                                        <polyline points="14 2 14 8 20 8"/>
+                                                    </svg>
+                                                    Bilan
+                                                </Link>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>

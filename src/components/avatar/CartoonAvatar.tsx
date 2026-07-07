@@ -13,12 +13,15 @@ export type AvatarEtat =
     | "malheureux_perdu";
 
 /**
- * Dossier = premier mot du nom tel quel : "Andréa Dupont" → "Andréa"
- * Préfixe fichier = premier mot normalisé : "Andréa" → "andrea"
- * Chemin final : /avatar/Andréa/andrea_souriant_main.png
+ * Dossier = premier mot ASCII-normalisé : "Andréa Dupont" → "Andrea"
+ * Préfixe fichier = premier mot normalisé lowercase : "Andréa" → "andrea"
+ * Chemin final : /avatar/Andrea/andrea_souriant_main.png
  */
 function prenomDossier(nom: string): string {
-    const p = nom.split(" ")[0];
+    const p = nom.split(" ")[0]
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-zA-Z0-9]/g, "");
     return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
 }
 

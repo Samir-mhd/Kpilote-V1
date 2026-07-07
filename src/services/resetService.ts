@@ -197,6 +197,73 @@ export async function marquerCheckFait(conseillerId: string): Promise<void> {
         .eq("id", conseillerId);
 }
 
+const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
+
+/**
+ * Ajuste les totaux boutique à partir du Cerebro Check manager.
+ * Insère les deltas comme ventes source="cerebro_check" liées au MANAGER_UUID.
+ * Identique à ajusterCheckCerebro mais agrège TOUS les conseillers.
+ */
+export async function ajusterCheckCerebroManager(
+    desiredTotals: Record<string, number> // { produitCode: total_désiré_boutique }
+): Promise<void> {
+    const debut = debutMois();
+    const fin   = finMois();
+    const codes = Object.keys(desiredTotals);
+    if (codes.length === 0) return;
+
+    const { data: produits, error: errP } = await supabase
+        .from("produits")
+        .select("id, code")
+        .in("code", codes);
+    if (errP) throw new Error(errP.message ?? "Erreur récupération produits");
+
+    const produitsMap: Record<string, string> = {};
+    (produits ?? []).forEach((p: any) => { produitsMap[p.code] = p.id; });
+
+    // Somme de TOUTES les ventes du mois, sauf les ajustements manager existants
+    const { data: allVentes } = await supabase
+        .from("ventes")
+        .select("produit_id, quantite, source, conseiller_id")
+        .gte("created_at", debut)
+        .lte("created_at", fin);
+
+    const actualByProduitId: Record<string, number> = {};
+    (allVentes ?? []).forEach((v: any) => {
+        if (v.conseiller_id === MANAGER_UUID && v.source === "cerebro_check") return;
+        actualByProduitId[v.produit_id] = (actualByProduitId[v.produit_id] ?? 0) + (v.quantite ?? 1);
+    });
+
+    // Supprimer les anciens ajustements manager du mois
+    await supabase
+        .from("ventes")
+        .delete()
+        .eq("conseiller_id", MANAGER_UUID)
+        .eq("source", "cerebro_check")
+        .gte("created_at", debut)
+        .lte("created_at", fin);
+
+    const premierMois = new Date();
+    premierMois.setDate(1);
+    premierMois.setHours(12, 0, 0, 0);
+
+    const inserts = codes
+        .map(code => {
+            const produitId = produitsMap[code];
+            if (!produitId) return null;
+            const actual  = actualByProduitId[produitId] ?? 0;
+            const desired = desiredTotals[code] ?? 0;
+            const delta   = desired - actual;
+            if (delta <= 0) return null;
+            return { conseiller_id: MANAGER_UUID, produit_id: produitId, quantite: delta, source: "cerebro_check", created_at: premierMois.toISOString() };
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null);
+
+    if (inserts.length === 0) return;
+    const { error } = await supabase.from("ventes").insert(inserts);
+    if (error) throw new Error(error.message ?? "Erreur ajustement Cerebro manager");
+}
+
 export async function forcerCerebroCheck(conseillerId: string): Promise<void> {
     const { error } = await supabase
         .from("conseillers")

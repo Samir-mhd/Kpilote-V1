@@ -37,6 +37,11 @@ const menu = [
         icon: "bell" as const,
     },
     {
+        label: "Entretiens",
+        href: "/manager/entretien",
+        icon: "users" as const,
+    },
+    {
         label: "Gestion équipe",
         href: "/manager/gestion",
         icon: "settings" as const,
