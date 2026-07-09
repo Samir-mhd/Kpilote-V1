@@ -296,3 +296,11 @@ export async function resetCheckDate(conseillerId: string): Promise<void> {
         .update({ last_check_date: null })
         .eq("id", conseillerId);
 }
+
+/** Remet last_check_date à null pour TOUS les conseillers (action manager). */
+export async function resetAllCheckDates(): Promise<void> {
+    await supabase
+        .from("conseillers")
+        .update({ last_check_date: null })
+        .neq("id", "00000000-0000-0000-0000-000000000001");
+}

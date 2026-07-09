@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { uploadPhoto } from "@/services/photoService";
+import { resetCheckDate } from "@/services/resetService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
@@ -46,6 +47,9 @@ export default function GestionEquipePage() {
     // Suppression
     const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirm | null>(null);
     const [deleteEnCours, setDeleteEnCours] = useState(false);
+
+    // Reset cerebro check
+    const [resetingCheckId, setResetingCheckId] = useState<string | null>(null);
 
     // Toast
     const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
@@ -312,6 +316,30 @@ export default function GestionEquipePage() {
                                             title={`Genre : ${c.genre ?? "non défini"} — cliquer pour changer`}
                                         >
                                             {c.genre ?? "?"}
+                                        </button>
+
+                                        {/* Reset Cerebro Check */}
+                                        <button
+                                            onClick={async () => {
+                                                setResetingCheckId(c.id);
+                                                try {
+                                                    await resetCheckDate(c.id);
+                                                    afficherToast(`🧠 Cerebro Check réinitialisé pour ${c.nom.split(" ")[0]}`);
+                                                } catch {
+                                                    afficherToast("Erreur lors du reset.", false);
+                                                } finally {
+                                                    setResetingCheckId(null);
+                                                }
+                                            }}
+                                            disabled={resetingCheckId === c.id}
+                                            className="flex h-9 items-center gap-1.5 rounded-xl bg-slate-100 px-3 text-xs font-bold text-slate-500 transition-all hover:bg-violet-100 hover:text-violet-600 disabled:opacity-50"
+                                            title="Réinitialiser le Cerebro Check"
+                                        >
+                                            {resetingCheckId === c.id
+                                                ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-400 border-t-transparent" />
+                                                : <span className="text-base leading-none">🧠</span>
+                                            }
+                                            Check
                                         </button>
 
                                         {/* Renommer */}
