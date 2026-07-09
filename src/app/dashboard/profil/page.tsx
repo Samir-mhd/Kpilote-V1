@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { uploadPhoto, getPhotoUrl } from "@/services/photoService";
+import { resetCheckDate } from "@/services/resetService";
 
 export default function ProfilPage() {
     const searchParams = useSearchParams();
@@ -19,6 +20,9 @@ export default function ProfilPage() {
     const [succes, setSucces] = useState(false);
     const [erreur, setErreur] = useState<string | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
+
+    const [checkReseting, setCheckReseting] = useState(false);
+    const [checkDone, setCheckDone]         = useState(false);
 
     useEffect(() => {
         if (!conseillerId) return;
@@ -193,6 +197,35 @@ export default function ProfilPage() {
                         <span className="text-slate-300 text-xs">En lecture seule</span>
                     </div>
                 </div>
+            </div>
+
+            {/* Cerebro Check */}
+            <div className="rounded-[24px] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
+                <p className="mb-1 text-xs font-bold uppercase tracking-[0.2em] text-slate-400">🧠 Cerebro Check</p>
+                <p className="mb-5 text-sm text-slate-400">Refais ton check du mois pour corriger tes chiffres. Tes ventes saisies restent intactes.</p>
+
+                {checkDone ? (
+                    <div className="rounded-2xl bg-emerald-50 border border-emerald-200 px-5 py-4 text-sm font-semibold text-emerald-700">
+                        ✅ Check réinitialisé — relance ton dashboard pour le refaire.
+                    </div>
+                ) : (
+                    <button
+                        onClick={async () => {
+                            if (!conseillerId) return;
+                            setCheckReseting(true);
+                            await resetCheckDate(conseillerId).catch(() => {});
+                            setCheckReseting(false);
+                            setCheckDone(true);
+                        }}
+                        disabled={checkReseting || !conseillerId}
+                        className="flex items-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-5 py-3 text-sm font-black text-violet-700 transition-all hover:border-violet-400 hover:bg-violet-100 active:scale-[0.97] disabled:opacity-50"
+                    >
+                        {checkReseting
+                            ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-violet-400 border-t-transparent" /> Chargement…</>
+                            : <>🧠 Refaire mon Cerebro Check</>
+                        }
+                    </button>
+                )}
             </div>
 
         </div>
