@@ -76,7 +76,7 @@ export default function BilanConseiller() {
                     supabase.from("conseillers").select("id, nom, avatar").eq("id", id).single(),
                     getObjectifsMensuels(id),
                     supabase.from("ventes")
-                        .select("produit_id, quantite, created_at, produits(code)")
+                        .select("produit_id, quantite, created_at, source, produits(code)")
                         .eq("conseiller_id", id)
                         .gte("created_at", debut)
                         .lte("created_at", fin),
@@ -106,9 +106,12 @@ export default function BilanConseiller() {
                     const code = Array.isArray(v.produits) ? v.produits[0]?.code : v.produits?.code;
                     const qty  = v.quantite ?? 1;
                     if (code) ventesByCode[code] = (ventesByCode[code] ?? 0) + qty;
-                    const day  = new Date(v.created_at).getDate();
-                    const idx  = day <= 7 ? 0 : day <= 14 ? 1 : day <= 21 ? 2 : 3;
-                    semaines[idx].ventes += qty;
+                    // Exclure cerebro_check du momentum : backdatés au 1er, fausseraient la tendance
+                    if (v.source !== "cerebro_check") {
+                        const day = new Date(v.created_at).getDate();
+                        const idx = day <= 7 ? 0 : day <= 14 ? 1 : day <= 21 ? 2 : 3;
+                        semaines[idx].ventes += qty;
+                    }
                 });
 
                 // ── Produits ──
