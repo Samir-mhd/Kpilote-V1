@@ -1,34 +1,47 @@
 import { supabase } from "@/lib/supabase";
 
-const BUCKET = "photos";
+function isValidAvatar(url: string | null | undefined): url is string {
+    return !!url && (url.startsWith("http") || url.startsWith("data:"));
+}
+
+/** Redimensionne et compresse l'image côté client, retourne un data URL JPEG. */
+function compresserImage(file: File, maxPx = 320, qualite = 0.82): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Impossible de lire le fichier."));
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onerror = () => reject(new Error("Image invalide."));
+            img.onload = () => {
+                const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
+                const w = Math.round(img.width  * ratio);
+                const h = Math.round(img.height * ratio);
+                const canvas = document.createElement("canvas");
+                canvas.width  = w;
+                canvas.height = h;
+                canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL("image/jpeg", qualite));
+            };
+            img.src = e.target!.result as string;
+        };
+        reader.readAsDataURL(file);
+    });
+}
 
 /**
- * Upload une photo de profil dans Supabase Storage et sauvegarde l'URL
- * dans conseillers.avatar.
- * Le bucket "photos" doit exister et être public dans Supabase Storage.
+ * Compresse la photo côté client et la sauvegarde directement dans
+ * conseillers.avatar (base64 JPEG). Pas de dépendance au bucket Storage.
  */
 export async function uploadPhoto(conseillerId: string, file: File): Promise<string> {
-    const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
-    const path = `${conseillerId}.${ext}`;
-
-    const { error: uploadError } = await supabase.storage
-        .from(BUCKET)
-        .upload(path, file, { upsert: true, contentType: file.type });
-
-    if (uploadError) throw new Error(uploadError.message);
-
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    // On ajoute un timestamp pour forcer le navigateur à recharger l'image
-    const url = `${data.publicUrl}?t=${Date.now()}`;
+    const base64 = await compresserImage(file);
 
     const { error } = await supabase
         .from("conseillers")
-        .update({ avatar: url })
+        .update({ avatar: base64 })
         .eq("id", conseillerId);
 
     if (error) throw new Error(error.message);
-
-    return url;
+    return base64;
 }
 
 /**
@@ -45,8 +58,7 @@ export async function getPhotosByIds(ids: string[]): Promise<Record<string, stri
 
     const result: Record<string, string | null> = {};
     (data ?? []).forEach((row: any) => {
-        const url = row.avatar;
-        result[row.id] = url && url.startsWith("http") ? url : null;
+        result[row.id] = isValidAvatar(row.avatar) ? row.avatar : null;
     });
     return result;
 }
@@ -61,6 +73,5 @@ export async function getPhotoUrl(conseillerId: string): Promise<string | null> 
         .eq("id", conseillerId)
         .single();
 
-    const url = data?.avatar;
-    return url && url.startsWith("http") ? url : null;
+    return isValidAvatar(data?.avatar) ? data!.avatar : null;
 }

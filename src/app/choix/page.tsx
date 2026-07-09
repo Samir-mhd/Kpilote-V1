@@ -36,7 +36,8 @@ export default function ChoixConseiller() {
 
                 <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {conseillers.map((conseiller) => {
-                        const photoUrl = conseiller.avatar?.startsWith("http") ? conseiller.avatar : null;
+                        const av = conseiller.avatar;
+                        const photoUrl = av && (av.startsWith("http") || av.startsWith("data:")) ? av : null;
                         return (
                             <Link
                                 key={conseiller.id}
