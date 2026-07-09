@@ -4,6 +4,8 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import MorningCheck from "@/components/dashboard/MorningCheck";
+import { resetCheckDate, marquerCheckFait } from "@/services/resetService";
 
 /* ─── Types ──────────────────────────────────────────────── */
 type Vente = { id: string; produits: any; created_at: string; };
@@ -91,11 +93,15 @@ function buildHeatmap(ventes: Vente[]): number[][] {
 function StatsInner() {
     const searchParams  = useSearchParams();
     const conseillerId  = searchParams.get("id") ?? "";
+    const nom           = searchParams.get("nom") ?? "Conseiller";
 
     const [ventesAujourdhui, setVentesAujourdhui] = useState<Vente[]>([]);
     const [heatmap, setHeatmap]   = useState<number[][]>([]);
     const [insight, setInsight]   = useState<Insight | null>(null);
     const [loading, setLoading]   = useState(true);
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [resetting,   setResetting]   = useState(false);
+    const [showCheck,   setShowCheck]   = useState(false);
 
     useEffect(() => {
         if (!conseillerId) return;
@@ -172,6 +178,7 @@ function StatsInner() {
         : Minus;
 
     return (
+    <>
         <div className="space-y-7">
 
             {/* ── Header ──────────────────────────────────────── */}
@@ -335,6 +342,60 @@ function StatsInner() {
                 </div>
             </div>
 
+            {/* ── Reset Cerebro Check ─────────────────────────── */}
+            {conseillerId && (
+                <div className="rounded-[24px] bg-white p-6 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-violet-600">
+                                🧠 Cerebro Check
+                            </p>
+                            <p className="mt-1 font-black text-slate-900">Corriger mes chiffres du mois</p>
+                            <p className="mt-1 text-sm text-slate-400">
+                                Recalcule ton ajustement — tes ventes réelles restent intactes.
+                            </p>
+                        </div>
+                        {!showConfirm && (
+                            <button
+                                onClick={() => setShowConfirm(true)}
+                                className="flex-shrink-0 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-black text-violet-700 transition-all hover:border-violet-400 hover:bg-violet-100 active:scale-[0.97]"
+                            >
+                                Refaire le check
+                            </button>
+                        )}
+                    </div>
+
+                    {showConfirm && (
+                        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                            <p className="text-sm font-semibold text-amber-800">
+                                Tu vas refaire ton Cerebro Check. Tes ventes saisies manuellement ne seront pas effacées.
+                            </p>
+                            <div className="mt-3 flex gap-2">
+                                <button
+                                    onClick={() => setShowConfirm(false)}
+                                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500 transition-all hover:border-slate-300"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        setResetting(true);
+                                        await resetCheckDate(conseillerId);
+                                        setResetting(false);
+                                        setShowConfirm(false);
+                                        setShowCheck(true);
+                                    }}
+                                    disabled={resetting}
+                                    className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white transition-all hover:bg-violet-700 disabled:opacity-60"
+                                >
+                                    {resetting ? "Chargement…" : "Confirmer"}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             <style>{`
                 @keyframes fadeIn {
                     from { opacity:0; transform:translateX(-8px); }
@@ -342,6 +403,19 @@ function StatsInner() {
                 }
             `}</style>
         </div>
+
+        {showCheck && (
+            <MorningCheck
+                nom={nom}
+                conseillerId={conseillerId}
+                isReset={false}
+                onValidated={() => {
+                    marquerCheckFait(conseillerId).catch(() => {});
+                    setShowCheck(false);
+                }}
+            />
+        )}
+    </>
     );
 }
 

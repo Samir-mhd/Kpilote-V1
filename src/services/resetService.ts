@@ -288,3 +288,11 @@ export async function clearForceCheck(conseillerId: string): Promise<void> {
         .update({ force_check_date: null })
         .eq("id", conseillerId);
 }
+
+/** Remet last_check_date à null pour permettre au conseiller de refaire son check. */
+export async function resetCheckDate(conseillerId: string): Promise<void> {
+    await supabase
+        .from("conseillers")
+        .update({ last_check_date: null })
+        .eq("id", conseillerId);
+}
