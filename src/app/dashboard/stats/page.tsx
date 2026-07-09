@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import MorningCheck from "@/components/dashboard/MorningCheck";
-import { resetCheckDate, marquerCheckFait } from "@/services/resetService";
+import { resetCheckDate, resetVentesDuMois, marquerCheckFait } from "@/services/resetService";
 
 /* ─── Types ──────────────────────────────────────────────── */
 type Vente = { id: string; produits: any; created_at: string; };
@@ -342,17 +342,17 @@ function StatsInner() {
                 </div>
             </div>
 
-            {/* ── Reset Cerebro Check ─────────────────────────── */}
+            {/* ── Corriger mes chiffres ───────────────────────── */}
             {conseillerId && (
                 <div className="rounded-[24px] bg-white p-6 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-violet-600">
-                                🧠 Cerebro Check
+                                🧠 Corriger mes chiffres
                             </p>
-                            <p className="mt-1 font-black text-slate-900">Corriger mes chiffres du mois</p>
+                            <p className="mt-1 font-black text-slate-900">Je me suis trompé dans mes ventes</p>
                             <p className="mt-1 text-sm text-slate-400">
-                                Recalcule ton ajustement — tes ventes réelles restent intactes.
+                                Remet les compteurs à zéro et re-saisis tes vrais chiffres du mois.
                             </p>
                         </div>
                         {!showConfirm && (
@@ -360,7 +360,7 @@ function StatsInner() {
                                 onClick={() => setShowConfirm(true)}
                                 className="flex-shrink-0 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-black text-violet-700 transition-all hover:border-violet-400 hover:bg-violet-100 active:scale-[0.97]"
                             >
-                                Refaire le check
+                                Corriger
                             </button>
                         )}
                     </div>
@@ -368,7 +368,7 @@ function StatsInner() {
                     {showConfirm && (
                         <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
                             <p className="text-sm font-semibold text-amber-800">
-                                Tu vas refaire ton Cerebro Check. Tes ventes saisies manuellement ne seront pas effacées.
+                                ⚠️ Toutes tes ventes du mois seront effacées. Tu re-saisiras tes vrais totaux dans l'écran suivant.
                             </p>
                             <div className="mt-3 flex gap-2">
                                 <button
@@ -380,6 +380,7 @@ function StatsInner() {
                                 <button
                                     onClick={async () => {
                                         setResetting(true);
+                                        await resetVentesDuMois(conseillerId, null);
                                         await resetCheckDate(conseillerId);
                                         setResetting(false);
                                         setShowConfirm(false);
@@ -388,7 +389,7 @@ function StatsInner() {
                                     disabled={resetting}
                                     className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white transition-all hover:bg-violet-700 disabled:opacity-60"
                                 >
-                                    {resetting ? "Chargement…" : "Confirmer"}
+                                    {resetting ? "Réinitialisation…" : "Confirmer et corriger"}
                                 </button>
                             </div>
                         </div>
@@ -408,7 +409,7 @@ function StatsInner() {
             <MorningCheck
                 nom={nom}
                 conseillerId={conseillerId}
-                isReset={false}
+                isReset={true}
                 onValidated={() => {
                     marquerCheckFait(conseillerId).catch(() => {});
                     setShowCheck(false);
