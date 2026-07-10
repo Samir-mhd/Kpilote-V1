@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { uploadPhoto, getPhotoUrl } from "@/services/photoService";
 
-export default function ProfilPage() {
+function ProfilInner() {
     const searchParams = useSearchParams();
     const conseillerId = searchParams.get("id") ?? "";
     const nom = searchParams.get("nom") ?? "Conseiller";
@@ -199,3 +199,8 @@ export default function ProfilPage() {
         </div>
     );
 }
+
+export default function ProfilPage() {
+    return <Suspense><ProfilInner /></Suspense>;
+}
+

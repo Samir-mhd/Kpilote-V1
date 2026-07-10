@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import MorningCheck from "@/components/dashboard/MorningCheck";
-import { marquerCheckFait } from "@/services/resetService";
 
 /* ─── Types ──────────────────────────────────────────────── */
 type Vente = { id: string; produits: any; created_at: string; };

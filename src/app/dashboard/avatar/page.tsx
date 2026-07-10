@@ -9,7 +9,7 @@ import AvatarEditor from "@/components/avatar/AvatarEditor";
 import { AvatarConfig, defaultAvatarConfig } from "@/types/avatar";
 import { getAvatar, saveAvatar } from "@/services/avatarService";
 
-export default function AvatarPage() {
+function AvatarInner() {
     const searchParams = useSearchParams();
     const conseillerId = searchParams.get("id") ?? "";
     const prenom = searchParams.get("nom") ?? "Conseiller";
@@ -85,4 +85,8 @@ export default function AvatarPage() {
             </div>
         </main>
     );
+}
+
+export default function AvatarPage() {
+    return <Suspense><AvatarInner /></Suspense>;
 }

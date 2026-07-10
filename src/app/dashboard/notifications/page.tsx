@@ -28,7 +28,7 @@ const niveauStyles: Record<string, string> = {
 
 type NotifExtended = NotificationKPILOTE & { categorie: Categorie; date?: string };
 
-export default function NotificationsPage() {
+function NotificationsInner() {
     const searchParams = useSearchParams();
     const conseillerId = searchParams.get("id") ?? "";
 
@@ -180,4 +180,8 @@ export default function NotificationsPage() {
             )}
         </div>
     );
+}
+
+export default function NotificationsPage() {
+    return <Suspense><NotificationsInner /></Suspense>;
 }

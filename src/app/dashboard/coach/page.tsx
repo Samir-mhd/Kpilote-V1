@@ -16,7 +16,7 @@ const etatConfig = {
     retard:   { icon: "⚠️", label: "À rattraper",         color: "text-red-600",   bg: "bg-red-50" },
 };
 
-export default function CoachPage() {
+function CoachInner() {
     const searchParams = useSearchParams();
     const conseillerId = searchParams.get("id") ?? "";
     const nom = searchParams.get("nom") ?? "Conseiller";
@@ -157,4 +157,8 @@ export default function CoachPage() {
 
         </div>
     );
+}
+
+export default function CoachPage() {
+    return <Suspense><CoachInner /></Suspense>;
 }
