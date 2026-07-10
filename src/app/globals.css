@@ -86,6 +86,30 @@
     --sb-from: #d97706; --sb-to: #ea580c; --sel-bg: #d97706;
 }
 
+[data-theme="gold"] {
+    --color-violet-50:  var(--color-yellow-50);
+    --color-violet-100: var(--color-yellow-100);
+    --color-violet-200: var(--color-yellow-200);
+    --color-violet-300: var(--color-yellow-300);
+    --color-violet-400: var(--color-yellow-400);
+    --color-violet-500: var(--color-yellow-500);
+    --color-violet-600: var(--color-yellow-600);
+    --color-violet-700: var(--color-yellow-700);
+    --color-violet-800: var(--color-yellow-800);
+    --color-violet-900: var(--color-yellow-900);
+    --color-violet-950: var(--color-yellow-950);
+    --color-fuchsia-300: var(--color-amber-300);
+    --color-fuchsia-400: var(--color-amber-400);
+    --color-fuchsia-500: var(--color-amber-500);
+    --color-fuchsia-600: var(--color-amber-600);
+    --color-indigo-700:  var(--color-yellow-700);
+    --color-indigo-900:  var(--color-yellow-950);
+    --bg-a1: rgba(202,138,4,.12);
+    --bg-a2: rgba(217,119,6,.10);
+    --bg-a3: rgba(234,179,8,.08);
+    --sb-from: #ca8a04; --sb-to: #d97706; --sel-bg: #ca8a04;
+}
+
 [data-theme="ocean"] {
     --color-violet-50:  var(--color-sky-50);
     --color-violet-100: var(--color-sky-100);

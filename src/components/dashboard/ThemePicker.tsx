@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export type Theme = "violet" | "emerald" | "rose" | "amber" | "ocean";
+export type Theme = "violet" | "emerald" | "rose" | "amber" | "ocean" | "gold";
 
 export const PALETTES: { id: Theme; label: string; from: string; to: string }[] = [
     { id: "violet",  label: "Violet",    from: "#7c3aed", to: "#a855f7" },
@@ -10,6 +10,7 @@ export const PALETTES: { id: Theme; label: string; from: string; to: string }[] 
     { id: "rose",    label: "Rose",      from: "#e11d48", to: "#db2777" },
     { id: "amber",   label: "Ambre",     from: "#d97706", to: "#ea580c" },
     { id: "ocean",   label: "Océan",     from: "#0284c7", to: "#0891b2" },
+    { id: "gold",    label: "Or",        from: "#ca8a04", to: "#d97706" },
 ];
 
 export function applyTheme(theme: Theme) {
