@@ -20,7 +20,8 @@ type Insight = {
 };
 
 /* ─── Constantes ──────────────────────────────────────────── */
-const JOURS    = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+const JOURS      = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+const JOURS_FULL = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 const HEURES   = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
 const HEATMAP_COLORS = [
     "bg-slate-100 text-slate-300",
@@ -95,7 +96,7 @@ function computeInsights(ventes30j: Vente[], ventesSemC: number, ventesSemP: num
 
     return {
         meilleureHeure,
-        meilleurJour: mJourIdx !== null ? JOURS[mJourIdx] : null,
+        meilleurJour: mJourIdx !== null ? JOURS_FULL[mJourIdx] : null,
         meilleurProduit,
         semaineCourante: ventesSemC,
         semainePrecedente: ventesSemP,
@@ -325,7 +326,7 @@ export default function HistoriquePage() {
                                     <div className="flex items-start gap-3 rounded-2xl bg-white/10 px-4 py-3">
                                         <span className="text-xl flex-shrink-0">📅</span>
                                         <p className="text-sm text-white/90">
-                                            Le <strong className="text-white">{insight.meilleurJour}di</strong> est le jour le plus prolifique.
+                                            Le <strong className="text-white">{insight.meilleurJour}</strong> est le jour le plus prolifique.
                                         </p>
                                     </div>
                                 )}

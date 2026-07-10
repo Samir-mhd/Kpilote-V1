@@ -21,6 +21,7 @@ type Insight = {
 
 /* ─── Constantes ─────────────────────────────────────────── */
 const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+const JOURS_FULL = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 const HEURES = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
 const HEATMAP_COLORS = [
     "bg-slate-100 text-slate-300",
@@ -65,7 +66,7 @@ function computeInsights(ventes30j: Vente[], ventesSemCourante: number, ventesSe
     const meilleurJourIdx = Object.keys(parJour).length
         ? Number(Object.entries(parJour).sort((a, b) => b[1] - a[1])[0][0])
         : null;
-    const meilleurJour = meilleurJourIdx !== null ? JOURS[meilleurJourIdx] : null;
+    const meilleurJour = meilleurJourIdx !== null ? JOURS_FULL[meilleurJourIdx] : null;
 
     const meilleurProduit = Object.keys(parProduit).length
         ? Object.entries(parProduit).sort((a, b) => b[1] - a[1])[0][0]
@@ -239,7 +240,7 @@ function StatsInner() {
                             <div className="flex items-start gap-3 rounded-2xl bg-white/10 px-4 py-3">
                                 <span className="text-xl flex-shrink-0">📅</span>
                                 <p className="text-sm text-white/90">
-                                    Le <strong className="text-white">{insight.meilleurJour}di</strong> est ton meilleur jour de la semaine.
+                                    Le <strong className="text-white">{insight.meilleurJour}</strong> est ton meilleur jour de la semaine.
                                 </p>
                             </div>
                         )}
