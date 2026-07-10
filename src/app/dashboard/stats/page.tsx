@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import MorningCheck from "@/components/dashboard/MorningCheck";
-import { resetCheckDate, marquerCheckFait } from "@/services/resetService";
+import { marquerCheckFait } from "@/services/resetService";
 
 /* ─── Types ──────────────────────────────────────────────── */
 type Vente = { id: string; produits: any; created_at: string; };
@@ -100,7 +100,6 @@ function StatsInner() {
     const [insight, setInsight]   = useState<Insight | null>(null);
     const [loading, setLoading]   = useState(true);
     const [showConfirm, setShowConfirm] = useState(false);
-    const [resetting,   setResetting]   = useState(false);
     const [showCheck,   setShowCheck]   = useState(false);
 
     useEffect(() => {
@@ -378,17 +377,13 @@ function StatsInner() {
                                     Annuler
                                 </button>
                                 <button
-                                    onClick={async () => {
-                                        setResetting(true);
-                                        await resetCheckDate(conseillerId);
-                                        setResetting(false);
+                                    onClick={() => {
                                         setShowConfirm(false);
                                         setShowCheck(true);
                                     }}
-                                    disabled={resetting}
-                                    className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white transition-all hover:bg-violet-700 disabled:opacity-60"
+                                    className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white transition-all hover:bg-violet-700"
                                 >
-                                    {resetting ? "Chargement…" : "Corriger mes chiffres"}
+                                    Corriger mes chiffres
                                 </button>
                             </div>
                         </div>
@@ -409,10 +404,7 @@ function StatsInner() {
                 nom={nom}
                 conseillerId={conseillerId}
                 isReset={false}
-                onValidated={() => {
-                    marquerCheckFait(conseillerId).catch(() => {});
-                    setShowCheck(false);
-                }}
+                onValidated={() => setShowCheck(false)}
             />
         )}
     </>
