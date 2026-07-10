@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { getPhotoUrl } from "@/services/photoService";
+import { readTheme, applyTheme } from "@/components/dashboard/ThemePicker";
 
 const menus = [
     { label: "Accueil",       href: "/dashboard",              Icon: Home },
@@ -88,6 +89,15 @@ function SidebarFallback() {
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+    useEffect(() => {
+        applyTheme(readTheme());
+        const handler = (e: Event) => {
+            document.documentElement.setAttribute("data-theme", (e as CustomEvent<string>).detail);
+        };
+        window.addEventListener("kpilote-theme", handler);
+        return () => window.removeEventListener("kpilote-theme", handler);
+    }, []);
+
     return (
         <div className="flex min-h-screen bg-slate-50">
             <Suspense fallback={<SidebarFallback />}>

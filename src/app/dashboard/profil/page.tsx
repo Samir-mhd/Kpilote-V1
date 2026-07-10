@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { uploadPhoto, getPhotoUrl } from "@/services/photoService";
+import ThemePicker from "@/components/dashboard/ThemePicker";
 
 function ProfilInner() {
     const searchParams = useSearchParams();
@@ -181,6 +182,9 @@ function ProfilInner() {
                     </div>
                 </div>
             </div>
+
+            {/* Palette de couleurs */}
+            <ThemePicker />
 
             {/* Compte */}
             <div className="rounded-[24px] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,.07)]">

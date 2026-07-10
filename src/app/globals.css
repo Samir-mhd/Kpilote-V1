@@ -4,6 +4,112 @@
 /* KPILOTE DESIGN SYSTEM V1                         */
 /* ------------------------------------------------ */
 
+/* ── Variables de thème (surchargées par [data-theme]) ─── */
+:root {
+    --bg-a1: rgba(124,58,237,.12);
+    --bg-a2: rgba(59,130,246,.10);
+    --bg-a3: rgba(236,72,153,.08);
+    --sb-from: #7c3aed;
+    --sb-to:   #a855f7;
+    --sel-bg:  #7c3aed;
+}
+
+[data-theme="emerald"] {
+    --color-violet-50:  var(--color-emerald-50);
+    --color-violet-100: var(--color-emerald-100);
+    --color-violet-200: var(--color-emerald-200);
+    --color-violet-300: var(--color-emerald-300);
+    --color-violet-400: var(--color-emerald-400);
+    --color-violet-500: var(--color-emerald-500);
+    --color-violet-600: var(--color-emerald-600);
+    --color-violet-700: var(--color-emerald-700);
+    --color-violet-800: var(--color-emerald-800);
+    --color-violet-900: var(--color-emerald-900);
+    --color-violet-950: var(--color-emerald-950);
+    --color-fuchsia-300: var(--color-teal-300);
+    --color-fuchsia-400: var(--color-teal-400);
+    --color-fuchsia-500: var(--color-teal-500);
+    --color-fuchsia-600: var(--color-teal-600);
+    --color-indigo-700:  var(--color-emerald-700);
+    --color-indigo-900:  var(--color-emerald-950);
+    --bg-a1: rgba(5,150,105,.12);
+    --bg-a2: rgba(13,148,136,.10);
+    --bg-a3: rgba(16,185,129,.08);
+    --sb-from: #059669; --sb-to: #0d9488; --sel-bg: #059669;
+}
+
+[data-theme="rose"] {
+    --color-violet-50:  var(--color-rose-50);
+    --color-violet-100: var(--color-rose-100);
+    --color-violet-200: var(--color-rose-200);
+    --color-violet-300: var(--color-rose-300);
+    --color-violet-400: var(--color-rose-400);
+    --color-violet-500: var(--color-rose-500);
+    --color-violet-600: var(--color-rose-600);
+    --color-violet-700: var(--color-rose-700);
+    --color-violet-800: var(--color-rose-800);
+    --color-violet-900: var(--color-rose-900);
+    --color-violet-950: var(--color-rose-950);
+    --color-fuchsia-300: var(--color-pink-300);
+    --color-fuchsia-400: var(--color-pink-400);
+    --color-fuchsia-500: var(--color-pink-500);
+    --color-fuchsia-600: var(--color-pink-600);
+    --color-indigo-700:  var(--color-rose-700);
+    --color-indigo-900:  var(--color-rose-950);
+    --bg-a1: rgba(225,29,72,.12);
+    --bg-a2: rgba(219,39,119,.10);
+    --bg-a3: rgba(244,63,94,.08);
+    --sb-from: #e11d48; --sb-to: #db2777; --sel-bg: #e11d48;
+}
+
+[data-theme="amber"] {
+    --color-violet-50:  var(--color-amber-50);
+    --color-violet-100: var(--color-amber-100);
+    --color-violet-200: var(--color-amber-200);
+    --color-violet-300: var(--color-amber-300);
+    --color-violet-400: var(--color-amber-400);
+    --color-violet-500: var(--color-amber-500);
+    --color-violet-600: var(--color-amber-600);
+    --color-violet-700: var(--color-amber-700);
+    --color-violet-800: var(--color-amber-800);
+    --color-violet-900: var(--color-amber-900);
+    --color-violet-950: var(--color-amber-950);
+    --color-fuchsia-300: var(--color-orange-300);
+    --color-fuchsia-400: var(--color-orange-400);
+    --color-fuchsia-500: var(--color-orange-500);
+    --color-fuchsia-600: var(--color-orange-600);
+    --color-indigo-700:  var(--color-amber-700);
+    --color-indigo-900:  var(--color-amber-950);
+    --bg-a1: rgba(217,119,6,.12);
+    --bg-a2: rgba(234,88,12,.10);
+    --bg-a3: rgba(245,158,11,.08);
+    --sb-from: #d97706; --sb-to: #ea580c; --sel-bg: #d97706;
+}
+
+[data-theme="ocean"] {
+    --color-violet-50:  var(--color-sky-50);
+    --color-violet-100: var(--color-sky-100);
+    --color-violet-200: var(--color-sky-200);
+    --color-violet-300: var(--color-sky-300);
+    --color-violet-400: var(--color-sky-400);
+    --color-violet-500: var(--color-sky-500);
+    --color-violet-600: var(--color-sky-600);
+    --color-violet-700: var(--color-sky-700);
+    --color-violet-800: var(--color-sky-800);
+    --color-violet-900: var(--color-sky-900);
+    --color-violet-950: var(--color-sky-950);
+    --color-fuchsia-300: var(--color-cyan-300);
+    --color-fuchsia-400: var(--color-cyan-400);
+    --color-fuchsia-500: var(--color-cyan-500);
+    --color-fuchsia-600: var(--color-cyan-600);
+    --color-indigo-700:  var(--color-sky-700);
+    --color-indigo-900:  var(--color-sky-950);
+    --bg-a1: rgba(2,132,199,.12);
+    --bg-a2: rgba(8,145,178,.10);
+    --bg-a3: rgba(14,165,233,.08);
+    --sb-from: #0284c7; --sb-to: #0891b2; --sel-bg: #0284c7;
+}
+
 html,
 body {
 
@@ -48,15 +154,9 @@ body::before {
     z-index: -1;
 
     background:
-        radial-gradient(circle at 15% 20%,
-            rgba(124,58,237,.12),
-            transparent 28%),
-        radial-gradient(circle at 85% 15%,
-            rgba(59,130,246,.10),
-            transparent 28%),
-        radial-gradient(circle at 50% 90%,
-            rgba(236,72,153,.08),
-            transparent 35%),
+        radial-gradient(circle at 15% 20%, var(--bg-a1), transparent 28%),
+        radial-gradient(circle at 85% 15%, var(--bg-a2), transparent 28%),
+        radial-gradient(circle at 50% 90%, var(--bg-a3), transparent 35%),
         linear-gradient(180deg, #f8fafc, #eef2ff);
 
 }
@@ -79,13 +179,7 @@ body::before {
 
     border-radius: 999px;
 
-    background: linear-gradient(
-
-        #7c3aed,
-
-        #a855f7
-
-    );
+    background: linear-gradient(var(--sb-from), var(--sb-to));
 
 }
 
@@ -93,7 +187,7 @@ body::before {
 
 ::selection {
 
-    background: #7c3aed;
+    background: var(--sel-bg);
 
     color: white;
 
