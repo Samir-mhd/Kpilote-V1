@@ -161,9 +161,10 @@ export async function ajusterCheckCerebro(
             const actual  = actualByProduitId[produitId] ?? 0;
             const desired = desiredTotals[code] ?? 0;
             const delta   = desired - actual;
+            if (delta === 0) return null;
             return { conseiller_id: conseillerId, produit_id: produitId, quantite: delta, source: "cerebro_check", created_at: premierMois };
         })
-        .filter((r): r is NonNullable<typeof r> => r !== null && r.quantite > 0);
+        .filter((r): r is NonNullable<typeof r> => r !== null);
 
     if (inserts.length === 0) return;
     const { error } = await supabase.from("ventes").insert(inserts);
