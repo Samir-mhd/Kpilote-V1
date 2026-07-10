@@ -184,7 +184,7 @@ function ProfilInner() {
             </div>
 
             {/* Palette de couleurs */}
-            <ThemePicker />
+            <ThemePicker conseillerId={conseillerId} />
 
             {/* Compte */}
             <div className="rounded-[24px] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,.07)]">

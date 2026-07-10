@@ -13,23 +13,27 @@ export const PALETTES: { id: Theme; label: string; from: string; to: string }[] 
     { id: "gold",    label: "Or",        from: "#ca8a04", to: "#d97706" },
 ];
 
-export function applyTheme(theme: Theme) {
+function themeKey(conseillerId: string) {
+    return conseillerId ? `kpilote-theme-${conseillerId}` : "kpilote-theme";
+}
+
+export function applyTheme(theme: Theme, conseillerId = "") {
     document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("kpilote-theme", theme);
+    localStorage.setItem(themeKey(conseillerId), theme);
     window.dispatchEvent(new CustomEvent("kpilote-theme", { detail: theme }));
 }
 
-export function readTheme(): Theme {
+export function readTheme(conseillerId = ""): Theme {
     if (typeof window === "undefined") return "violet";
-    return (localStorage.getItem("kpilote-theme") as Theme) ?? "violet";
+    return (localStorage.getItem(themeKey(conseillerId)) as Theme) ?? "violet";
 }
 
-export default function ThemePicker() {
-    const [selected, setSelected] = useState<Theme>(readTheme);
+export default function ThemePicker({ conseillerId = "" }: { conseillerId?: string }) {
+    const [selected, setSelected] = useState<Theme>(() => readTheme(conseillerId));
 
     function select(id: Theme) {
         setSelected(id);
-        applyTheme(id);
+        applyTheme(id, conseillerId);
     }
 
     return (

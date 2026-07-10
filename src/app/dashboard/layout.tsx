@@ -90,7 +90,8 @@ function SidebarFallback() {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     useEffect(() => {
-        applyTheme(readTheme());
+        const id = new URLSearchParams(window.location.search).get("id") ?? "";
+        applyTheme(readTheme(id));
         const handler = (e: Event) => {
             document.documentElement.setAttribute("data-theme", (e as CustomEvent<string>).detail);
         };
