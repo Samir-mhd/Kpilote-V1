@@ -21,7 +21,7 @@ type Insight = {
 /* ─── Constantes ─────────────────────────────────────────── */
 const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const JOURS_FULL = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
-const HEURES = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+const HEURES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
 const HEATMAP_COLORS = [
     "bg-slate-100 text-slate-300",
     "bg-violet-100 text-violet-400",
