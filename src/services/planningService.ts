@@ -204,6 +204,62 @@ export async function getJoursTravail(
     return { travailles: Math.max(travailles, 1), restants: Math.max(restants, 1) };
 }
 
+// ─── Total jours planifiés (tous conseillers) ─────────────────────────────────
+
+/**
+ * Retourne le nombre total de jours "present" dans le mois pour chaque conseiller.
+ * Fallback : jours ouvrés (hors weekend) si aucune donnée planning.
+ */
+export async function getJoursTravailTous(
+    conseillerIds: string[],
+    annee: number,
+    mois: number
+): Promise<Record<string, number>> {
+    if (conseillerIds.length === 0) return {};
+
+    const debut = jourStrParts(annee, mois, 1);
+    const fin   = jourStrParts(annee, mois, new Date(annee, mois, 0).getDate());
+
+    const { data } = await supabase
+        .from("planning_conseillers")
+        .select("conseiller_id, jour, statut")
+        .in("conseiller_id", conseillerIds)
+        .gte("jour", debut)
+        .lte("jour", fin);
+
+    const plannings: Record<string, Record<string, StatutJour>> = {};
+    for (const id of conseillerIds) plannings[id] = {};
+    (data ?? []).forEach((row: any) => {
+        if (plannings[row.conseiller_id]) {
+            plannings[row.conseiller_id][row.jour] = row.statut as StatutJour;
+        }
+    });
+
+    const nb = new Date(annee, mois, 0).getDate();
+    const result: Record<string, number> = {};
+
+    for (const conseillerId of conseillerIds) {
+        const planning = plannings[conseillerId];
+        let total = 0;
+
+        for (let j = 1; j <= nb; j++) {
+            const clé     = jourStrParts(annee, mois, j);
+            const dateObj = new Date(annee, mois - 1, j);
+            const statut  = planning[clé] as StatutJour | undefined;
+
+            const estJourVente = statut !== undefined
+                ? STATUTS_VENDEUR.includes(statut)
+                : !estWeekend(dateObj);
+
+            if (estJourVente) total++;
+        }
+
+        result[conseillerId] = Math.max(total, 1);
+    }
+
+    return result;
+}
+
 // ─── Lecture planning ──────────────────────────────────────────────────────────
 
 export async function getPlanningMois(

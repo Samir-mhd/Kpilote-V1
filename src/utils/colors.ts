@@ -8,6 +8,8 @@ export const couleursProduits: Record<string, string> = {
   McAfee: "from-orange-500 to-amber-400",
 
   Assurance: "from-red-500 to-rose-400",
+
+  Spiderhome: "from-sky-500 to-cyan-400",
 };
 
 export const couleursProgression: Record<string, string> = {
@@ -20,4 +22,6 @@ export const couleursProgression: Record<string, string> = {
   McAfee: "bg-orange-500",
 
   Assurance: "bg-red-500",
+
+  Spiderhome: "bg-sky-500",
 };

@@ -14,18 +14,20 @@ function getProduit(produits: ProduitLie | ProduitLie[] | null) {
 }
 
 export function couleurProduit(produit: string): string {
-    if (produit === "Box") return "bg-green-500";
-    if (produit === "Forfaits") return "bg-blue-500";
+    if (produit === "Box")        return "bg-green-500";
+    if (produit === "Forfaits")   return "bg-blue-500";
     if (produit === "Téléphones") return "bg-purple-500";
-    if (produit === "McAfee") return "bg-orange-500";
+    if (produit === "McAfee")     return "bg-orange-500";
+    if (produit === "Spiderhome") return "bg-sky-500";
     return "bg-red-500";
 }
 
 export function couleurGradientProduit(produit: string): string {
-    if (produit === "Box") return "from-green-500 to-emerald-400";
-    if (produit === "Forfaits") return "from-blue-500 to-cyan-400";
+    if (produit === "Box")        return "from-green-500 to-emerald-400";
+    if (produit === "Forfaits")   return "from-blue-500 to-cyan-400";
     if (produit === "Téléphones") return "from-purple-500 to-violet-400";
-    if (produit === "McAfee") return "from-orange-500 to-amber-400";
+    if (produit === "McAfee")     return "from-orange-500 to-amber-400";
+    if (produit === "Spiderhome") return "from-sky-500 to-cyan-400";
     return "from-red-500 to-rose-400";
 }
 
@@ -67,7 +69,12 @@ async function calcul(conseillerId: string, annee: number, mois: number, ventesG
             .filter((v) => getProduit(v.produits)?.code === produitCode)
             .reduce((t, v) => t + v.quantite, 0);
 
-        return { produit: produitNom, objectifMensuel: objectif.objectif, realise, joursTravailles, joursRestants };
+        // Spiderhome : objectif mensuel auto = 25 × total jours planifiés du mois
+        const objectifMensuel = produitCode === "spiderhome"
+            ? 25 * (joursTravailles + joursRestants)
+            : objectif.objectif;
+
+        return { produit: produitNom, objectifMensuel, realise, joursTravailles, joursRestants };
     });
 
     return calculerObjectifs(inputs);

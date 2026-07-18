@@ -13,15 +13,17 @@ import {
     updateObjectifMensuel,
     ObjectifManagerRow,
 } from "@/services/objectifs";
+import { getJoursTravailTous } from "@/services/planningService";
 import { exporterObjectifsPDF } from "@/utils/exportObjectifsPDF";
 import Link from "next/link";
 
-const colonnesProduits: { label: string; code: string }[] = [
-    { label: "Box", code: "box" },
-    { label: "Forfaits", code: "forfaits" },
+const colonnesProduits: { label: string; code: string; auto?: boolean }[] = [
+    { label: "Box",        code: "box" },
+    { label: "Forfaits",   code: "forfaits" },
     { label: "Téléphones", code: "telephones" },
-    { label: "McAfee", code: "mcafee" },
-    { label: "Assurance", code: "assurance" },
+    { label: "McAfee",     code: "mcafee" },
+    { label: "Assurance",  code: "assurance" },
+    { label: "Spiderhome", code: "spiderhome", auto: true },
 ];
 
 type LigneConseiller = {
@@ -54,16 +56,25 @@ function regrouperParConseiller(rows: ObjectifManagerRow[]): LigneConseiller[] {
 }
 
 export default function ObjectifsPage() {
-    const [rows, setRows] = useState<ObjectifManagerRow[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [edits, setEdits] = useState<Record<string, number>>({});
+    const [rows, setRows]             = useState<ObjectifManagerRow[]>([]);
+    const [loading, setLoading]       = useState(true);
+    const [edits, setEdits]           = useState<Record<string, number>>({});
     const [enregistrement, setEnregistrement] = useState(false);
-    const [confirmation, setConfirmation] = useState<string | null>(null);
+    const [confirmation, setConfirmation]     = useState<string | null>(null);
+    const [joursPlanifies, setJoursPlanifies] = useState<Record<string, number>>({});
 
     async function charger() {
         setLoading(true);
         const data = await getObjectifsManager();
+
+        const ids = [...new Set(data.map((r) => r.conseiller_id))];
+        const now = new Date();
+        const jours = ids.length > 0
+            ? await getJoursTravailTous(ids, now.getFullYear(), now.getMonth() + 1)
+            : {};
+
         setRows(data);
+        setJoursPlanifies(jours);
         setEdits({});
         setLoading(false);
     }
@@ -100,6 +111,21 @@ export default function ObjectifsPage() {
         }
     }
 
+    function handleExportPDF() {
+        // Pour Spiderhome, injecte la valeur calculée (25 × jours planifiés) dans le PDF
+        const lignesAvecSpider = lignes.map((l) => ({
+            ...l,
+            cellules: {
+                ...l.cellules,
+                spiderhome: {
+                    id: l.cellules["spiderhome"]?.id ?? "",
+                    objectif: 25 * (joursPlanifies[l.conseillerId] ?? 0),
+                },
+            },
+        }));
+        exporterObjectifsPDF(lignesAvecSpider, colonnesProduits);
+    }
+
     return (
         <main>
             <p className="text-emerald-600 font-black uppercase tracking-[0.35em]">
@@ -116,7 +142,7 @@ export default function ObjectifsPage() {
 
                 {lignes.length > 0 && (
                     <button
-                        onClick={() => exporterObjectifsPDF(lignes, colonnesProduits)}
+                        onClick={handleExportPDF}
                         className="group flex flex-shrink-0 items-center gap-2.5 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-5 py-3 text-sm font-black text-violet-700 shadow-sm transition-all hover:border-violet-400 hover:from-violet-100 hover:to-fuchsia-100 hover:shadow-md active:scale-[0.97]"
                     >
                         <svg className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -155,7 +181,12 @@ export default function ObjectifsPage() {
                                         <th className="px-4 pb-2">Conseiller</th>
                                         {colonnesProduits.map((colonne) => (
                                             <th key={colonne.code} className="px-4 pb-2 text-center">
-                                                {colonne.label}
+                                                <span>{colonne.label}</span>
+                                                {colonne.auto && (
+                                                    <span className="ml-1.5 inline-block rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-black text-sky-600 normal-case tracking-normal">
+                                                        Auto
+                                                    </span>
+                                                )}
                                             </th>
                                         ))}
                                         <th className="px-4 pb-2 text-center">Bilan</th>
@@ -171,6 +202,23 @@ export default function ObjectifsPage() {
 
                                             {colonnesProduits.map((colonne) => {
                                                 const cellule = ligne.cellules[colonne.code];
+                                                const jours   = joursPlanifies[ligne.conseillerId] ?? 0;
+
+                                                // Spiderhome : cellule auto-calculée (lecture seule)
+                                                if (colonne.auto) {
+                                                    return (
+                                                        <td key={colonne.code} className="px-4 py-4 text-center">
+                                                            <div className="inline-flex flex-col items-center gap-0.5 rounded-xl bg-sky-50 px-4 py-2 ring-1 ring-sky-200">
+                                                                <span className="text-xl font-black text-sky-700">
+                                                                    {25 * jours}
+                                                                </span>
+                                                                <span className="text-[10px] text-sky-400">
+                                                                    25 × {jours} j
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                }
 
                                                 return (
                                                     <td
