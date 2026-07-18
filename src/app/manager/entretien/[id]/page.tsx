@@ -106,6 +106,8 @@ export default function BilanConseiller() {
                     const code = Array.isArray(v.produits) ? v.produits[0]?.code : v.produits?.code;
                     const qty  = v.quantite ?? 1;
                     if (code) ventesByCode[code] = (ventesByCode[code] ?? 0) + qty;
+                    // Spiderhome = historisation → exclu du momentum et des actes commerciaux
+                    if (code === "spiderhome") return;
                     // Exclure cerebro_check du momentum : backdatés au 1er, fausseraient la tendance
                     if (v.source !== "cerebro_check") {
                         const day = new Date(v.created_at).getDate();
@@ -124,8 +126,10 @@ export default function BilanConseiller() {
                         return { code: p.code, label: p.label, emoji: p.emoji, ventes, objectif, taux };
                     });
 
-                const totalVentes  = produits.reduce((s, p) => s + p.ventes, 0);
-                const totalObjectif = produits.reduce((s, p) => s + p.objectif, 0);
+                // Spiderhome = historisation → exclu des totaux commerciaux
+                const produitsCommerciaux = produits.filter(p => p.code !== "spiderhome");
+                const totalVentes  = produitsCommerciaux.reduce((s, p) => s + p.ventes, 0);
+                const totalObjectif = produitsCommerciaux.reduce((s, p) => s + p.objectif, 0);
                 const tauxGlobal   = totalObjectif > 0 ? Math.round((totalVentes / totalObjectif) * 100) : 0;
 
                 const sortedByTaux = [...produits].sort((a, b) => b.taux - a.taux);
