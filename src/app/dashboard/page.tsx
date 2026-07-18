@@ -82,6 +82,9 @@ export default function Dashboard() {
     const [missions, setMissions] = useState<MissionDashboard[]>([]);
     const [rang, setRang] = useState(0);
 
+    // Genre du conseiller — récupéré au chargement, stocké en ref pour éviter les closures
+    const genreRef = useRef<"H" | "F" | null>(null);
+
     // Avatar cartoon — état calculé automatiquement selon les ventes du jour
     const { etat: avatarEtat, refresh: refreshAvatar } = useAvatarEtat(conseillerId);
     const [challengeResult, setChallengeResult] = useState<"gagne" | "perdu" | null>(null);
@@ -146,7 +149,8 @@ export default function Dashboard() {
         const data = await getMissionsReelles(conseillerId);
         setMissions(data);
         const contexte = analyserDashboard(
-            data.map((m) => ({ produit: m.produit, objectif: m.objectif, realise: m.realise }))
+            data.map((m) => ({ produit: m.produit, objectif: m.objectif, realise: m.realise })),
+            genreRef.current
         );
         setHeroMessage(contexte.messageHero);
         setCoachMessage(contexte.messageCoach);
@@ -225,9 +229,20 @@ export default function Dashboard() {
     }
 
     useEffect(() => {
-        chargerMissions();
-        chargerRang();
-        chargerDefis();
+        async function init() {
+            if (!conseillerId) return;
+            // Charger le genre en premier pour que chargerMissions l'ait disponible
+            try {
+                const { data } = await supabase
+                    .from("conseillers")
+                    .select("genre")
+                    .eq("id", conseillerId)
+                    .single();
+                genreRef.current = (data?.genre as "H" | "F") ?? null;
+            } catch { /* genre inconnu = défaut masculin */ }
+            await Promise.all([chargerMissions(), chargerRang(), chargerDefis()]);
+        }
+        init();
     }, [conseillerId]);
 
     // Realtime : toutes les modifications sur challenges impliquant ce conseiller
