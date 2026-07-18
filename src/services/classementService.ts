@@ -53,11 +53,12 @@ export async function construireClassementPeriode(
         });
     });
 
-    // Ventes
+    // Ventes (Spiderhome = historisation → exclu du classement commercial)
     (ventes ?? []).forEach((v: any) => {
         const row = map.get(v.conseiller_id);
         if (!row) return;
         const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code as ProduitCode;
+        if (code === "spiderhome") return;
         if (code && row.produits[code] !== undefined) {
             row.produits[code] += v.quantite ?? 1;
             row.total += v.quantite ?? 1;

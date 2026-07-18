@@ -148,9 +148,33 @@ export default function Dashboard() {
         if (!conseillerId) return;
         const data = await getMissionsReelles(conseillerId);
         setMissions(data);
+
+        // Dernière vente commerciale (hors Spiderhome) du jour — pour détecter l'inactivité
+        const debutJour = new Date();
+        debutJour.setHours(0, 0, 0, 0);
+        const { data: dernieres } = await supabase
+            .from("ventes")
+            .select("created_at, produits(code)")
+            .eq("conseiller_id", conseillerId)
+            .gte("created_at", debutJour.toISOString())
+            .order("created_at", { ascending: false })
+            .limit(20);
+
+        let derniereVente: Date | null = null;
+        for (const v of (dernieres ?? [])) {
+            const code = (Array.isArray((v as any).produits) ? (v as any).produits[0] : (v as any).produits)?.code;
+            if (code !== "spiderhome") {
+                derniereVente = new Date((v as any).created_at);
+                break;
+            }
+        }
+
+        // Spiderhome n'est pas un acte commercial : exclure du contexte
+        const missionsCommerciales = data.filter((m) => m.produit.toLowerCase() !== "spiderhome");
         const contexte = analyserDashboard(
-            data.map((m) => ({ produit: m.produit, objectif: m.objectif, realise: m.realise })),
-            genreRef.current
+            missionsCommerciales.map((m) => ({ produit: m.produit, objectif: m.objectif, realise: m.realise })),
+            genreRef.current,
+            derniereVente
         );
         setHeroMessage(contexte.messageHero);
         setCoachMessage(contexte.messageCoach);
@@ -162,11 +186,13 @@ export default function Dashboard() {
             const debut = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
             const { data } = await supabase
                 .from("ventes")
-                .select("conseiller_id, quantite")
+                .select("conseiller_id, quantite, produits(code)")
                 .gte("created_at", debut);
             if (!data) return;
             const totaux: Record<string, number> = {};
             data.forEach((v: any) => {
+                const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code;
+                if (code === "spiderhome") return; // historisation, pas un acte commercial
                 totaux[v.conseiller_id] = (totaux[v.conseiller_id] ?? 0) + v.quantite;
             });
             const sorted = Object.entries(totaux).sort((a, b) => b[1] - a[1]);
@@ -345,18 +371,26 @@ export default function Dashboard() {
         );
     }
 
-    const realiseGlobal = missions.reduce((t, m) => t + m.realise, 0);
-    const objectifGlobal = missions.reduce((t, m) => t + m.objectif, 0);
+    // Spiderhome = historisation, pas un acte commercial → exclu des totaux
+    const missionsCommerciales = missions.filter((m) => m.produit.toLowerCase() !== "spiderhome");
+    const realiseGlobal = missionsCommerciales.reduce((t, m) => t + m.realise, 0);
+    const objectifGlobal = missionsCommerciales.reduce((t, m) => t + m.objectif, 0);
     const tauxGlobal = objectifGlobal > 0 ? Math.round((realiseGlobal / objectifGlobal) * 100) : 0;
 
     async function handleSale(produit: string) {
         const mission = missions.find((m) => m.produit === produit);
         if (!mission) return;
+        const isHistorisation = produit.toLowerCase() === "spiderhome";
         if (conseillerId) {
             await traiterVente({ conseillerId, produit });
             await chargerMissions();
             await chargerRang();
             refreshAvatar();
+        }
+        // Spiderhome = historisation : ne compte pas dans les actes commerciaux
+        if (isHistorisation) {
+            setCoachMessage("📋 Historisation enregistrée. Continue !");
+            return;
         }
         const nouveauTotal = totalVentesJour + 1;
         setTotalVentesJour(nouveauTotal);

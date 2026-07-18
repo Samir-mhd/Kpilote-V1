@@ -111,7 +111,9 @@ const coachLent: Msg[] = [
 
 export function analyserDashboard(
     missions: MissionContext[],
-    genre: "H" | "F" | null = null
+    genre: "H" | "F" | null = null,
+    // Date de la dernière vente commerciale aujourd'hui (null = aucune vente aujourd'hui ; undefined = non fourni)
+    derniereVente?: Date | null
 ): DashboardContext {
 
     const total = missions.length;
@@ -133,6 +135,16 @@ export function analyserDashboard(
             situation: "TOUS_OBJECTIFS",
             messageHero: "🔥 " + pick(heroFeu, genre),
             messageCoach: pick(coachFeu, genre),
+        };
+    }
+
+    // Inactivité : une vente commerciale existait aujourd'hui mais il y a > 1h → LENT
+    if (derniereVente instanceof Date &&
+        Date.now() - derniereVente.getTime() > 60 * 60 * 1000) {
+        return {
+            situation: "LENT",
+            messageHero: "⚡ " + pick(heroLent, genre),
+            messageCoach: pick(coachLent, genre),
         };
     }
 

@@ -180,22 +180,26 @@ export async function getClassementMois(annee: number, mois: number) {
 
     const { data: conseillers } = await supabase.from("conseillers").select("id, nom");
 
-    // Tentative avec filtre date
+    // Tentative avec filtre date (inclut le code produit pour exclure Spiderhome)
     let { data: ventes, error } = await supabase
         .from("ventes")
-        .select("conseiller_id, quantite")
+        .select("conseiller_id, quantite, produits(code)")
         .gte("created_at", debut)
         .lte("created_at", fin);
 
     // Fallback sans filtre si created_at absent
     if (error && error.message?.includes("created_at")) {
-        const fallback = await supabase.from("ventes").select("conseiller_id, quantite");
+        const fallback = await supabase.from("ventes").select("conseiller_id, quantite, produits(code)");
         ventes = fallback.data;
     }
 
     const totaux: Record<string, { id: string; nom: string; ventes: number }> = {};
     (conseillers ?? []).forEach((c: any) => { totaux[c.id] = { id: c.id, nom: c.nom, ventes: 0 }; });
-    (ventes ?? []).forEach((v: any) => { if (totaux[v.conseiller_id]) totaux[v.conseiller_id].ventes += v.quantite; });
+    (ventes ?? []).forEach((v: any) => {
+        const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code;
+        if (code === "spiderhome") return; // historisation, pas un acte commercial
+        if (totaux[v.conseiller_id]) totaux[v.conseiller_id].ventes += v.quantite;
+    });
 
     return Object.values(totaux).sort((a, b) => b.ventes - a.ventes);
 }

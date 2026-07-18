@@ -51,6 +51,7 @@ export async function construireDashboardManager() {
       : objectif.produits;
 
     if (!produit) return;
+    if (produit.code === "spiderhome") return; // historisation, pas un acte commercial
 
     const realise = (ventes ?? [])
       .filter((vente: any) => {
