@@ -16,6 +16,7 @@ const PALETTE: Record<string, { hex: string; arcStroke: string; gradient: string
     "bg-blue-500":   { hex: "#3b82f6", arcStroke: "#60a5fa", gradient: "from-blue-500 to-cyan-400",      glow: "rgba(59,130,246,.35)" },
     "bg-purple-500": { hex: "#8b5cf6", arcStroke: "#a78bfa", gradient: "from-purple-500 to-violet-400",  glow: "rgba(139,92,246,.35)" },
     "bg-orange-500": { hex: "#f97316", arcStroke: "#fb923c", gradient: "from-orange-500 to-amber-400",   glow: "rgba(249,115,22,.35)" },
+    "bg-sky-500":    { hex: "#0ea5e9", arcStroke: "#38bdf8", gradient: "from-sky-500 to-cyan-400",       glow: "rgba(14,165,233,.35)" },
     "bg-red-500":    { hex: "#ef4444", arcStroke: "#f87171", gradient: "from-red-500 to-rose-400",       glow: "rgba(239,68,68,.35)"  },
 };
 const DEFAULT_PAL = { hex: "#8b5cf6", arcStroke: "#a78bfa", gradient: "from-violet-500 to-purple-400", glow: "rgba(139,92,246,.35)" };
@@ -83,6 +84,7 @@ export default function MissionCard({ titre, realise, objectif, couleur, onSale 
     const pct   = objectif > 0 ? Math.min(Math.round((realise / objectif) * 100), 100) : 0;
     const status = getStatus(pct);
     const article = getArticle(titre);
+    const isHistorisation = titre.toLowerCase() === "spiderhome";
 
     function handleSale() {
         if (celebrating) return;
@@ -201,7 +203,7 @@ export default function MissionCard({ titre, realise, objectif, couleur, onSale 
                         className="rounded-xl px-4 py-2.5 text-sm font-black text-white"
                         style={{ background: `${pal.hex}22`, border: `1px solid ${pal.hex}40` }}
                     >
-                        ✅ {article.charAt(0).toUpperCase() + article.slice(1)} {titre} de plus — excellent !
+                        ✅ {isHistorisation ? "Une historisation" : `${article.charAt(0).toUpperCase() + article.slice(1)} ${titre}`} de plus — excellent !
                     </div>
                 </div>
 
@@ -212,7 +214,7 @@ export default function MissionCard({ titre, realise, objectif, couleur, onSale 
                     className={`group mt-6 flex w-full items-center justify-between rounded-2xl bg-gradient-to-r ${pal.gradient} px-6 py-4 text-sm font-black text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50`}
                     style={{ boxShadow: `0 4px 20px ${pal.glow}` }}
                 >
-                    <span>J'ai vendu {article} {titre}</span>
+                    <span>{isHistorisation ? "J'ai fait une historisation" : `J'ai vendu ${article} ${titre}`}</span>
                     <svg
                         width="16" height="16"
                         viewBox="0 0 24 24" fill="none" stroke="currentColor"
