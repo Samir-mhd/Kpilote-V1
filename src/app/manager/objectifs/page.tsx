@@ -17,12 +17,16 @@ import { getJoursTravailTous } from "@/services/planningService";
 import { exporterObjectifsPDF } from "@/utils/exportObjectifsPDF";
 import Link from "next/link";
 
-const colonnesProduits: { label: string; code: string; auto?: boolean }[] = [
-    { label: "Box",        code: "box" },
-    { label: "Forfaits",   code: "forfaits" },
-    { label: "Téléphones", code: "telephones" },
-    { label: "McAfee",     code: "mcafee" },
-    { label: "Assurance",  code: "assurance" },
+const PRODUITS_MANUELS = [
+    { label: "Box",        code: "box",        emoji: "📦", accent: "#10b981" },
+    { label: "Forfaits",   code: "forfaits",   emoji: "📱", accent: "#3b82f6" },
+    { label: "Téléphones", code: "telephones", emoji: "📲", accent: "#8b5cf6" },
+    { label: "McAfee",     code: "mcafee",     emoji: "🔒", accent: "#f97316" },
+    { label: "Assurance",  code: "assurance",  emoji: "🛡️", accent: "#ef4444" },
+];
+
+const colonnesProduits = [
+    ...PRODUITS_MANUELS.map((p) => ({ label: p.label, code: p.code })),
     { label: "Spiderhome", code: "spiderhome", auto: true },
 ];
 
@@ -46,22 +50,25 @@ function regrouperParConseiller(rows: ObjectifManagerRow[]): LigneConseiller[] {
 
         const ligne = lignes.get(row.conseiller_id)!;
         const code = row.produits?.code;
-
-        if (code) {
-            ligne.cellules[code] = { id: row.id, objectif: row.objectif };
-        }
+        if (code) ligne.cellules[code] = { id: row.id, objectif: row.objectif };
     });
 
     return Array.from(lignes.values()).sort((a, b) => a.nom.localeCompare(b.nom));
 }
 
 export default function ObjectifsPage() {
-    const [rows, setRows]             = useState<ObjectifManagerRow[]>([]);
-    const [loading, setLoading]       = useState(true);
-    const [edits, setEdits]           = useState<Record<string, number>>({});
-    const [enregistrement, setEnregistrement] = useState(false);
-    const [confirmation, setConfirmation]     = useState<string | null>(null);
-    const [joursPlanifies, setJoursPlanifies] = useState<Record<string, number>>({});
+    const [rows, setRows]                         = useState<ObjectifManagerRow[]>([]);
+    const [loading, setLoading]                   = useState(true);
+    const [edits, setEdits]                       = useState<Record<string, number>>({});
+    const [enregistrement, setEnregistrement]     = useState(false);
+    const [confirmation, setConfirmation]         = useState<string | null>(null);
+    const [joursPlanifies, setJoursPlanifies]     = useState<Record<string, number>>({});
+    const [coeff, setCoeff]                       = useState(25);
+
+    useEffect(() => {
+        const stored = localStorage.getItem("spiderhome_coeff");
+        if (stored) setCoeff(Math.max(1, Number(stored) || 25));
+    }, []);
 
     async function charger() {
         setLoading(true);
@@ -79,13 +86,17 @@ export default function ObjectifsPage() {
         setLoading(false);
     }
 
-    useEffect(() => {
-        charger();
-    }, []);
+    useEffect(() => { charger(); }, []);
+
+    function handleCoeff(val: number) {
+        const v = Math.max(1, Math.min(999, isNaN(val) ? 25 : val));
+        setCoeff(v);
+        localStorage.setItem("spiderhome_coeff", String(v));
+    }
 
     if (loading) {
         return (
-            <main className="flex min-h-[60vh] items-center justify-center">
+            <main className="flex min-h-[60vh] items-center justify-center text-slate-400 font-semibold">
                 Chargement...
             </main>
         );
@@ -96,14 +107,10 @@ export default function ObjectifsPage() {
 
     async function handleEnregistrer() {
         setEnregistrement(true);
-
         try {
             await Promise.all(
-                Object.entries(edits).map(([id, objectif]) =>
-                    updateObjectifMensuel(id, objectif)
-                )
+                Object.entries(edits).map(([id, objectif]) => updateObjectifMensuel(id, objectif))
             );
-
             setConfirmation("Objectifs mis à jour avec succès.");
             await charger();
         } finally {
@@ -112,14 +119,13 @@ export default function ObjectifsPage() {
     }
 
     function handleExportPDF() {
-        // Pour Spiderhome, injecte la valeur calculée (25 × jours planifiés) dans le PDF
         const lignesAvecSpider = lignes.map((l) => ({
             ...l,
             cellules: {
                 ...l.cellules,
                 spiderhome: {
                     id: l.cellules["spiderhome"]?.id ?? "",
-                    objectif: 25 * (joursPlanifies[l.conseillerId] ?? 0),
+                    objectif: coeff * (joursPlanifies[l.conseillerId] ?? 0),
                 },
             },
         }));
@@ -132,7 +138,7 @@ export default function ObjectifsPage() {
                 KPILOTE MANAGER
             </p>
 
-            <div className="mt-4 flex items-end justify-between gap-4">
+            <div className="mt-4 flex items-end justify-between gap-4 flex-wrap">
                 <div>
                     <h1 className="text-5xl font-black text-slate-900">Objectifs</h1>
                     <p className="mt-4 max-w-2xl text-lg text-slate-500">
@@ -156,7 +162,6 @@ export default function ObjectifsPage() {
                 )}
             </div>
 
-            {/* ── Objectifs Boutique ── */}
             <div className="mt-8">
                 <ObjectifsBoutiqueCard />
             </div>
@@ -169,62 +174,79 @@ export default function ObjectifsPage() {
 
             <div className="mt-10">
                 <Card>
-                    <SectionTitle badge="Objectifs mensuels" titre="Par conseiller et par produit" color="text-emerald-600" />
+                    {/* ── Titre + réglage Spiderhome ── */}
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                        <SectionTitle
+                            badge="Objectifs mensuels"
+                            titre="Par conseiller et par produit"
+                            color="text-emerald-600"
+                        />
+
+                        {/* Coefficient journalier Spiderhome */}
+                        <div className="flex items-center gap-3 rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 to-cyan-50 px-4 py-3 shadow-sm">
+                            <span className="text-xl">🏠</span>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-400 mb-1">
+                                    Objectif / jour Spiderhome
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={999}
+                                        value={coeff}
+                                        onChange={(e) => handleCoeff(Number(e.target.value))}
+                                        className="w-16 rounded-xl border border-sky-300 bg-white px-2 py-1.5 text-center text-xl font-black text-sky-700 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                                    />
+                                    <span className="text-sm font-semibold text-sky-500">× jours planifiés</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     {lignes.length === 0 ? (
-                        <p className="text-slate-500">Aucun objectif enregistré pour le moment.</p>
+                        <p className="mt-6 text-slate-500">Aucun objectif enregistré pour le moment.</p>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full border-separate border-spacing-y-3">
-                                <thead>
-                                    <tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-400">
-                                        <th className="px-4 pb-2">Conseiller</th>
-                                        {colonnesProduits.map((colonne) => (
-                                            <th key={colonne.code} className="px-4 pb-2 text-center">
-                                                <span>{colonne.label}</span>
-                                                {colonne.auto && (
-                                                    <span className="ml-1.5 inline-block rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-black text-sky-600 normal-case tracking-normal">
-                                                        Auto
-                                                    </span>
-                                                )}
-                                            </th>
-                                        ))}
-                                        <th className="px-4 pb-2 text-center">Bilan</th>
-                                    </tr>
-                                </thead>
-
-                                <tbody>
-                                    {lignes.map((ligne) => (
-                                        <tr key={ligne.conseillerId} className="bg-slate-100 align-middle">
-                                            <td className="rounded-l-2xl px-4 py-4 text-lg font-black text-slate-800">
+                        <div className="mt-8 space-y-4">
+                            {lignes.map((ligne) => {
+                                const jours = joursPlanifies[ligne.conseillerId] ?? 0;
+                                return (
+                                    <div
+                                        key={ligne.conseillerId}
+                                        className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden"
+                                    >
+                                        {/* Header conseiller */}
+                                        <div className="flex items-center justify-between gap-4 bg-slate-50 border-b border-slate-100 px-5 py-3.5">
+                                            <h3 className="text-lg font-black text-slate-800">
                                                 {ligne.nom}
-                                            </td>
+                                            </h3>
+                                            <Link
+                                                href={`/manager/entretien/${ligne.conseillerId}`}
+                                                className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-black text-violet-600 transition-all hover:border-violet-400 hover:bg-violet-100 active:scale-95"
+                                            >
+                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                                    <polyline points="14 2 14 8 20 8"/>
+                                                </svg>
+                                                Bilan
+                                            </Link>
+                                        </div>
 
-                                            {colonnesProduits.map((colonne) => {
-                                                const cellule = ligne.cellules[colonne.code];
-                                                const jours   = joursPlanifies[ligne.conseillerId] ?? 0;
-
-                                                // Spiderhome : cellule auto-calculée (lecture seule)
-                                                if (colonne.auto) {
-                                                    return (
-                                                        <td key={colonne.code} className="px-4 py-4 text-center">
-                                                            <div className="inline-flex flex-col items-center gap-0.5 rounded-xl bg-sky-50 px-4 py-2 ring-1 ring-sky-200">
-                                                                <span className="text-xl font-black text-sky-700">
-                                                                    {25 * jours}
-                                                                </span>
-                                                                <span className="text-[10px] text-sky-400">
-                                                                    25 × {jours} j
-                                                                </span>
-                                                            </div>
-                                                        </td>
-                                                    );
-                                                }
-
+                                        {/* Grille produits */}
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-0 divide-x divide-slate-100">
+                                            {PRODUITS_MANUELS.map((prod) => {
+                                                const cellule = ligne.cellules[prod.code];
                                                 return (
-                                                    <td
-                                                        key={colonne.code}
-                                                        className="px-4 py-4 text-center"
-                                                    >
+                                                    <div key={prod.code} className="flex flex-col gap-2.5 p-4">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-sm">{prod.emoji}</span>
+                                                            <span
+                                                                className="text-[10px] font-black uppercase tracking-wide"
+                                                                style={{ color: prod.accent }}
+                                                            >
+                                                                {prod.label}
+                                                            </span>
+                                                        </div>
                                                         {cellule ? (
                                                             <input
                                                                 type="number"
@@ -236,30 +258,39 @@ export default function ObjectifsPage() {
                                                                         [cellule.id]: Number(e.target.value),
                                                                     }))
                                                                 }
-                                                                className="w-24 rounded-xl border border-slate-300 bg-white px-3 py-2 text-center text-lg font-black text-slate-800 outline-none focus:border-emerald-500"
+                                                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-center text-2xl font-black text-slate-800 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-50 transition-all"
                                                             />
                                                         ) : (
-                                                            <span className="text-slate-300">—</span>
+                                                            <div className="text-center text-2xl font-black text-slate-200">—</div>
                                                         )}
-                                                    </td>
+                                                    </div>
                                                 );
                                             })}
-                                            <td className="rounded-r-2xl px-4 py-4 text-center">
-                                                <Link
-                                                    href={`/manager/entretien/${ligne.conseillerId}`}
-                                                    className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-black text-violet-600 transition-all hover:border-violet-400 hover:bg-violet-100"
-                                                >
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                                        <polyline points="14 2 14 8 20 8"/>
-                                                    </svg>
-                                                    Bilan
-                                                </Link>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+
+                                            {/* Spiderhome auto */}
+                                            <div className="flex flex-col gap-2.5 p-4 bg-gradient-to-b from-sky-50/60 to-transparent">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-sm">🏠</span>
+                                                    <span className="text-[10px] font-black uppercase tracking-wide text-sky-500">
+                                                        Spiderhome
+                                                    </span>
+                                                    <span className="ml-auto rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-black text-sky-600">
+                                                        Auto
+                                                    </span>
+                                                </div>
+                                                <div className="flex flex-col items-center justify-center flex-1 rounded-xl bg-sky-50 border border-sky-100 py-2">
+                                                    <span className="text-2xl font-black text-sky-700 tabular-nums">
+                                                        {coeff * jours}
+                                                    </span>
+                                                    <span className="text-[10px] text-sky-400 mt-0.5">
+                                                        {coeff} × {jours} j
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
 
@@ -273,30 +304,21 @@ export default function ObjectifsPage() {
                 </Card>
             </div>
 
-            {/* ── Calendrier des présences ── */}
             {lignes.length > 0 && (
                 <div className="mt-8">
                     <PlanningCalendrier
-                        conseillers={lignes.map((l) => ({
-                            id: l.conseillerId,
-                            nom: l.nom,
-                        }))}
+                        conseillers={lignes.map((l) => ({ id: l.conseillerId, nom: l.nom }))}
                     />
                 </div>
             )}
 
-            {/* ── Réinitialisation des ventes ── */}
             {lignes.length > 0 && (
                 <div className="mt-8">
                     <ResetVentesCard
-                        conseillers={lignes.map((l) => ({
-                            id: l.conseillerId,
-                            nom: l.nom,
-                        }))}
+                        conseillers={lignes.map((l) => ({ id: l.conseillerId, nom: l.nom }))}
                     />
                 </div>
             )}
-
         </main>
     );
 }
