@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { getMissionsCompletes } from "@/services/missionsReelles";
-import { sauvegarderCheckCerebro, ajusterCheckCerebro } from "@/services/resetService";
+import { ajusterCheckCerebro } from "@/services/resetService";
 
 type Props = {
     nom: string;
     conseillerId: string;
-    /** true = check forcé après reset manager → sauvegarde les valeurs en base */
+    /** true = check relancé par le manager → message d'avertissement différent (jamais destructif) */
     isReset?: boolean;
     onValidated: () => void;
 };
@@ -108,7 +108,7 @@ export default function MorningCheck({ nom, conseillerId, isReset = false, onVal
                     </p>
                     <p className="mb-6 text-xs text-white/30">
                         {isReset
-                            ? "⚠️ Tes données ont été réinitialisées. Saisis tes vrais chiffres du mois."
+                            ? "⚠️ Ton manager t'a demandé de revérifier tes chiffres. Ajuste-les si besoin — rien n'est supprimé."
                             : "Vérifie tes volumes du mois en cours — ajuste si nécessaire."}
                     </p>
 
@@ -166,27 +166,17 @@ export default function MorningCheck({ nom, conseillerId, isReset = false, onVal
                                 const toCode = (produit: string) =>
                                     produit.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-                                if (isReset) {
-                                    // Après reset : toutes les ventes ont été supprimées → on insère le total complet
+                                // Toujours un ajustement par écart (jamais de suppression/réécriture) :
+                                // ne redéfinit que ce qui a changé par rapport aux vrais totaux actuels.
+                                const hasChanges = items.some((it, i) => it.valeur !== (originalItems[i]?.valeur ?? 0));
+                                if (hasChanges) {
                                     setSaving(true);
                                     try {
                                         const values: Record<string, number> = {};
-                                        items.forEach(it => { if (it.valeur > 0) values[toCode(it.produit)] = it.valeur; });
-                                        await sauvegarderCheckCerebro(conseillerId, values);
+                                        items.forEach(it => { values[toCode(it.produit)] = it.valeur; });
+                                        await ajusterCheckCerebro(conseillerId, values);
                                     } catch { /* silencieux */ }
                                     setSaving(false);
-                                } else {
-                                    // Mode normal : sauvegarde uniquement si le conseiller a modifié des valeurs
-                                    const hasChanges = items.some((it, i) => it.valeur !== (originalItems[i]?.valeur ?? 0));
-                                    if (hasChanges) {
-                                        setSaving(true);
-                                        try {
-                                            const values: Record<string, number> = {};
-                                            items.forEach(it => { values[toCode(it.produit)] = it.valeur; });
-                                            await ajusterCheckCerebro(conseillerId, values);
-                                        } catch { /* silencieux */ }
-                                        setSaving(false);
-                                    }
                                 }
                             }
                             setTimeout(onValidated, 100);

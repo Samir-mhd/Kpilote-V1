@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ChoixActeModal, { ChoixActe } from "@/components/dashboard/ChoixActeModal";
 
 type Props = {
     titre: string;
@@ -8,6 +9,9 @@ type Props = {
     objectif: number;
     couleur: string; // ex. "bg-green-500"
     onSale: (produit: string) => void;
+    sousChoix?: ChoixActe[];
+    acteDirect?: ChoixActe;
+    onChoixVariable?: (option: ChoixActe) => void;
 };
 
 // Mapping couleur Tailwind → hex (pour le SVG arc) + gradient (pour la barre/bouton)
@@ -30,14 +34,18 @@ function getArticle(t: string) { return articlesMap[t.toLowerCase()] ?? "un(e)";
 
 const CELEBRATIONS = ["🎉", "🔥", "⚡", "🚀", "💪", "🏆"];
 
+// Uniquement des messages neutres/encourageants — le retard est déjà géré par le hero/coach au-dessus.
 type StatusCfg = { icon: string; label: string; color: string };
-function getStatus(pct: number): StatusCfg {
-    if (pct >= 100) return { icon: "🏆", label: "Objectif atteint !", color: "#34d399" };
-    if (pct >= 80)  return { icon: "🔥", label: "Excellent rythme",   color: "#fb923c" };
-    if (pct >= 60)  return { icon: "⚡", label: "Très bon rythme",    color: "#fbbf24" };
-    if (pct >= 40)  return { icon: "💪", label: "Continue comme ça",  color: "#60a5fa" };
-    if (pct >= 20)  return { icon: "⚠️", label: "À accélérer",       color: "#f87171" };
-    return           { icon: "🔴", label: "Mission en retard",        color: "#f87171" };
+function getStatus(pct: number, realise: number, objectif: number, isHistorisation: boolean): StatusCfg {
+    if (realise === 0 && isHistorisation) return { icon: "🌱", label: "N'oublie pas d'historiser !", color: "#94a3b8" };
+    if (realise === 0) return { icon: "🌱", label: "En attente de ta première vente", color: "#94a3b8" };
+    // Pas d'objectif fixé : chaque vente est une avance pure, pas un "démarrage"
+    if (objectif === 0) return { icon: "🚀", label: `+${realise} d'avance sur l'objectif`, color: "#34d399" };
+    if (pct >= 100)     return { icon: "🏆", label: "Objectif atteint !",  color: "#34d399" };
+    if (pct >= 80)      return { icon: "🔥", label: "Excellent rythme",   color: "#fb923c" };
+    if (pct >= 60)      return { icon: "⚡", label: "Très bon rythme",    color: "#fbbf24" };
+    if (pct >= 40)      return { icon: "💪", label: "Continue comme ça",  color: "#60a5fa" };
+    return                 { icon: "🌟", label: "Bon démarrage, continue !", color: "#60a5fa" };
 }
 
 // Cercle arc SVG
@@ -75,25 +83,40 @@ function genParticles(): Particle[] {
     }));
 }
 
-export default function MissionCard({ titre, realise, objectif, couleur, onSale }: Props) {
+export default function MissionCard({ titre, realise, objectif, couleur, onSale, sousChoix, acteDirect, onChoixVariable }: Props) {
     const [celebrating, setCelebrating] = useState(false);
     const [celebEmoji, setCelebEmoji] = useState("🎉");
     const [particles,  setParticles]  = useState<Particle[]>([]);
+    const [modalOuverte, setModalOuverte] = useState(false);
 
     const pal   = PALETTE[couleur] ?? DEFAULT_PAL;
     const pct   = objectif > 0 ? Math.min(Math.round((realise / objectif) * 100), 100) : 0;
-    const status = getStatus(pct);
     const article = getArticle(titre);
     const isHistorisation = titre.toLowerCase() === "spiderhome";
+    const status = getStatus(pct, realise, objectif, isHistorisation);
 
-    function handleSale() {
-        if (celebrating) return;
+    function declencherVente(choix?: ChoixActe) {
         setCelebEmoji(CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)]);
         setCelebrating(true);
         setParticles(genParticles());
         onSale(titre);
+        if (choix) onChoixVariable?.(choix);
         setTimeout(() => setParticles([]), 750);
         setTimeout(() => setCelebrating(false), 1600);
+    }
+
+    function handleSale() {
+        if (celebrating) return;
+        if (sousChoix && sousChoix.length > 0) {
+            setModalOuverte(true);
+            return;
+        }
+        declencherVente(acteDirect);
+    }
+
+    function handleChoix(choix: ChoixActe) {
+        setModalOuverte(false);
+        declencherVente(choix);
     }
 
     return (
@@ -226,6 +249,15 @@ export default function MissionCard({ titre, realise, objectif, couleur, onSale 
                 </button>
 
             </div>
+
+            {modalOuverte && sousChoix && (
+                <ChoixActeModal
+                    titre={`J'ai vendu ${article} ${titre}`}
+                    options={sousChoix}
+                    onChoisir={handleChoix}
+                    onClose={() => setModalOuverte(false)}
+                />
+            )}
 
             <style>{`
                 @keyframes bounceUp {

@@ -56,50 +56,6 @@ export async function resetVentesDuMois(
     }
 }
 
-/**
- * Sauvegarde les valeurs saisies dans le Cerebro Check comme ventes du mois.
- * Insère une ligne par produit avec la quantité totale déclarée.
- * Appelé après un reset — remplace les ventes supprimées par les chiffres réels.
- */
-/**
- * Sauvegarde les valeurs saisies dans le Cerebro Check comme ventes du mois.
- * Les entrées sont BACKDATÉES au 1er du mois à midi (heure locale) :
- *   - getVentesDuJour (dashboard) ne les compte PAS (filtre aujourd'hui)
- *   - getVentesDuMois (résultats + prochain check) les compte ✓
- * Appelé UNIQUEMENT après un reset manager — jamais lors d'un check normal.
- */
-export async function sauvegarderCheckCerebro(
-    conseillerId: string,
-    values: Record<string, number> // { produitCode: quantite }
-): Promise<void> {
-    const codes = Object.keys(values).filter(k => (values[k] ?? 0) > 0);
-    if (codes.length === 0) return;
-
-    const { data: produits, error: errP } = await supabase
-        .from("produits")
-        .select("id, code")
-        .in("code", codes);
-    if (errP) throw new Error(errP.message ?? "Erreur récupération produits");
-
-    // Backdaté au 1er du mois à midi pour ne pas parasiter getVentesDuJour
-    const now = new Date();
-    const premierMois = new Date(now.getFullYear(), now.getMonth(), 1, 12, 0, 0).toISOString();
-
-    const inserts = (produits ?? [])
-        .map((p: any) => ({
-            conseiller_id: conseillerId,
-            produit_id:    p.id,
-            quantite:      values[p.code] ?? 0,
-            source:        "cerebro_check",
-            created_at:    premierMois,
-        }))
-        .filter(r => r.quantite > 0);
-
-    if (inserts.length === 0) return;
-
-    const { error } = await supabase.from("ventes").insert(inserts);
-    if (error) throw new Error(error.message ?? "Erreur sauvegarde check Cerebro");
-}
 
 /**
  * Ajuste les entrées cerebro_check en mode normal (sans reset préalable).
@@ -290,13 +246,6 @@ export async function clearForceCheck(conseillerId: string): Promise<void> {
         .eq("id", conseillerId);
 }
 
-/** Remet last_check_date à null pour permettre au conseiller de refaire son check. */
-export async function resetCheckDate(conseillerId: string): Promise<void> {
-    await supabase
-        .from("conseillers")
-        .update({ last_check_date: null })
-        .eq("id", conseillerId);
-}
 
 /** Remet last_check_date à null pour TOUS les conseillers (action manager). */
 export async function resetAllCheckDates(): Promise<void> {

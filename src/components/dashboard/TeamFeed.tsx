@@ -209,7 +209,7 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
                 supabase.from("conseillers").select("id, nom"),
                 supabase
                     .from("ventes")
-                    .select("id, conseiller_id, created_at, source, produits(nom, code)")
+                    .select("id, conseiller_id, created_at, source, quantite, produits(nom, code)")
                     .gte("created_at", debut.toISOString())
                     .order("created_at", { ascending: false })
                     .limit(50),
@@ -240,6 +240,7 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
             const ventesAsc = [...rawVentes].reverse();
             const tempCounts: Counts = {};
             const tempRanks: Record<string, number> = {};
+            const netTotaux: Record<string, number> = {}; // clé "conseillerId|produitCode" → total net du jour
             const built: Entry[] = [];
 
             const nbConseillers = Object.keys(map).length;
@@ -247,6 +248,25 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
             ventesAsc.forEach((v: any) => {
                 const cid = v.conseiller_id;
                 const { produitNom, produitCode } = extractProduit(v);
+                const nom = map[cid] ?? "Équipe";
+                const netKey = `${cid}|${produitCode}`;
+                netTotaux[netKey] = (netTotaux[netKey] ?? 0) + (v.quantite ?? 1);
+
+                // Correction du jour (carte remise à niveau) : un seul message avec le total, pas de streak
+                if (v.source === "reset_jour") {
+                    built.push({
+                        id: v.id,
+                        conseiller_id: cid,
+                        nom,
+                        produitNom,
+                        produitCode,
+                        created_at: v.created_at,
+                        isNew: false,
+                        message: `${nom.split(" ")[0]} vient de réajuster ses ventes sur ${produitLabel(produitCode, produitNom)} - ${netTotaux[netKey]} au total`,
+                    });
+                    return;
+                }
+
                 const rankBefore = tempRanks[cid] ?? nbConseillers;
 
                 if (!tempCounts[cid]) tempCounts[cid] = { total: 0, byCode: {} };
@@ -257,7 +277,6 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
                 Object.assign(tempRanks, newRanks);
                 const rankAfter = newRanks[cid] ?? 1;
 
-                const nom = map[cid] ?? "Équipe";
                 built.push({
                     id: v.id,
                     conseiller_id: cid,
@@ -290,11 +309,38 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
     useEffect(() => {
         const channel = supabase
             .channel("team-feed-rt")
-            .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventes" }, (payload: any) => {
+            .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventes" }, async (payload: any) => {
                 const v = payload.new;
                 if (v.source === "cerebro_check") return;
 
                 const cid = v.conseiller_id;
+                const nom = namesRef.current[cid] ?? "Équipe";
+
+                // Correction du jour : un seul message avec le nouveau total, pas de streak/rank
+                if (v.source === "reset_jour") {
+                    const debutJour = new Date(); debutJour.setHours(0, 0, 0, 0);
+                    const [{ data: produit }, { data: lignes }] = await Promise.all([
+                        supabase.from("produits").select("nom, code").eq("id", v.produit_id).maybeSingle(),
+                        supabase.from("ventes").select("quantite")
+                            .eq("conseiller_id", cid).eq("produit_id", v.produit_id)
+                            .gte("created_at", debutJour.toISOString()),
+                    ]);
+                    const total = (lignes ?? []).reduce((t: number, r: any) => t + (r.quantite ?? 1), 0);
+                    const produitCode = produit?.code ?? "";
+                    const entry: Entry = {
+                        id: v.id,
+                        conseiller_id: cid,
+                        nom,
+                        produitNom: produit?.nom ?? "",
+                        produitCode,
+                        created_at: v.created_at,
+                        isNew: true,
+                        message: `${nom.split(" ")[0]} vient de réajuster ses ventes sur ${produitLabel(produitCode, produit?.nom ?? "")} - ${total} au total`,
+                    };
+                    setEntries(prev => [entry, ...prev].slice(0, 15));
+                    return;
+                }
+
                 const nbTotal = Object.keys(namesRef.current).length;
                 const rankBefore = ranksRef.current[cid] ?? nbTotal;
 
@@ -309,7 +355,6 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
                 ranksRef.current = computeRanks(countsRef.current);
                 const rankAfter = ranksRef.current[cid] ?? 1;
 
-                const nom = namesRef.current[cid] ?? "Équipe";
                 const entry: Entry = {
                     id: v.id,
                     conseiller_id: cid,
@@ -330,6 +375,11 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
                     ),
                 };
                 setEntries(prev => [entry, ...prev].slice(0, 15));
+            })
+            .on("postgres_changes", { event: "DELETE", schema: "public", table: "ventes" }, (payload: any) => {
+                const oldId = payload.old?.id;
+                if (!oldId) return;
+                setEntries(prev => prev.filter(e => e.id !== oldId));
             })
             .subscribe();
         return () => { supabase.removeChannel(channel); };

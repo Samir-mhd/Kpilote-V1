@@ -5,6 +5,11 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import MorningCheck from "@/components/dashboard/MorningCheck";
+import CorrigerVentesJourCard from "@/components/dashboard/CorrigerVentesJourCard";
+
+// Exclut les ajustements techniques (cerebro check, correction du jour) de l'affichage —
+// ils restent comptés dans les totaux réels, mais ne doivent pas polluer heatmap/timeline.
+const EXCLURE_AJUSTEMENTS = "source.is.null,and(source.neq.cerebro_check,source.neq.reset_jour)";
 
 /* ─── Types ──────────────────────────────────────────────── */
 type Vente = { id: string; produits: any; created_at: string; };
@@ -102,60 +107,60 @@ function StatsInner() {
     const [showConfirm, setShowConfirm] = useState(false);
     const [showCheck,   setShowCheck]   = useState(false);
 
-    useEffect(() => {
+    async function charger() {
         if (!conseillerId) return;
+        setLoading(true);
+        const now   = new Date();
+        const debutJour = new Date(now); debutJour.setHours(0, 0, 0, 0);
+        const debut30j  = new Date(now); debut30j.setDate(now.getDate() - 30);
 
-        async function charger() {
-            setLoading(true);
-            const now   = new Date();
-            const debutJour = new Date(now); debutJour.setHours(0, 0, 0, 0);
-            const debut30j  = new Date(now); debut30j.setDate(now.getDate() - 30);
+        // Lundi de cette semaine
+        const lundi = new Date(now);
+        lundi.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+        lundi.setHours(0, 0, 0, 0);
 
-            // Lundi de cette semaine
-            const lundi = new Date(now);
-            lundi.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-            lundi.setHours(0, 0, 0, 0);
+        // Lundi semaine précédente
+        const lundiPrec = new Date(lundi);
+        lundiPrec.setDate(lundi.getDate() - 7);
 
-            // Lundi semaine précédente
-            const lundiPrec = new Date(lundi);
-            lundiPrec.setDate(lundi.getDate() - 7);
+        const [resAujourd, res30j, resSemCour, resSemPrec] = await Promise.all([
+            supabase.from("ventes").select("id,created_at,produits(nom,code)")
+                .eq("conseiller_id", conseillerId)
+                .or(EXCLURE_AJUSTEMENTS)
+                .gte("created_at", debutJour.toISOString())
+                .order("created_at", { ascending: true }),
 
-            const [resAujourd, res30j, resSemCour, resSemPrec] = await Promise.all([
-                supabase.from("ventes").select("id,created_at,produits(nom,code)")
-                    .eq("conseiller_id", conseillerId)
-                    .or("source.neq.cerebro_check,source.is.null")
-                    .gte("created_at", debutJour.toISOString())
-                    .order("created_at", { ascending: true }),
+            supabase.from("ventes").select("id,created_at,produits(nom,code)")
+                .eq("conseiller_id", conseillerId)
+                .or(EXCLURE_AJUSTEMENTS)
+                .gte("created_at", debut30j.toISOString()),
 
-                supabase.from("ventes").select("id,created_at,produits(nom,code)")
-                    .eq("conseiller_id", conseillerId)
-                    .or("source.neq.cerebro_check,source.is.null")
-                    .gte("created_at", debut30j.toISOString()),
+            supabase.from("ventes").select("id", { count: "exact", head: true })
+                .eq("conseiller_id", conseillerId)
+                .or(EXCLURE_AJUSTEMENTS)
+                .gte("created_at", lundi.toISOString()),
 
-                supabase.from("ventes").select("id", { count: "exact", head: true })
-                    .eq("conseiller_id", conseillerId)
-                    .or("source.neq.cerebro_check,source.is.null")
-                    .gte("created_at", lundi.toISOString()),
+            supabase.from("ventes").select("id", { count: "exact", head: true })
+                .eq("conseiller_id", conseillerId)
+                .or(EXCLURE_AJUSTEMENTS)
+                .gte("created_at", lundiPrec.toISOString())
+                .lt("created_at", lundi.toISOString()),
+        ]);
 
-                supabase.from("ventes").select("id", { count: "exact", head: true })
-                    .eq("conseiller_id", conseillerId)
-                    .or("source.neq.cerebro_check,source.is.null")
-                    .gte("created_at", lundiPrec.toISOString())
-                    .lt("created_at", lundi.toISOString()),
-            ]);
+        const auj   = resAujourd.data ?? [];
+        const j30   = res30j.data ?? [];
+        const semC  = resSemCour.count ?? 0;
+        const semP  = resSemPrec.count ?? 0;
 
-            const auj   = resAujourd.data ?? [];
-            const j30   = res30j.data ?? [];
-            const semC  = resSemCour.count ?? 0;
-            const semP  = resSemPrec.count ?? 0;
+        setVentesAujourdhui(auj);
+        setHeatmap(buildHeatmap(j30));
+        setInsight(computeInsights(j30, semC, semP));
+        setLoading(false);
+    }
 
-            setVentesAujourdhui(auj);
-            setHeatmap(buildHeatmap(j30));
-            setInsight(computeInsights(j30, semC, semP));
-            setLoading(false);
-        }
-
+    useEffect(() => {
         charger();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [conseillerId]);
 
     if (loading) return (
@@ -341,7 +346,16 @@ function StatsInner() {
                 </div>
             </div>
 
-            {/* ── Corriger mes chiffres ───────────────────────── */}
+            {/* ── Corriger mes ventes du jour ───────────────────── */}
+            {conseillerId && (
+                <CorrigerVentesJourCard
+                    conseillerId={conseillerId}
+                    ventesAujourdhui={ventesAujourdhui}
+                    onCorrige={charger}
+                />
+            )}
+
+            {/* ── Corriger mes chiffres (mois, Cerebro Check) ──── */}
             {conseillerId && (
                 <div className="rounded-[24px] bg-white p-6 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
                     <div className="flex items-start justify-between gap-4">

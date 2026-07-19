@@ -32,6 +32,11 @@ const menu = [
         icon: "challenge" as const,
     },
     {
+        label: "Variable",
+        href: "/manager/variable",
+        icon: "euro" as const,
+    },
+    {
         label: "Historique",
         href: "/manager/historique",
         icon: "bell" as const,

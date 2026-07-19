@@ -128,9 +128,8 @@ export default function HeroHeader({
 
                     {/* ── Gauche : infos conseiller ─────────────────────── */}
                     <div className="max-w-2xl">
-                        <p className="text-xs uppercase tracking-[0.45em] text-violet-300">KPILOTE</p>
                         <h1
-                            className="mt-1 text-3xl font-black leading-tight transition-opacity duration-280"
+                            className="text-3xl font-black leading-tight transition-opacity duration-280"
                             style={{ opacity: titreVisible ? 1 : 0 }}
                         >
                             {titreBrut}

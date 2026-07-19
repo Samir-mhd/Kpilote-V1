@@ -12,6 +12,7 @@ import { detecterEvenement } from "@/engine/eventEngine";
 import { genererMessageCoach } from "@/engine/coachEngine";
 import { traiterVente } from "@/engine/venteEngine";
 import { getMissionsReelles } from "@/services/missionsReelles";
+import { construireClassementPeriode } from "@/services/classementService";
 import { analyserDashboard } from "@/engine/contextEngine";
 import { supabase } from "@/lib/supabase";
 import { checkForceActive, clearForceCheck, getLastCheckDate, marquerCheckFait } from "@/services/resetService";
@@ -24,6 +25,21 @@ import { chargerChallenge, formatTempsRestant, ChallengeDashboard } from "@/serv
 import { useAvatarEtat } from "@/hooks/useAvatarEtat";
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 import TeamFeed from "@/components/dashboard/TeamFeed";
+import CagnotteJourCard from "@/components/dashboard/CagnotteJourCard";
+import AutresActesCard from "@/components/dashboard/AutresActesCard";
+import { ChoixActe } from "@/components/dashboard/ChoixActeModal";
+import {
+    BaremeVariable,
+    BonusManuel,
+    ActeJour,
+    BAREME_DEFAUT,
+    getBareme,
+    getBonusManuels,
+    getCagnotteJour,
+    enregistrerActeJour,
+    annulerActeJour,
+    jourCourant,
+} from "@/services/variableConseiller";
 
 const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
 
@@ -96,6 +112,14 @@ export default function Dashboard() {
     }, [conseillerId]);
 
     const [totalVentesJour, setTotalVentesJour] = useState(0);
+
+    // Cagnotte du jour (prime) — barème/bonus manuels courants + journal du jour
+    const [bareme, setBareme] = useState<BaremeVariable>(BAREME_DEFAUT);
+    const [bonusManuels, setBonusManuels] = useState<BonusManuel[]>([]);
+    const [cagnotteTotal, setCagnotteTotal] = useState(0);
+    const [cagnotteFlash, setCagnotteFlash] = useState<{ key: number; montant: number } | null>(null);
+    const [cagnotteActes, setCagnotteActes] = useState<ActeJour[]>([]);
+
     const [heroMessage, setHeroMessage] = useState("Chargement de ta journée...");
     const [coachMessage, setCoachMessage] = useState("🎯 Commence par ta mission prioritaire du jour.");
     const [missions, setMissions] = useState<MissionDashboard[]>([]);
@@ -199,23 +223,12 @@ export default function Dashboard() {
         setCoachMessage(contexte.messageCoach);
     }
 
+    // Classement du JOUR (cohérent avec "Actes du jour" de la StatsBar, qui repart à 0 chaque matin)
     async function chargerRang() {
         if (!conseillerId) return;
         try {
-            const debut = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-            const { data } = await supabase
-                .from("ventes")
-                .select("conseiller_id, quantite, produits(code)")
-                .gte("created_at", debut);
-            if (!data) return;
-            const totaux: Record<string, number> = {};
-            data.forEach((v: any) => {
-                const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code;
-                if (code === "spiderhome") return; // historisation, pas un acte commercial
-                totaux[v.conseiller_id] = (totaux[v.conseiller_id] ?? 0) + v.quantite;
-            });
-            const sorted = Object.entries(totaux).sort((a, b) => b[1] - a[1]);
-            const pos = sorted.findIndex(([id]) => id === conseillerId) + 1;
+            const classement = await construireClassementPeriode("jour");
+            const pos = classement.findIndex((c) => c.id === conseillerId) + 1;
             setRang(pos > 0 ? pos : 0);
         } catch { /* silencieux */ }
     }
@@ -288,6 +301,18 @@ export default function Dashboard() {
             await Promise.all([chargerMissions(), chargerRang(), chargerDefis()]);
         }
         init();
+
+        // Cagnotte du jour : barème/bonus courants + total déjà déclaré aujourd'hui
+        if (conseillerId) {
+            Promise.all([getBareme(), getBonusManuels(), getCagnotteJour(conseillerId, jourCourant())]).then(
+                ([b, m, actes]) => {
+                    setBareme(b);
+                    setBonusManuels(m);
+                    setCagnotteTotal(actes.reduce((t, a) => t + a.montant, 0));
+                    setCagnotteActes(actes);
+                }
+            );
+        }
     }, [conseillerId]);
 
     // Realtime : toutes les modifications sur challenges impliquant ce conseiller
@@ -464,6 +489,72 @@ export default function Dashboard() {
                 setDefiActif(null);
                 setChallengeResult("gagne");
             }
+        }
+    }
+
+    async function ajouterActeVariable(option: ChoixActe) {
+        if (!conseillerId) return;
+        const montant = option.montant ?? 0;
+        try {
+            const acte = await enregistrerActeJour(conseillerId, option.label, montant, option.champ, option.bonusManuelId, option.produitCode);
+            setCagnotteTotal((prev) => prev + montant);
+            setCagnotteFlash({ key: Date.now(), montant });
+            setCagnotteActes((prev) => [...prev, acte]);
+        } catch { /* silencieux — la cagnotte n'est pas critique pour l'usage courant */ }
+    }
+
+    // Annule le dernier acte "Autres actes" — uniquement s'il s'agit bien du tout dernier acte
+    // du jour (pas rattaché à une carte produit, qui elle se corrige sur /dashboard/stats).
+    async function annulerDernierActeAutre() {
+        if (!conseillerId) return;
+        const dernier = cagnotteActes[cagnotteActes.length - 1];
+        if (!dernier || dernier.produitCode) return;
+        try {
+            await annulerActeJour(conseillerId, dernier);
+            setCagnotteTotal((prev) => prev - dernier.montant);
+            setCagnotteActes((prev) => prev.slice(0, -1));
+        } catch { /* silencieux */ }
+    }
+
+    // Box et McAfee sont payés à M+2 : le champ identifie le sous-type (pour la cagnotte et la
+    // correction du jour) mais n'incrémente jamais le simulateur mensuel (voir CHAMPS_NON_SYNCHRONISES
+    // dans variableConseiller.ts) — déclaration manuelle sur /dashboard/variable.
+    const BOX_CHOIX: ChoixActe[] = [
+        { label: "Ultra / Ultra Essentiel", montant: bareme.box_ultra, champ: "box_ultra", produitCode: "box" },
+        { label: "POP", montant: bareme.box_pop, champ: "box_pop", produitCode: "box" },
+        { label: "POP S / Révolution / Box 5G", montant: bareme.box_pop_s_revolution_5g, champ: "box_pop_s_revolution_5g", produitCode: "box" },
+    ];
+    const FORFAIT_CHOIX: ChoixActe[] = [
+        { label: "Forfait Free / Série Free", montant: bareme.forfait_free_serie, champ: "forfait_free_serie", produitCode: "forfaits" },
+        { label: "Forfait Free Max", montant: bareme.forfait_free_max, champ: "forfait_free_max", produitCode: "forfaits" },
+    ];
+    const MCAFEE_CHOIX: ChoixActe[] = [
+        { label: "McAfee 4,99€", montant: bareme.mcafee_499, champ: "mcafee_499", produitCode: "mcafee" },
+        { label: "McAfee 6,99€", montant: bareme.mcafee_699, champ: "mcafee_699", produitCode: "mcafee" },
+    ];
+
+    const TELEPHONE_ACTE: ChoixActe = { label: "Smartphone", montant: bareme.smartphone, champ: "smartphones", produitCode: "telephones" };
+    const ASSURANCE_ACTE: ChoixActe = { label: "Assurance Nouveau Mobile", montant: bareme.assurance_nouveau_mobile, champ: "assurance_nouveau_mobile", produitCode: "assurance" };
+
+    // Sans accents pour matcher "Téléphones"/"telephones" indifféremment
+    function normaliser(s: string): string {
+        return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    }
+
+    function sousChoixPour(titre: string): ChoixActe[] | undefined {
+        switch (normaliser(titre)) {
+            case "box": return BOX_CHOIX;
+            case "forfaits": return FORFAIT_CHOIX;
+            case "mcafee": return MCAFEE_CHOIX;
+            default: return undefined;
+        }
+    }
+
+    function acteDirectPour(titre: string): ChoixActe | undefined {
+        switch (normaliser(titre)) {
+            case "telephones": return TELEPHONE_ACTE;
+            case "assurance": return ASSURANCE_ACTE;
+            default: return undefined;
         }
     }
 
@@ -772,12 +863,17 @@ export default function Dashboard() {
                 </div>
             )}
 
-            <StatsBar
-                ventes={realiseGlobal}
-                objectif={objectifGlobal}
-                taux={tauxGlobal}
-                rang={rang}
-            />
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                <div className="lg:col-span-2">
+                    <StatsBar
+                        ventes={realiseGlobal}
+                        objectif={objectifGlobal}
+                        taux={tauxGlobal}
+                        rang={rang}
+                    />
+                </div>
+                <CagnotteJourCard total={cagnotteTotal} flash={cagnotteFlash} />
+            </div>
 
             <TeamFeed conseillerId={conseillerId} />
 
@@ -800,10 +896,21 @@ export default function Dashboard() {
                             objectif={mission.objectif}
                             couleur={mission.couleur}
                             onSale={handleSale}
+                            sousChoix={sousChoixPour(mission.produit)}
+                            acteDirect={acteDirectPour(mission.produit)}
+                            onChoixVariable={ajouterActeVariable}
                         />
                     ))}
                 </div>
             </section>
+
+            <AutresActesCard
+                bareme={bareme}
+                bonusManuels={bonusManuels}
+                onChoisir={ajouterActeVariable}
+                dernierActe={cagnotteActes[cagnotteActes.length - 1]}
+                onAnnulerDernier={annulerDernierActeAutre}
+            />
 
         </div>
     );
