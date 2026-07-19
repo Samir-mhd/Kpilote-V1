@@ -41,6 +41,25 @@ function dateLocale(): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** Clé localStorage du début de session (par conseiller, par jour — s'efface automatiquement le lendemain). */
+function cleSessionStart(conseillerId: string): string {
+    return `session_start_${dateLocale()}_${conseillerId}`;
+}
+
+/** Retourne l'heure de début de session (après cerebro check) ou minuit comme fallback. */
+function getDebutSession(conseillerId: string): Date {
+    const stored = localStorage.getItem(cleSessionStart(conseillerId));
+    if (stored) return new Date(parseInt(stored));
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+/** Enregistre l'heure de début de session (appelé à la validation du cerebro check). */
+function enregistrerDebutSession(conseillerId: string): void {
+    localStorage.setItem(cleSessionStart(conseillerId), Date.now().toString());
+}
+
 export default function Dashboard() {
     const searchParams = useSearchParams();
     const nom = searchParams.get("nom") || "Conseiller";
@@ -149,9 +168,9 @@ export default function Dashboard() {
         const data = await getMissionsReelles(conseillerId);
         setMissions(data);
 
-        // Dernière vente commerciale (hors Spiderhome) du jour — pour détecter l'inactivité
-        const debutJour = new Date();
-        debutJour.setHours(0, 0, 0, 0);
+        // Borne de départ = heure du cerebro check (après validation), pas minuit
+        // Évite les faux positifs si le conseiller a vendu le matin avant une pause
+        const debutJour = getDebutSession(conseillerId);
         const { data: dernieres } = await supabase
             .from("ventes")
             .select("created_at, produits(code)")
@@ -325,6 +344,14 @@ export default function Dashboard() {
         };
     }, [conseillerId]);
 
+    // Enregistre le début de session si le check était déjà validé (premier chargement du jour sur cet appareil)
+    useEffect(() => {
+        if (!morningCheckValidated || !conseillerId) return;
+        if (!localStorage.getItem(cleSessionStart(conseillerId))) {
+            enregistrerDebutSession(conseillerId);
+        }
+    }, [morningCheckValidated, conseillerId]);
+
     // Réactions reçues des collègues
     useEffect(() => {
         if (!conseillerId) return;
@@ -360,6 +387,8 @@ export default function Dashboard() {
                     if (conseillerId) {
                         marquerCheckFait(conseillerId).catch(() => {});
                         clearForceCheck(conseillerId).catch(() => {});
+                        // Heure réelle de début de session (après le cerebro check)
+                        enregistrerDebutSession(conseillerId);
                     }
                     setCheckForced(false);
                     setMorningCheckValidated(true);
