@@ -19,6 +19,15 @@ function pick(arr: Msg[], genre: "H" | "F" | null = null): string {
     return genre === "F" ? m.F : m.H;
 }
 
+/** Formate une durée en minutes → "1h", "1h30", "2h"… */
+function formatDuree(minutes: number): string {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (m < 15) return `${h}h`;
+    if (m < 45) return `${h}h30`;
+    return `${h + 1}h`;
+}
+
 // ─── Tous objectifs atteints ──────────────────────────────────
 const heroFeu: Msg[] = [
     "T'es un avion !",
@@ -47,7 +56,7 @@ const coachFeu: Msg[] = [
     "Pourquoi ne pas aider un collègue sur un autre KPI ?",
 ];
 
-// ─── Bonne avance (≥ 70 %) ────────────────────────────────────
+// ─── Bonne avance (≥ 70%) ────────────────────────────────────
 const heroSolide: Msg[] = [
     "Tu fais le boulot !",
     "T'es au-dessus du lot !",
@@ -65,7 +74,7 @@ const coachSolide: Msg[] = [
     "Très belle cadence, continue !",
 ];
 
-// ─── En cours (≥ 15 %) ────────────────────────────────────────
+// ─── En cours (≥ 15%) ────────────────────────────────────────
 const heroEnCours: Msg[] = [
     "🎯 Une mission est encore en cours.",
     "💪 T'es proche de tout terminer.",
@@ -78,7 +87,7 @@ const coachEnCours: Msg[] = [
     "Continue, tu tiens le bon rythme.",
 ];
 
-// ─── Ralenti (< 15 %) ─────────────────────────────────────────
+// ─── Ralenti (< 15%, pas d'inactivité détectée) ───────────────
 const heroLent: Msg[] = [
     "T'as le frein à main !",
     "Tu démarres au gasoil !",
@@ -109,10 +118,89 @@ const coachLent: Msg[] = [
     "Chaque minute compte. En avant !",
 ];
 
+// ─── Inactivité Palier 5 : taux ≥ 80 % ───────────────────────
+// Belle journée, juste une pause — ton valorisant
+const heroInactif5: Msg[] = [
+    "T'as cartonné — {durée} de silence, une dernière pour finir en beauté !",
+    "Belle journée jusqu'ici ! {durée} sans vente, signe ta performance.",
+    "T'es au top — {durée} de pause, c'est l'heure du sprint final.",
+    { H: "T'as été un monstre ce matin — {durée} sans vente, montre que t'as pas fini !", F: "T'as été une monstre ce matin — {durée} sans vente, montre que t'as pas fini !" },
+    "Grosse matinée ! Mais {durée} de silence, c'est l'heure du coup de grâce.",
+];
+
+const coachInactif5: Msg[] = [
+    "T'es bien placé. Reprends juste le rythme pour finir fort.",
+    "Une petite relance et ta journée est parfaite.",
+    "L'objectif est presque là. Une dernière accélération et c'est dans la boîte.",
+    "Reste dans la dynamique — chaque vente en plus sécurise le mois.",
+];
+
+// ─── Inactivité Palier 4 : 60 % ≤ taux < 80 % ────────────────
+// Bonne base — encourageant, doux
+const heroInactif4: Msg[] = [
+    "Bonne base ! Mais {durée} sans vente — la fin de journée te tend les bras.",
+    "{durée} de silence. T'es bien parti — remets une pièce dans la machine.",
+    "Solide jusqu'ici ! {durée} sans vente, c'est l'heure de la relance.",
+    "T'as bien bossé. {durée} de pause, mais l'objectif n'est pas encore là.",
+];
+
+const coachInactif4: Msg[] = [
+    "T'es en bonne position. Quelques ventes et tu dépasses ton objectif.",
+    "La base est solide. Relance maintenant et tu finis fort.",
+    "Continue sur ta lancée — une vente de plus et tu passes le cap.",
+];
+
+// ─── Inactivité Palier 3 : 40 % ≤ taux < 60 % ────────────────
+// Mi-chemin — neutre, motivant
+const heroInactif3: Msg[] = [
+    "Mi-chemin et {durée} de silence — la deuxième mi-temps commence maintenant !",
+    "{durée} sans vente. T'as le niveau pour rattraper ça, lance-toi !",
+    "On est à mi-parcours — {durée} de pause, c'est l'heure de réagir.",
+    "Moitié faite, moitié à faire. Et {durée} de silence — reprends le fil.",
+];
+
+const coachInactif3: Msg[] = [
+    "T'as encore le temps. Mais chaque minute compte.",
+    "Recentre-toi sur ton objectif prioritaire.",
+    "Mi-chemin, c'est exactement le bon moment pour accélérer.",
+];
+
+// ─── Inactivité Palier 2 : 20 % ≤ taux < 40 % ────────────────
+// En difficulté — appel à l'action clair
+const heroInactif2: Msg[] = [
+    "{durée} sans vente et l'objectif est loin — accélère maintenant !",
+    "L'objectif s'éloigne. {durée} de silence, c'est trop long.",
+    "Pas de vente depuis {durée} — remets-toi en mode chasseur !",
+    "{durée} de pause avec encore beaucoup à faire — c'est le moment de changer de rythme.",
+];
+
+const coachInactif2: Msg[] = [
+    "La journée est encore longue. Un effort maintenant peut tout changer.",
+    "Focus. Objectif prioritaire. Maintenant.",
+    "C'est le moment de changer de vitesse — chaque vente compte double.",
+];
+
+// ─── Inactivité Palier 1 : taux < 20 % ───────────────────────
+// Critique — message fort avec durée
+const heroInactif1: Msg[] = [
+    "T'as le frein à main ! Et {durée} de silence en plus...",
+    "{durée} sans vente — et l'objectif est encore loin.",
+    "T'es en veille depuis {durée} — c'est maintenant ou jamais !",
+    "T'as avalé une enclume ? {durée} sans vente et presque rien au compteur.",
+    "Oh fan, {durée} de silence — mets la deuxième !",
+    "T'as les pieds dans le béton depuis {durée} — secoue-toi !",
+];
+
+const coachInactif1: Msg[] = [
+    "Allez, réveille-toi ! Les objectifs ne vont pas se faire seuls.",
+    "Un peu d'énergie et ça repart — c'est maintenant ou jamais.",
+    "Chaque minute compte. En avant !",
+];
+
 export function analyserDashboard(
     missions: MissionContext[],
     genre: "H" | "F" | null = null,
-    // Date de la dernière vente commerciale aujourd'hui (null = aucune vente aujourd'hui ; undefined = non fourni)
+    // Date de la dernière vente commerciale aujourd'hui (null = aucune vente ; undefined = non fourni)
     derniereVente?: Date | null
 ): DashboardContext {
 
@@ -138,16 +226,57 @@ export function analyserDashboard(
         };
     }
 
-    // Inactivité : une vente commerciale existait aujourd'hui mais il y a > 1h → LENT
+    // ─── Inactivité : dernière vente commerciale > 1h ────────────────────────
     if (derniereVente instanceof Date &&
         Date.now() - derniereVente.getTime() > 60 * 60 * 1000) {
+
+        const minutesInactif = Math.floor((Date.now() - derniereVente.getTime()) / 60000);
+        const duree = formatDuree(minutesInactif);
+
+        let heroArr: Msg[];
+        let coachArr: Msg[];
+        let situation: string;
+        let emoji: string;
+
+        // 5 paliers de 20 %
+        if (tauxGlobal >= 0.80) {
+            heroArr    = heroInactif5;
+            coachArr   = coachInactif5;
+            situation  = "PAUSE_MERITEE";
+            emoji      = "⭐";
+        } else if (tauxGlobal >= 0.60) {
+            heroArr    = heroInactif4;
+            coachArr   = coachInactif4;
+            situation  = "RELANCE_DOUCE";
+            emoji      = "💪";
+        } else if (tauxGlobal >= 0.40) {
+            heroArr    = heroInactif3;
+            coachArr   = coachInactif3;
+            situation  = "RELANCE";
+            emoji      = "⚡";
+        } else if (tauxGlobal >= 0.20) {
+            heroArr    = heroInactif2;
+            coachArr   = coachInactif2;
+            situation  = "ALERTE";
+            emoji      = "⚡";
+        } else {
+            heroArr    = heroInactif1;
+            coachArr   = coachInactif1;
+            situation  = "LENT_CRITIQUE";
+            emoji      = "⚡";
+        }
+
+        const heroRaw   = pick(heroArr, genre);
+        const heroFinal = heroRaw.replace("{durée}", duree);
+
         return {
-            situation: "LENT",
-            messageHero: "⚡ " + pick(heroLent, genre),
-            messageCoach: pick(coachLent, genre),
+            situation,
+            messageHero:  `${emoji} ${heroFinal}`,
+            messageCoach: pick(coachArr, genre),
         };
     }
 
+    // ─── Logique normale basée sur les % ─────────────────────────────────────
     if (tauxGlobal >= 0.7) {
         return {
             situation: "AVANCE",
