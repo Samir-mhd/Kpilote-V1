@@ -296,6 +296,16 @@ export function analyserDashboard(
         };
     }
 
+    // Vente réalisée il y a moins de 15 min : jamais le ton "ralenti", même si le % reste
+    // bas en tout début de journée (1 vente sur un objectif complet donne un taux mécaniquement faible).
+    if (derniereVente instanceof Date && Date.now() - derniereVente.getTime() < 15 * 60 * 1000) {
+        return {
+            situation: "MISSION",
+            messageHero: pick(heroEnCours, genre),
+            messageCoach: pick(coachEnCours, genre),
+        };
+    }
+
     return {
         situation: "LENT",
         messageHero: "⚡ " + pick(heroLent, genre),
