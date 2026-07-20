@@ -82,10 +82,12 @@ function ResultatsInner() {
         );
     }
 
-    const totalRealise    = missions.reduce((t, m) => t + m.realise, 0);
-    const totalObjectif   = missions.reduce((t, m) => t + m.objectifMensuel, 0);
+    // Spiderhome = historisation, pas un acte commercial → exclu du total de la carte principale
+    const missionsCommerciales = missions.filter((m) => m.produit.toLowerCase() !== "spiderhome");
+    const totalRealise    = missionsCommerciales.reduce((t, m) => t + m.realise, 0);
+    const totalObjectif   = missionsCommerciales.reduce((t, m) => t + m.objectifMensuel, 0);
     const progressionGlob = totalObjectif > 0 ? Math.round((totalRealise / totalObjectif) * 100) : 0;
-    const projection      = missions.reduce((t, m) => t + m.projectionFinMois, 0);
+    const projection      = missionsCommerciales.reduce((t, m) => t + m.projectionFinMois, 0);
     const cGlob           = tauxColor(progressionGlob);
     const etatGlob        = progressionGlob >= 100 ? "termine" : progressionGlob >= 80 ? "avance" : progressionGlob >= 50 ? "rythme" : "retard";
 
