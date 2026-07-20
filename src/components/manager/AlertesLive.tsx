@@ -145,12 +145,17 @@ export default function AlertesLive() {
         const [resC, resP, resV] = await Promise.all([
             supabase.from("conseillers").select("id, nom"),
             supabase.from("planning_conseillers").select("conseiller_id, statut").eq("jour", today),
-            supabase.from("ventes").select("conseiller_id, created_at, source").gte("created_at", debut.toISOString()),
+            supabase.from("ventes").select("conseiller_id, created_at, source, produits(code)").gte("created_at", debut.toISOString()),
         ]);
 
         const tous    = resC.data ?? [];
         const planning = resP.data ?? [];
-        const ventes  = (resV.data ?? []).filter((v: any) => v.source !== "cerebro_check");
+        // Spiderhome = historisation, pas un acte commercial → exclu (comme partout ailleurs)
+        const ventes  = (resV.data ?? []).filter((v: any) => {
+            if (v.source === "cerebro_check") return false;
+            const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code;
+            return code !== "spiderhome";
+        });
 
         const statutMap: Record<string, string> = {};
         planning.forEach((p: any) => { statutMap[p.conseiller_id] = p.statut; });
