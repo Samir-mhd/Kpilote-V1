@@ -361,11 +361,11 @@ function StatsInner() {
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-violet-600">
-                                🧠 Corriger mes chiffres
+                                🧠 Revoir mon Cerebro Check
                             </p>
-                            <p className="mt-1 font-black text-slate-900">Une erreur sur un produit ?</p>
+                            <p className="mt-1 font-black text-slate-900">Validé trop vite ce matin ?</p>
                             <p className="mt-1 text-sm text-slate-400">
-                                Ajuste les totaux du mois sans toucher à tes ventes saisies.
+                                Ajuste ton cumul du mois (avant aujourd'hui) sans toucher à tes ventes saisies.
                             </p>
                         </div>
                         {!showConfirm && (

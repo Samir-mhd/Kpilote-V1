@@ -3,26 +3,16 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { PRODUITS_ORDRE } from "@/utils/produits";
-import { Periode, PERIODE_LABELS, couleurTaux } from "@/utils/periodes";
+import { Periode, PERIODE_LABELS, couleurTaux, lundiCourant } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
+import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
+import { getJoursTravailPlageTous } from "@/services/planningService";
 import type { ProduitCode } from "@/utils/produits";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { supabase } from "@/lib/supabase";
-import { envoyerReaction } from "@/services/reactionService";
 
 const medals = ["🥇", "🥈", "🥉"];
-
-// Jours ouvrés restants dans le mois (aujourd'hui inclus, dimanches exclus)
-function workingDaysRemaining(): number {
-    const now = new Date();
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    let count = 0;
-    for (const d = new Date(now); d <= end; d.setDate(d.getDate() + 1)) {
-        if (d.getDay() !== 0) count++;
-    }
-    return Math.max(count, 1);
-}
 
 function ClassementInner() {
     const searchParams  = useSearchParams();
@@ -31,19 +21,12 @@ function ClassementInner() {
     const [periode, setPeriode]             = useState<Periode>("mois");
     const [classement, setClassement]       = useState<ConseillerStats[]>([]);
     const [moisMap, setMoisMap]             = useState(new Map<string, ConseillerStats>());
+    const [semaineMap, setSemaineMap]       = useState(new Map<string, ConseillerStats>());
+    const [objSemaine, setObjSemaine]       = useState<Record<string, Record<ProduitCode, number>>>({});
+    const [joursRestantsSemaine, setJoursRestantsSemaine] = useState<Record<string, number>>({});
     const [photos, setPhotos]               = useState<Record<string, string | null>>({});
     const [loading, setLoading]             = useState(true);
     const [maj, setMaj]                     = useState("");
-    const [sentReactions, setSentReactions] = useState<Record<string, string>>({});
-
-    const monNom = classement.find(c => c.id === conseillerId)?.nom ?? "";
-
-    async function handleReaction(toId: string, emoji: string) {
-        if (!conseillerId || sentReactions[toId]) return;
-        await envoyerReaction(conseillerId, monNom, toId, emoji);
-        setSentReactions(prev => ({ ...prev, [toId]: emoji }));
-        setTimeout(() => setSentReactions(prev => { const n = { ...prev }; delete n[toId]; return n; }), 8000);
-    }
 
     async function charger(p: Periode) {
         setLoading(true);
@@ -59,6 +42,27 @@ function ClassementInner() {
             const ids = data.map(c => c.id);
             const avs = await getPhotosByIds(ids).catch(() => ({}));
             setPhotos(avs);
+
+            // "semaine" et "jour" ont tous les deux besoin de l'objectif semaine figé (le jour s'y recale)
+            if (p === "semaine" || p === "jour") {
+                const lundi = lundiCourant();
+                const figes = await getObjectifsSemaineFiges(ids, lundi).catch(() => ({}));
+                setObjSemaine(figes);
+            }
+
+            // "jour" a en plus besoin du cumul de la semaine (avant aujourd'hui) et des jours
+            // planifiés restants de la semaine, selon le planning réel de chaque conseiller
+            if (p === "jour") {
+                const lundi = lundiCourant();
+                const dimanche = new Date(lundi);
+                dimanche.setDate(lundi.getDate() + 6);
+                const [semaineData, joursRestants] = await Promise.all([
+                    construireClassementPeriode("semaine").catch(() => [] as ConseillerStats[]),
+                    getJoursTravailPlageTous(ids, new Date(), dimanche).catch(() => ({})),
+                ]);
+                setSemaineMap(new Map(semaineData.map(c => [c.id, c])));
+                setJoursRestantsSemaine(joursRestants);
+            }
         } catch {}
         finally { setLoading(false); }
     }
@@ -77,18 +81,25 @@ function ClassementInner() {
         return () => { supabase.removeChannel(channel); };
     }, [periode]);
 
-    // Objectif dynamique par conseiller × produit
+    // Objectif par conseiller × produit :
+    // - "mois"    : fixé par le manager
+    // - "semaine" : figé au premier calcul de la semaine (reste à faire du mois ÷ jours planifiés
+    //               restants du mois × jours planifiés de la semaine), ne change plus ensuite
+    // - "jour"    : dynamique, recalé sur l'objectif SEMAINE figé (jamais sur le mois) — reste à
+    //               faire de la semaine ÷ jours planifiés restants de la semaine
     function getObjDynamic(c: ConseillerStats, key: ProduitCode): number {
         const objMois   = c.objectifs[key] ?? 0;
         if (periode === "mois") return objMois;
-        const moisStats = moisMap.get(c.id);
-        const monthVal  = moisStats?.produits[key] ?? 0;
-        const periodVal = c.produits[key] ?? 0;
-        const doneBeforePeriod = Math.max(monthVal - periodVal, 0);
-        const remaining        = Math.max(objMois - doneBeforePeriod, 0);
-        const daysLeft         = workingDaysRemaining();
-        if (periode === "jour") return Math.ceil(remaining / daysLeft);
-        return Math.ceil(remaining / daysLeft * 6); // semaine : taux × 6 jours ouvrés
+        if (periode === "semaine") return objSemaine[c.id]?.[key] ?? 0;
+
+        const objSemaineFixe = objSemaine[c.id]?.[key] ?? 0;
+        const semaineStats   = semaineMap.get(c.id);
+        const realiseSemaine = semaineStats?.produits[key] ?? 0;
+        const realiseAujourdhui = c.produits[key] ?? 0;
+        const realiseAvantAujourdhui = Math.max(realiseSemaine - realiseAujourdhui, 0);
+        const reste = Math.max(objSemaineFixe - realiseAvantAujourdhui, 0);
+        const joursRestants = joursRestantsSemaine[c.id] ?? 0;
+        return joursRestants > 0 ? Math.ceil(reste / joursRestants) : reste;
     }
 
     const monRang = classement.findIndex(c => c.id === conseillerId) + 1;
@@ -195,7 +206,6 @@ function ClassementInner() {
                                         ))}
                                         <th className="px-4 pb-2 text-right">Total</th>
                                         <th className="px-5 pb-2 text-right">Taux</th>
-                                        <th className="px-4 pb-2 text-center">React</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -244,7 +254,7 @@ function ClassementInner() {
                                                 <td className="px-4 py-3 text-right">
                                                     <p className={`text-lg font-black ${isMoi ? "text-green-700" : "text-slate-800"}`}>{c.total}</p>
                                                 </td>
-                                                <td className="px-5 py-3 text-right">
+                                                <td className="rounded-r-2xl px-5 py-3 text-right">
                                                     <div className="flex flex-col items-end gap-1">
                                                         <span className={`text-sm font-black ${ct.text}`}>{taux}%</span>
                                                         <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-200">
@@ -252,41 +262,20 @@ function ClassementInner() {
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="rounded-r-2xl px-4 py-3 text-center">
-                                                    {isMoi ? (
-                                                        <span className="text-xs text-slate-300">—</span>
-                                                    ) : sentReactions[c.id] ? (
-                                                        <span className="text-xl" style={{ animation: "reactPop .3s ease" }}>{sentReactions[c.id]}</span>
-                                                    ) : (
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            {["🔥", "💪", "👏"].map(emoji => (
-                                                                <button
-                                                                    key={emoji}
-                                                                    onClick={() => handleReaction(c.id, emoji)}
-                                                                    className="text-base hover:scale-125 transition-transform leading-none"
-                                                                    title={`Envoyer ${emoji}`}
-                                                                >
-                                                                    {emoji}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </td>
                                             </tr>
                                         );
                                     })}
                                 </tbody>
                             </table>
                         </div>
-                        <div className="px-7 pb-5 pt-2 text-xs text-slate-300">Objectifs en rythme dynamique — ajustés selon l'avancement du mois</div>
+                        <div className="px-7 pb-5 pt-2 text-xs text-slate-300">
+                            {periode === "jour"
+                                ? "Objectif du jour en rythme dynamique — recalé sur l'objectif de la semaine figé"
+                                : periode === "semaine"
+                                ? "Objectif de la semaine figé depuis lundi — ne change pas selon l'avancement"
+                                : "Objectif mensuel fixé par le manager"}
+                        </div>
                     </div>
-                    <style>{`
-                        @keyframes reactPop {
-                            0%   { transform: scale(0.4); opacity: 0; }
-                            70%  { transform: scale(1.3); opacity: 1; }
-                            100% { transform: scale(1); }
-                        }
-                    `}</style>
                 </>
             )}
         </div>

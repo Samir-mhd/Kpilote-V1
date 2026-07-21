@@ -260,6 +260,78 @@ export async function getJoursTravailTous(
     return result;
 }
 
+/**
+ * Retourne le nombre de jours "present" planifiés entre `debut` et `fin` inclus (plage libre),
+ * pour chaque conseiller. Brique de base pour tous les calculs "jours planifiés restants".
+ * Fallback : jours ouvrés (hors dimanche) si aucune donnée planning.
+ */
+export async function getJoursTravailPlageTous(
+    conseillerIds: string[],
+    debut: Date,
+    fin: Date
+): Promise<Record<string, number>> {
+    if (conseillerIds.length === 0) return {};
+
+    const debutStr = jourStr(debut);
+    const finStr   = jourStr(fin);
+
+    const { data } = await supabase
+        .from("planning_conseillers")
+        .select("conseiller_id, jour, statut")
+        .in("conseiller_id", conseillerIds)
+        .gte("jour", debutStr)
+        .lte("jour", finStr);
+
+    const plannings: Record<string, Record<string, StatutJour>> = {};
+    for (const id of conseillerIds) plannings[id] = {};
+    (data ?? []).forEach((row: any) => {
+        if (plannings[row.conseiller_id]) {
+            plannings[row.conseiller_id][row.jour] = row.statut as StatutJour;
+        }
+    });
+
+    const result: Record<string, number> = {};
+    for (const conseillerId of conseillerIds) {
+        const planning = plannings[conseillerId];
+        let total = 0;
+
+        for (const d = new Date(debut); d <= fin; d.setDate(d.getDate() + 1)) {
+            const clé    = jourStr(d);
+            const statut = planning[clé] as StatutJour | undefined;
+
+            const estJourVente = statut !== undefined
+                ? STATUTS_VENDEUR.includes(statut)
+                : !estWeekend(d);
+
+            if (estJourVente) total++;
+        }
+
+        result[conseillerId] = total;
+    }
+
+    return result;
+}
+
+/** Version pour un seul conseiller. */
+export async function getJoursTravailPlage(conseillerId: string, debut: Date, fin: Date): Promise<number> {
+    const r = await getJoursTravailPlageTous([conseillerId], debut, fin);
+    return r[conseillerId] ?? 0;
+}
+
+/**
+ * Retourne le nombre de jours "present" de la semaine (lundi → dimanche fourni) pour chaque
+ * conseiller. Utilisé pour l'objectif Spiderhome hebdomadaire et le nombre de jours planifiés
+ * de la semaine dans le calcul de l'objectif semaine figé.
+ */
+export async function getJoursTravailSemaineTous(
+    conseillerIds: string[],
+    lundi: Date
+): Promise<Record<string, number>> {
+    const dimanche = new Date(lundi);
+    dimanche.setDate(lundi.getDate() + 6);
+    return getJoursTravailPlageTous(conseillerIds, lundi, dimanche);
+}
+
 // ─── Lecture planning ──────────────────────────────────────────────────────────
 
 export async function getPlanningMois(

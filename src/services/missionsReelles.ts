@@ -1,7 +1,10 @@
 import { getObjectifsMensuels } from "@/services/objectifs";
-import { getVentesDuJour, getVentesDuMois } from "@/services/stats";
-import { getJoursTravail } from "@/services/planningService";
+import { getVentesDuJour, getVentesDuMois, getVentesDepuisLundi } from "@/services/stats";
+import { getJoursTravail, getJoursTravailPlage } from "@/services/planningService";
+import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import { calculerObjectifs, EtatObjectif } from "@/engine/objectifEngine";
+import { lundiCourant } from "@/utils/periodes";
+import type { ProduitCode } from "@/utils/produits";
 import { supabase } from "@/lib/supabase";
 
 type ProduitLie = { nom: string; code: string };
@@ -84,22 +87,25 @@ async function calcul(conseillerId: string, annee: number, mois: number, ventesG
 
 /**
  * Vue simplifiée (dashboard principal) :
- * - objectif = objectifJour calculé depuis le cumul mensuel + jours restants
- *   → adapte la cible en fonction de ce qui est déjà réalisé ce mois
+ * - objectif = objectif du jour, dynamique, recalé sur l'objectif SEMAINE figé (jamais sur le
+ *   mois) : (objectif semaine − réalisé de la semaine avant aujourd'hui) ÷ jours planifiés
+ *   restants de la semaine. Spiderhome garde son propre calcul auto (hors de cette cascade).
  * - realise = ventes d'AUJOURD'HUI uniquement → repart à 0 chaque matin
- *
- * Cela permet à Julie de commencer à 0 chaque jour, avec une cible journalière
- * qui intègre les jours précédents et les jours restants.
  */
 export async function getMissionsReelles(conseillerId: string) {
-    const now = new Date();
+    const now   = new Date();
     const annee = now.getFullYear();
     const mois  = now.getMonth() + 1;
+    const lundi = lundiCourant();
+    const dimanche = new Date(lundi);
+    dimanche.setDate(lundi.getDate() + 6);
 
-    // Le moteur utilise le cumul mensuel pour calculer objectifJour correctement
-    const [resultats, ventesJour] = await Promise.all([
-        calcul(conseillerId, annee, mois, getVentesDuMois),
+    const [resultats, ventesJour, objSemaineParConseiller, ventesSemaine, joursRestantsSemaine] = await Promise.all([
+        calcul(conseillerId, annee, mois, getVentesDuMois), // conserve le calcul mensuel (Spiderhome + messages)
         getVentesDuJour(conseillerId),
+        getObjectifsSemaineFiges([conseillerId], lundi),
+        getVentesDepuisLundi(conseillerId, lundi),
+        getJoursTravailPlage(conseillerId, now, dimanche), // jours planifiés restants de la semaine, aujourd'hui inclus
     ]);
 
     // Index des ventes d'aujourd'hui par code produit
@@ -109,13 +115,39 @@ export async function getMissionsReelles(conseillerId: string) {
         if (p?.code) realiseJour[p.code] = (realiseJour[p.code] ?? 0) + (v.quantite ?? 1);
     });
 
+    // Index des ventes depuis lundi par code produit (inclut aujourd'hui)
+    const realiseSemaine: Record<string, number> = {};
+    (ventesSemaine as any[]).forEach((v) => {
+        const p = Array.isArray(v.produits) ? v.produits[0] : v.produits;
+        if (p?.code) realiseSemaine[p.code] = (realiseSemaine[p.code] ?? 0) + (v.quantite ?? 1);
+    });
+
+    const objSemaine = objSemaineParConseiller[conseillerId] ?? {};
+
     return resultats.map((m) => {
         // Normalise le nom produit en code : "Téléphones" → "telephones"
         const code = m.produit.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+        const realiseAujourdhui = realiseJour[code] ?? 0;
+
+        if (code === "spiderhome") {
+            return {
+                produit:  m.produit,
+                objectif: m.objectifJour, // Spiderhome : hors cascade semaine, calcul auto mensuel inchangé
+                realise:  realiseAujourdhui,
+                couleur:  couleurProduit(m.produit),
+                message:  m.message,
+            };
+        }
+
+        const objectifSemaineFixe   = objSemaine[code as ProduitCode] ?? 0;
+        const realiseAvantAujourdhui = Math.max((realiseSemaine[code] ?? 0) - realiseAujourdhui, 0);
+        const resteSemaine          = Math.max(objectifSemaineFixe - realiseAvantAujourdhui, 0);
+        const objectifJour          = joursRestantsSemaine > 0 ? Math.ceil(resteSemaine / joursRestantsSemaine) : resteSemaine;
+
         return {
             produit:  m.produit,
-            objectif: m.objectifJour,         // pace journalière calculée depuis le cumul mensuel
-            realise:  realiseJour[code] ?? 0, // ventes d'aujourd'hui = 0 au début de chaque journée
+            objectif: objectifJour,
+            realise:  realiseAujourdhui, // ventes d'aujourd'hui = 0 au début de chaque journée
             couleur:  couleurProduit(m.produit),
             message:  m.message,
         };

@@ -10,14 +10,8 @@ const MOIS_FR = [
     "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
 ];
 
-export function exporterObjectifsPDF(
-    lignes: LignePDF[],
-    colonnes: ColonnePDF[]
-): void {
-    const now        = new Date();
-    const mois       = MOIS_FR[now.getMonth()];
-    const annee      = now.getFullYear();
-    const dateGen    = now.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+function construireEtOuvrirPDF(titre: string, sousTitre: string, lignes: LignePDF[], colonnes: ColonnePDF[]): void {
+    const dateGen = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 
     const lignesHTML = lignes.map((ligne, i) => {
         const cellules = colonnes.map(c => {
@@ -35,7 +29,7 @@ export function exporterObjectifsPDF(
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Objectifs ${mois} ${annee} — KPILOTE</title>
+  <title>${titre} — KPILOTE</title>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -175,8 +169,8 @@ export function exporterObjectifsPDF(
       <div class="logo-box">K</div>
       <span class="logo-label">KPILOTE Manager</span>
     </div>
-    <h1>Objectifs de ${mois} ${annee}</h1>
-    <p class="sub">Objectifs mensuels par conseiller et par produit</p>
+    <h1>${titre}</h1>
+    <p class="sub">${sousTitre}</p>
   </div>
 
   <div class="content">
@@ -212,4 +206,40 @@ export function exporterObjectifsPDF(
     }
     win.document.write(html);
     win.document.close();
+}
+
+export function exporterObjectifsPDF(
+    lignes: LignePDF[],
+    colonnes: ColonnePDF[]
+): void {
+    const now  = new Date();
+    const mois = MOIS_FR[now.getMonth()];
+    const annee = now.getFullYear();
+
+    construireEtOuvrirPDF(
+        `Objectifs de ${mois} ${annee}`,
+        "Objectifs mensuels par conseiller et par produit",
+        lignes,
+        colonnes
+    );
+}
+
+/** Imprime les objectifs de la semaine (lundi → dimanche fournis), même mise en page que le mensuel. */
+export function exporterObjectifsSemainePDF(
+    lignes: LignePDF[],
+    colonnes: ColonnePDF[],
+    lundi: Date
+): void {
+    const dimanche = new Date(lundi);
+    dimanche.setDate(lundi.getDate() + 6);
+
+    const fmt = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+    const periodeLabel = `Semaine du ${fmt(lundi)} au ${fmt(dimanche)} ${dimanche.getFullYear()}`;
+
+    construireEtOuvrirPDF(
+        `Objectifs de la semaine`,
+        `${periodeLabel} — objectifs par conseiller et par produit`,
+        lignes,
+        colonnes
+    );
 }

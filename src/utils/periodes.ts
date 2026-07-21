@@ -20,38 +20,12 @@ export function dateDebutPeriode(periode: Periode): string {
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 }
 
-/** Proratise un objectif mensuel selon la période et le nombre de jours ouvrés. */
-export function proratiserObjectif(
-    objectifMensuel: number,
-    periode: Periode
-): number {
-    if (periode === "mois") return objectifMensuel;
-
+/** Lundi de la semaine en cours (minuit local). */
+export function lundiCourant(): Date {
     const now = new Date();
-    const annee = now.getFullYear();
-    const mois  = now.getMonth();
-
-    // Nombre de jours ouvrés (lun-sam) du mois
-    const nbJoursMois = new Date(annee, mois + 1, 0).getDate();
-    let joursOuvresMois = 0;
-    for (let j = 1; j <= nbJoursMois; j++) {
-        const d = new Date(annee, mois, j).getDay();
-        if (d !== 0) joursOuvresMois++; // tous sauf dimanche
-    }
-
-    const tauxJour = objectifMensuel / (joursOuvresMois || 1);
-
-    if (periode === "jour") return Math.round(tauxJour * 10) / 10;
-
-    // Semaine : compter les jours ouvrés de la semaine en cours
     const dow = now.getDay();
-    const diffLundi = dow === 0 ? -6 : 1 - dow;
-    let joursOuvresSemaine = 0;
-    for (let i = 0; i < 6; i++) { // lundi à samedi
-        const d = new Date(annee, mois, now.getDate() + diffLundi + i).getDay();
-        if (d !== 0) joursOuvresSemaine++;
-    }
-    return Math.round(tauxJour * joursOuvresSemaine * 10) / 10;
+    const diff = dow === 0 ? -6 : 1 - dow;
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
 }
 
 /** Couleur CSS selon le taux d'avancement. */

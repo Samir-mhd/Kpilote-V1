@@ -61,3 +61,20 @@ export async function getVentesDuMois(conseillerId: string) {
     if (error) throw new Error(error.message ?? "Erreur chargement ventes");
     return data ?? [];
 }
+
+/**
+ * Ventes depuis lundi (inclus) jusqu'à maintenant → objectif jour dynamique, recalé sur
+ * l'objectif semaine figé. Exclut le Cerebro Check (backdaté au 1er du mois, pas un acte de
+ * la semaine) ; inclut les corrections "reset_jour" qui doivent compter dans le réalisé réel.
+ */
+export async function getVentesDepuisLundi(conseillerId: string, lundi: Date) {
+    const { data, error } = await supabase
+        .from("ventes")
+        .select(`*, produits(nom, code)`)
+        .eq("conseiller_id", conseillerId)
+        .or("source.is.null,source.neq.cerebro_check")
+        .gte("created_at", lundi.toISOString());
+
+    if (error) throw new Error(error.message ?? "Erreur chargement ventes semaine");
+    return data ?? [];
+}
