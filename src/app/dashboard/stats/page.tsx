@@ -147,7 +147,9 @@ function StatsInner() {
                 .lt("created_at", lundi.toISOString()),
         ]);
 
-        const auj   = resAujourd.data ?? [];
+        // Spiderhome = historisation, pas un acte commercial → exclu de "Mes ventes aujourd'hui"
+        const estSpiderhome = (v: any) => (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code === "spiderhome";
+        const auj   = (resAujourd.data ?? []).filter((v) => !estSpiderhome(v));
         const j30   = res30j.data ?? [];
         const semC  = resSemCour.count ?? 0;
         const semP  = resSemPrec.count ?? 0;

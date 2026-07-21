@@ -195,25 +195,31 @@ function extractProduit(v: any): { produitNom: string; produitCode: string } {
 export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
     const [entries, setEntries] = useState<Entry[]>([]);
     const [dbError, setDbError] = useState<string | null>(null);
-    const namesRef  = useRef<Record<string, string>>({});
-    const genresRef = useRef<Record<string, string | null>>({});
-    const countsRef = useRef<Counts>({});
-    const ranksRef  = useRef<Record<string, number>>({});
+    const namesRef    = useRef<Record<string, string>>({});
+    const genresRef   = useRef<Record<string, string | null>>({});
+    const countsRef   = useRef<Counts>({});
+    const ranksRef    = useRef<Record<string, number>>({});
+    const produitsRef = useRef<Record<string, string>>({}); // produit_id -> code (pour le realtime, sans jointure)
 
     useEffect(() => {
         const debut = new Date();
         debut.setHours(0, 0, 0, 0);
 
         (async () => {
-            const [resC, resV] = await Promise.all([
+            const [resC, resV, resP] = await Promise.all([
                 supabase.from("conseillers").select("id, nom"),
                 supabase
                     .from("ventes")
-                    .select("id, conseiller_id, created_at, source, quantite, produits(nom, code)")
+                    .select("id, conseiller_id, created_at, source, quantite, produit_id, produits(nom, code)")
                     .gte("created_at", debut.toISOString())
                     .order("created_at", { ascending: false })
                     .limit(50),
+                supabase.from("produits").select("id, code"),
             ]);
+
+            const pmap: Record<string, string> = {};
+            (resP.data ?? []).forEach((p: any) => { pmap[p.id] = p.code; });
+            produitsRef.current = pmap;
 
             if (resV.error) {
                 setDbError(`Erreur ventes: ${resV.error.message} (${resV.error.code})`);
@@ -234,7 +240,10 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
             } catch { /* colonne absente ou erreur réseau — on ignore */ }
             genresRef.current = gmap;
 
-            const rawVentes = (resV.data ?? []).filter((v: any) => v.source !== "cerebro_check");
+            // Spiderhome = historisation, pas un acte commercial → exclu du feed (comme partout ailleurs)
+            const rawVentes = (resV.data ?? []).filter((v: any) =>
+                v.source !== "cerebro_check" && extractProduit(v).produitCode !== "spiderhome"
+            );
 
             // Retracer chronologiquement pour le contexte cumulatif
             const ventesAsc = [...rawVentes].reverse();
@@ -312,6 +321,7 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
             .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventes" }, async (payload: any) => {
                 const v = payload.new;
                 if (v.source === "cerebro_check") return;
+                if (produitsRef.current[v.produit_id] === "spiderhome") return;
 
                 const cid = v.conseiller_id;
                 const nom = namesRef.current[cid] ?? "Équipe";
