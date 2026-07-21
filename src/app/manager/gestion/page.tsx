@@ -14,6 +14,7 @@ type Conseiller = {
     avatar: string | null;
     ordre: number;
     genre: "H" | "F" | null;
+    variable_activee: boolean | null;
 };
 
 type DeleteMode = "archive" | "full";
@@ -97,6 +98,13 @@ export default function GestionEquipePage() {
         const { error } = await supabase.from("conseillers").update({ genre: next }).eq("id", id);
         if (error) { afficherToast("Erreur mise à jour genre.", false); return; }
         setConseillers(prev => prev.map(c => c.id === id ? { ...c, genre: next } : c));
+    }
+
+    async function toggleVariable(id: string, actuel: boolean | null) {
+        const next = actuel === false ? true : false;
+        const { error } = await supabase.from("conseillers").update({ variable_activee: next }).eq("id", id);
+        if (error) { afficherToast("Erreur mise à jour variable.", false); return; }
+        setConseillers(prev => prev.map(c => c.id === id ? { ...c, variable_activee: next } : c));
     }
 
     async function supprimerAvatar(id: string) {
@@ -312,6 +320,19 @@ export default function GestionEquipePage() {
                                             title={`Genre : ${c.genre ?? "non défini"} — cliquer pour changer`}
                                         >
                                             {c.genre ?? "?"}
+                                        </button>
+
+                                        {/* Variable / prime */}
+                                        <button
+                                            onClick={() => toggleVariable(c.id, c.variable_activee)}
+                                            className={`flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-all ${
+                                                c.variable_activee === false
+                                                    ? "bg-slate-100 text-slate-400 hover:bg-slate-200"
+                                                    : "bg-emerald-100 text-emerald-600 hover:bg-emerald-200"
+                                            }`}
+                                            title="Activer/désactiver la variable (prime) pour ce conseiller"
+                                        >
+                                            💶 {c.variable_activee === false ? "Sans variable" : "Variable"}
                                         </button>
 
                                         {/* Renommer */}

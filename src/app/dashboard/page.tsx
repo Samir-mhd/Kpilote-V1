@@ -114,6 +114,7 @@ export default function Dashboard() {
     const [totalVentesJour, setTotalVentesJour] = useState(0);
 
     // Cagnotte du jour (prime) — barème/bonus manuels courants + journal du jour
+    const [variableActivee, setVariableActivee] = useState(true);
     const [bareme, setBareme] = useState<BaremeVariable>(BAREME_DEFAUT);
     const [bonusManuels, setBonusManuels] = useState<BonusManuel[]>([]);
     const [cagnotteTotal, setCagnotteTotal] = useState(0);
@@ -292,10 +293,11 @@ export default function Dashboard() {
             try {
                 const { data } = await supabase
                     .from("conseillers")
-                    .select("genre")
+                    .select("genre, variable_activee")
                     .eq("id", conseillerId)
                     .single();
                 genreRef.current = (data?.genre as "H" | "F") ?? null;
+                setVariableActivee(data?.variable_activee !== false);
             } catch { /* genre inconnu = défaut masculin */ }
             await Promise.all([chargerMissions(), chargerRang(), chargerDefis()]);
         }
@@ -820,17 +822,26 @@ export default function Dashboard() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-                <div className="lg:col-span-2">
-                    <StatsBar
-                        ventes={realiseGlobal}
-                        objectif={objectifGlobal}
-                        taux={tauxGlobal}
-                        rang={rang}
-                    />
+            {variableActivee ? (
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                    <div className="lg:col-span-2">
+                        <StatsBar
+                            ventes={realiseGlobal}
+                            objectif={objectifGlobal}
+                            taux={tauxGlobal}
+                            rang={rang}
+                        />
+                    </div>
+                    <CagnotteJourCard total={cagnotteTotal} flash={cagnotteFlash} />
                 </div>
-                <CagnotteJourCard total={cagnotteTotal} flash={cagnotteFlash} />
-            </div>
+            ) : (
+                <StatsBar
+                    ventes={realiseGlobal}
+                    objectif={objectifGlobal}
+                    taux={tauxGlobal}
+                    rang={rang}
+                />
+            )}
 
             <TeamFeed conseillerId={conseillerId} />
 
@@ -853,21 +864,23 @@ export default function Dashboard() {
                             objectif={mission.objectif}
                             couleur={mission.couleur}
                             onSale={handleSale}
-                            sousChoix={sousChoixPour(mission.produit)}
-                            acteDirect={acteDirectPour(mission.produit)}
-                            onChoixVariable={ajouterActeVariable}
+                            sousChoix={variableActivee ? sousChoixPour(mission.produit) : undefined}
+                            acteDirect={variableActivee ? acteDirectPour(mission.produit) : undefined}
+                            onChoixVariable={variableActivee ? ajouterActeVariable : undefined}
                         />
                     ))}
                 </div>
             </section>
 
-            <AutresActesCard
-                bareme={bareme}
-                bonusManuels={bonusManuels}
-                onChoisir={ajouterActeVariable}
-                dernierActe={cagnotteActes[cagnotteActes.length - 1]}
-                onAnnulerDernier={annulerDernierActeAutre}
-            />
+            {variableActivee && (
+                <AutresActesCard
+                    bareme={bareme}
+                    bonusManuels={bonusManuels}
+                    onChoisir={ajouterActeVariable}
+                    dernierActe={cagnotteActes[cagnotteActes.length - 1]}
+                    onAnnulerDernier={annulerDernierActeAutre}
+                />
+            )}
 
         </div>
     );

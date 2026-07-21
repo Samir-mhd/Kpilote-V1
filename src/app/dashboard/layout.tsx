@@ -9,6 +9,7 @@ import {
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { getPhotoUrl } from "@/services/photoService";
 import { readTheme, applyTheme } from "@/components/dashboard/ThemePicker";
+import { supabase } from "@/lib/supabase";
 
 const menus = [
     { label: "Accueil",       href: "/dashboard",              Icon: Home },
@@ -36,6 +37,19 @@ function SidebarInner() {
         getPhotoUrl(id).then(setPhotoUrl).catch(() => {});
     }, [id]);
 
+    const [variableActivee, setVariableActivee] = useState(true);
+    useEffect(() => {
+        if (!id) return;
+        (async () => {
+            try {
+                const { data } = await supabase.from("conseillers").select("variable_activee").eq("id", id).maybeSingle();
+                setVariableActivee(data?.variable_activee !== false);
+            } catch { /* défaut : variable activée */ }
+        })();
+    }, [id]);
+
+    const menusAffiches = variableActivee ? menus : menus.filter((m) => m.href !== "/dashboard/variable");
+
     return (
         <aside className="sticky top-0 flex h-screen w-[245px] flex-col bg-slate-950 px-5 py-7 text-white">
 
@@ -47,7 +61,7 @@ function SidebarInner() {
             </Link>
 
             <nav className="flex flex-1 flex-col gap-2">
-                {menus.map(({ label, href, Icon }) => {
+                {menusAffiches.map(({ label, href, Icon }) => {
                     const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
                     const to = `${href}${qs}`;
                     return (

@@ -33,10 +33,21 @@ function VariableInner() {
     const [bonusManuels, setBonusManuels] = useState<BonusManuel[]>([]);
     const [loading, setLoading] = useState(true);
     const [enregistre, setEnregistre] = useState(true);
+    const [variableActivee, setVariableActivee] = useState(true);
 
     const mois = useMemo(() => moisCourant(), []);
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const chargeInitiale = useRef(true);
+
+    useEffect(() => {
+        if (!conseillerId) return;
+        (async () => {
+            try {
+                const { data } = await supabase.from("conseillers").select("variable_activee").eq("id", conseillerId).maybeSingle();
+                setVariableActivee(data?.variable_activee !== false);
+            } catch { /* défaut : variable activée */ }
+        })();
+    }, [conseillerId]);
 
     // Chargement initial : barème courant, bonus manuels, volumes déjà saisis ce mois-ci
     useEffect(() => {
@@ -104,6 +115,16 @@ function VariableInner() {
         return (
             <main className="flex min-h-[60vh] items-center justify-center text-slate-400 font-semibold">
                 Chargement...
+            </main>
+        );
+    }
+
+    if (!variableActivee) {
+        return (
+            <main className="flex min-h-[60vh] flex-col items-center justify-center gap-2 text-center text-slate-400">
+                <p className="text-4xl">🚫</p>
+                <p className="font-semibold">La variable n'est pas activée pour toi.</p>
+                <p className="text-sm text-slate-300">Contacte ton manager si tu penses que c'est une erreur.</p>
             </main>
         );
     }
