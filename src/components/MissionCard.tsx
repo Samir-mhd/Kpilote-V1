@@ -8,10 +8,10 @@ type Props = {
     realise: number;
     objectif: number;
     couleur: string; // ex. "bg-green-500"
-    onSale: (produit: string) => void;
+    onSale: (produit: string) => void | Promise<void>;
     sousChoix?: ChoixActe[];
     acteDirect?: ChoixActe;
-    onChoixVariable?: (option: ChoixActe) => void;
+    onChoixVariable?: (option: ChoixActe) => void | Promise<void>;
 };
 
 // Mapping couleur Tailwind → hex (pour le SVG arc) + gradient (pour la barre/bouton)
@@ -95,12 +95,14 @@ export default function MissionCard({ titre, realise, objectif, couleur, onSale,
     const isHistorisation = titre.toLowerCase() === "spiderhome";
     const status = getStatus(pct, realise, objectif, isHistorisation);
 
-    function declencherVente(choix?: ChoixActe) {
+    // La vente doit être committée avant le choix variable : le boost auto compte le volume
+    // réel du mois, il a donc besoin que CETTE vente soit déjà en base au moment du comptage.
+    async function declencherVente(choix?: ChoixActe) {
         setCelebEmoji(CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)]);
         setCelebrating(true);
         setParticles(genParticles());
-        onSale(titre);
-        if (choix) onChoixVariable?.(choix);
+        await onSale(titre);
+        if (choix) await onChoixVariable?.(choix);
         setTimeout(() => setParticles([]), 750);
         setTimeout(() => setCelebrating(false), 1600);
     }

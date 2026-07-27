@@ -573,28 +573,27 @@ export async function annulerDernierActeLie(
 }
 
 /**
- * Compte, pour le mois en cours (toutes les journées confondues), le volume déjà déclaré
- * par sous-type via la cagnotte accueil — sert à détecter le franchissement d'un seuil de
- * boost individuel (ex: seuil_box) indépendamment de la synchronisation M+2 du simulateur.
+ * Compte le volume réel total (table ventes, toutes sources confondues y compris les
+ * ajustements Cerebro Check) d'un produit pour le mois en cours — sert à détecter le
+ * franchissement d'un seuil de boost individuel (ex: seuil_box) sur le vrai volume vendu,
+ * indépendamment de la synchronisation M+2 du simulateur ou des clics cagnotte du jour.
  */
-export async function compterActesMoisParChamp(
-    conseillerId: string,
-    champs: (keyof VenteConseiller)[]
-): Promise<number> {
-    const mois = moisCourant();
-    const [annee, moisNum] = mois.split("-").map(Number);
-    const finMois = new Date(annee, moisNum, 0);
-    const finStr = `${finMois.getFullYear()}-${String(finMois.getMonth() + 1).padStart(2, "0")}-${String(finMois.getDate()).padStart(2, "0")}`;
+export async function compterVentesMoisParProduit(conseillerId: string, produitCode: string): Promise<number> {
+    const now = new Date();
+    const debut = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const fin = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
 
     const { data } = await supabase
-        .from("variable_actes_jour")
-        .select("quantite")
+        .from("ventes")
+        .select("quantite, produits(code)")
         .eq("conseiller_id", conseillerId)
-        .in("champ", champs as string[])
-        .gte("jour", mois)
-        .lte("jour", finStr);
+        .gte("created_at", debut)
+        .lte("created_at", fin);
 
-    return (data ?? []).reduce((t: number, r: any) => t + (r.quantite ?? 1), 0);
+    return (data ?? []).reduce((t: number, v: any) => {
+        const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code;
+        return code === produitCode ? t + (v.quantite ?? 1) : t;
+    }, 0);
 }
 
 /** Compte, pour aujourd'hui, le volume déjà déclaré par sous-type (pour préremplir un formulaire de correction). */
