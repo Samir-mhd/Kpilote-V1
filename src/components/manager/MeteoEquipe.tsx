@@ -58,7 +58,7 @@ export default function MeteoEquipe() {
         debut.setHours(0, 0, 0, 0);
 
         const [resC, resP, resV] = await Promise.all([
-            supabase.from("conseillers").select("id, nom"),
+            supabase.from("conseillers").select("id, nom, profil_actif"),
             supabase
                 .from("planning_conseillers")
                 .select("conseiller_id, statut")
@@ -91,6 +91,7 @@ export default function MeteoEquipe() {
 
         const result: ConseillerMeteo[] = tous
             .filter((c: any) => {
+                if (c.profil_actif === false) return false; // profil désactivé = invisible de la météo équipe
                 const statut = statutMap[c.id];
                 // Pas de ligne planning → présent par défaut
                 // "present" → présent

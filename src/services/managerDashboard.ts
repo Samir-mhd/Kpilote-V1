@@ -42,6 +42,11 @@ export async function construireDashboardManager() {
   const classement = await construireClassementManager();
   const coach = await construireCoachManager();
 
+  // Profil désactivé (mode restreint) : n'impacte pas les chiffres boutique
+  const exclus = new Set(
+    (conseillers ?? []).filter((c: any) => c.profil_actif === false).map((c: any) => c.id)
+  );
+
   const fusion = new Map<string, KPI>();
 
   (objectifs ?? []).forEach((objectif: any) => {
@@ -52,9 +57,12 @@ export async function construireDashboardManager() {
 
     if (!produit) return;
     if (produit.code === "spiderhome") return; // historisation, pas un acte commercial
+    if (exclus.has(objectif.conseiller_id)) return;
 
     const realise = (ventes ?? [])
       .filter((vente: any) => {
+
+        if (exclus.has(vente.conseiller_id)) return false;
 
         const produitVente = Array.isArray(vente.produits)
           ? vente.produits[0]

@@ -20,7 +20,7 @@ export async function construireClassementPeriode(
     const debut = dateDebutPeriode(periode);
 
     const [consRes, ventesRes, objRes] = await Promise.all([
-        supabase.from("conseillers").select("id, nom"),
+        supabase.from("conseillers").select("id, nom, profil_actif"),
         supabase
             .from("ventes")
             .select("conseiller_id, quantite, produits(code)")
@@ -44,6 +44,8 @@ export async function construireClassementPeriode(
     // Init map
     const map = new Map<string, ConseillerStats>();
     conseillers.forEach((c: any) => {
+        // Profil désactivé (mode restreint) : invisible du classement et des totaux boutique
+        if (c.profil_actif === false) return;
         map.set(c.id, {
             id:   c.id,
             nom:  c.nom,

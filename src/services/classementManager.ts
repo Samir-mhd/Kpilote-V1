@@ -20,8 +20,9 @@ export type ConseillerClassement = {
   objectifs: ObjectifsProduits;
 };
 
-function classementVide(conseillers: { id: string; nom: string }[]): ConseillerClassement[] {
-  return conseillers.map((c) => ({
+function classementVide(conseillers: { id: string; nom: string; profil_actif?: boolean | null }[]): ConseillerClassement[] {
+  // Profil désactivé (mode restreint) : invisible du classement et des totaux boutique
+  return conseillers.filter((c) => c.profil_actif !== false).map((c) => ({
     id: c.id,
     prenom: c.nom, // on garde la propriété "prenom" pour ne rien casser dans l'UI
     ventes: 0,
@@ -120,7 +121,7 @@ function appliquerObjectifs(classement: ConseillerClassement[], objectifs: any[]
 export async function construireClassementManager() {
   const { data: conseillers, error: conseillersError } = await supabase
     .from("conseillers")
-    .select("id, nom");
+    .select("id, nom, profil_actif");
 
   if (conseillersError) throw conseillersError;
 

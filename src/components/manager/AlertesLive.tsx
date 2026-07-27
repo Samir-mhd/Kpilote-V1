@@ -143,7 +143,7 @@ export default function AlertesLive() {
         debut.setHours(0, 0, 0, 0);
 
         const [resC, resP, resV] = await Promise.all([
-            supabase.from("conseillers").select("id, nom"),
+            supabase.from("conseillers").select("id, nom, profil_actif"),
             supabase.from("planning_conseillers").select("conseiller_id, statut").eq("jour", today),
             supabase.from("ventes").select("conseiller_id, created_at, source, produits(code)").gte("created_at", debut.toISOString()),
         ]);
@@ -168,6 +168,7 @@ export default function AlertesLive() {
 
         const presents: ConseilllerData[] = tous
             .filter((c: any) => {
+                if (c.profil_actif === false) return false; // profil désactivé = invisible des alertes live
                 const s = statutMap[c.id];
                 return s === undefined || s === "present";
             })

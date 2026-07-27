@@ -38,17 +38,22 @@ function SidebarInner() {
     }, [id]);
 
     const [variableActivee, setVariableActivee] = useState(true);
+    const [profilActif, setProfilActif] = useState(true);
     useEffect(() => {
         if (!id) return;
         (async () => {
             try {
-                const { data } = await supabase.from("conseillers").select("variable_activee").eq("id", id).maybeSingle();
+                const { data } = await supabase.from("conseillers").select("variable_activee, profil_actif").eq("id", id).maybeSingle();
                 setVariableActivee(data?.variable_activee !== false);
-            } catch { /* défaut : variable activée */ }
+                setProfilActif(data?.profil_actif !== false);
+            } catch { /* défaut : variable activée, profil actif */ }
         })();
     }, [id]);
 
-    const menusAffiches = variableActivee ? menus : menus.filter((m) => m.href !== "/dashboard/variable");
+    // Profil désactivé : espace restreint (accueil, stats, variable, profil uniquement)
+    const HREFS_RESTREINT = ["/dashboard", "/dashboard/stats", "/dashboard/variable", "/dashboard/profil"];
+    const menusBase = profilActif ? menus : menus.filter((m) => HREFS_RESTREINT.includes(m.href));
+    const menusAffiches = variableActivee ? menusBase : menusBase.filter((m) => m.href !== "/dashboard/variable");
 
     return (
         <aside className="sticky top-0 flex h-screen w-[245px] flex-col bg-slate-950 px-5 py-7 text-white">

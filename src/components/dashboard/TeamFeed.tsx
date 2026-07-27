@@ -200,6 +200,7 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
     const countsRef   = useRef<Counts>({});
     const ranksRef    = useRef<Record<string, number>>({});
     const produitsRef = useRef<Record<string, string>>({}); // produit_id -> code (pour le realtime, sans jointure)
+    const actifsRef   = useRef<Record<string, boolean>>({}); // conseiller_id -> profil actif (profil désactivé = invisible du feed)
 
     useEffect(() => {
         const debut = new Date();
@@ -207,7 +208,7 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
 
         (async () => {
             const [resC, resV, resP] = await Promise.all([
-                supabase.from("conseillers").select("id, nom"),
+                supabase.from("conseillers").select("id, nom, profil_actif"),
                 supabase
                     .from("ventes")
                     .select("id, conseiller_id, created_at, source, quantite, produit_id, produits(nom, code)")
@@ -227,8 +228,14 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
             }
 
             const map: Record<string, string> = {};
-            (resC.data ?? []).forEach((c: any) => { map[c.id] = c.nom; });
+            const amap: Record<string, boolean> = {};
+            (resC.data ?? []).forEach((c: any) => {
+                amap[c.id] = c.profil_actif !== false;
+                if (c.profil_actif === false) return; // profil désactivé = invisible du feed
+                map[c.id] = c.nom;
+            });
             namesRef.current = map;
+            actifsRef.current = amap;
 
             // Fetch genre séparément — résistant si la colonne n'existe pas encore
             const gmap: Record<string, string | null> = {};
@@ -240,9 +247,11 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
             } catch { /* colonne absente ou erreur réseau — on ignore */ }
             genresRef.current = gmap;
 
-            // Spiderhome = historisation, pas un acte commercial → exclu du feed (comme partout ailleurs)
+            // Spiderhome = historisation, profil désactivé = restreint → exclus du feed (comme partout ailleurs)
             const rawVentes = (resV.data ?? []).filter((v: any) =>
-                v.source !== "cerebro_check" && extractProduit(v).produitCode !== "spiderhome"
+                v.source !== "cerebro_check"
+                && extractProduit(v).produitCode !== "spiderhome"
+                && amap[v.conseiller_id] !== false
             );
 
             // Retracer chronologiquement pour le contexte cumulatif
@@ -322,6 +331,7 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
                 const v = payload.new;
                 if (v.source === "cerebro_check") return;
                 if (produitsRef.current[v.produit_id] === "spiderhome") return;
+                if (actifsRef.current[v.conseiller_id] === false) return;
 
                 const cid = v.conseiller_id;
                 const nom = namesRef.current[cid] ?? "Équipe";

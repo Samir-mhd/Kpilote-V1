@@ -15,6 +15,7 @@ type Conseiller = {
     ordre: number;
     genre: "H" | "F" | null;
     variable_activee: boolean | null;
+    profil_actif: boolean | null;
 };
 
 type DeleteMode = "archive" | "full";
@@ -105,6 +106,14 @@ export default function GestionEquipePage() {
         const { error } = await supabase.from("conseillers").update({ variable_activee: next }).eq("id", id);
         if (error) { afficherToast("Erreur mise à jour variable.", false); return; }
         setConseillers(prev => prev.map(c => c.id === id ? { ...c, variable_activee: next } : c));
+    }
+
+    async function toggleProfil(id: string, actuel: boolean | null) {
+        const next = actuel === false ? true : false;
+        const { error } = await supabase.from("conseillers").update({ profil_actif: next }).eq("id", id);
+        if (error) { afficherToast("Erreur mise à jour du profil.", false); return; }
+        setConseillers(prev => prev.map(c => c.id === id ? { ...c, profil_actif: next } : c));
+        afficherToast(next ? "Profil réactivé." : "Profil désactivé — espace restreint, invisible de l'équipe.");
     }
 
     async function supprimerAvatar(id: string) {
@@ -241,7 +250,7 @@ export default function GestionEquipePage() {
                                 key={c.id}
                                 className={`flex items-center gap-5 rounded-[20px] bg-white px-6 py-5 shadow-[0_2px_16px_rgba(15,23,42,.06)] transition-all ${
                                     isDeleting ? "ring-2 ring-red-300" : ""
-                                }`}
+                                } ${c.profil_actif === false ? "opacity-60" : ""}`}
                             >
                                 {/* Photo */}
                                 <div className="relative flex-shrink-0">
@@ -272,7 +281,14 @@ export default function GestionEquipePage() {
                                         />
                                     ) : (
                                         <div>
-                                            <p className="font-black text-slate-900">{c.nom}</p>
+                                            <p className="flex items-center gap-2 font-black text-slate-900">
+                                                {c.nom}
+                                                {c.profil_actif === false && (
+                                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-400">
+                                                        Profil désactivé
+                                                    </span>
+                                                )}
+                                            </p>
                                             <p className="text-xs text-slate-400">ID : {c.id.slice(0, 8)}…</p>
                                         </div>
                                     )}
@@ -333,6 +349,19 @@ export default function GestionEquipePage() {
                                             title="Activer/désactiver la variable (prime) pour ce conseiller"
                                         >
                                             💶 {c.variable_activee === false ? "Sans variable" : "Variable"}
+                                        </button>
+
+                                        {/* Profil actif / désactivé (espace restreint) */}
+                                        <button
+                                            onClick={() => toggleProfil(c.id, c.profil_actif)}
+                                            className={`flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-all ${
+                                                c.profil_actif === false
+                                                    ? "bg-red-100 text-red-600 hover:bg-red-200"
+                                                    : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                            }`}
+                                            title="Désactiver le profil : invisible du classement, de la feedbar et des chiffres boutique. Le conseiller garde un espace restreint (accueil, stats, variable, profil)."
+                                        >
+                                            {c.profil_actif === false ? "🚫 Désactivé" : "👁️ Actif"}
                                         </button>
 
                                         {/* Renommer */}

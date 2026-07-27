@@ -6,25 +6,33 @@ export type CoachManagerResult = {
 };
 
 export async function construireCoachManager(): Promise<CoachManagerResult> {
+  const { data: conseillers } = await supabase.from("conseillers").select("id, profil_actif");
+  // Profil désactivé (mode restreint) : n'impacte pas les chiffres boutique
+  const exclus = new Set(
+    (conseillers ?? []).filter((c: any) => c.profil_actif === false).map((c: any) => c.id)
+  );
+
   const { data: objectifs, error: objectifsError } = await supabase
     .from("objectifs_mensuels")
-    .select("objectif, produits(code)");
+    .select("objectif, conseiller_id, produits(code)");
 
   if (objectifsError) throw objectifsError;
 
   const { data: ventes, error: ventesError } = await supabase
     .from("ventes")
-    .select("quantite, produits(code)");
+    .select("quantite, conseiller_id, produits(code)");
 
   if (ventesError) throw ventesError;
 
   // Spiderhome = historisation, pas un acte commercial → exclu des totaux
   const objectifGlobal = (objectifs ?? []).reduce((total: number, o: any) => {
+    if (exclus.has(o.conseiller_id)) return total;
     const code = (Array.isArray(o.produits) ? o.produits[0] : o.produits)?.code;
     return code === "spiderhome" ? total : total + o.objectif;
   }, 0);
 
   const realiseGlobal = (ventes ?? []).reduce((total: number, v: any) => {
+    if (exclus.has(v.conseiller_id)) return total;
     const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code;
     return code === "spiderhome" ? total : total + v.quantite;
   }, 0);
