@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import { PRODUITS_ORDRE } from "@/utils/produits";
 import { Periode, PERIODE_LABELS } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
@@ -39,25 +40,41 @@ export default function ClassementPage() {
         setHeure(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
     }, []);
 
-    useEffect(() => {
-        setLoading(true);
+    async function charger(opts?: { silencieux?: boolean }) {
+        if (!opts?.silencieux) setLoading(true);
         setConseillerOuvert(null);
 
         const fetches = periode === "mois"
             ? [construireClassementPeriode("mois"), Promise.resolve([] as ConseillerStats[])]
             : [construireClassementPeriode(periode), construireClassementPeriode("mois")];
 
-        Promise.all(fetches)
-            .then(async ([data, moisData]) => {
-                setClassement(data);
-                const map = new Map((periode === "mois" ? data : moisData).map(c => [c.id, c]));
-                setMoisMap(map);
-                const ids = data.map(c => c.id);
-                const avs = await getPhotosByIds(ids).catch(() => ({}));
-                setPhotos(avs);
+        try {
+            const [data, moisData] = await Promise.all(fetches);
+            setClassement(data);
+            const map = new Map((periode === "mois" ? data : moisData).map(c => [c.id, c]));
+            setMoisMap(map);
+            const ids = data.map(c => c.id);
+            const avs = await getPhotosByIds(ids).catch(() => ({}));
+            setPhotos(avs);
+        } catch {}
+        finally { if (!opts?.silencieux) setLoading(false); }
+    }
+
+    useEffect(() => {
+        charger();
+
+        // Rafraîchissement live : nouvelles ventes prises en compte sans reload manuel
+        const channel = supabase
+            .channel(`classement-manager-${periode}`)
+            .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventes" }, () => {
+                charger({ silencieux: true });
             })
-            .catch(() => {})
-            .finally(() => setLoading(false));
+            .subscribe();
+
+        // Filet de sécurité si le canal live décroche
+        const interval = setInterval(() => charger({ silencieux: true }), 60_000);
+
+        return () => { supabase.removeChannel(channel); clearInterval(interval); };
     }, [periode]);
 
     // Objectif dynamique par conseiller × produit

@@ -28,8 +28,8 @@ function ClassementInner() {
     const [loading, setLoading]             = useState(true);
     const [maj, setMaj]                     = useState("");
 
-    async function charger(p: Periode) {
-        setLoading(true);
+    async function charger(p: Periode, opts?: { silencieux?: boolean }) {
+        if (!opts?.silencieux) setLoading(true);
         try {
             const fetches = p === "mois"
                 ? [construireClassementPeriode("mois"), Promise.resolve([] as ConseillerStats[])]
@@ -64,7 +64,7 @@ function ClassementInner() {
                 setJoursRestantsSemaine(joursRestants);
             }
         } catch {}
-        finally { setLoading(false); }
+        finally { if (!opts?.silencieux) setLoading(false); }
     }
 
     useEffect(() => {
@@ -74,11 +74,15 @@ function ClassementInner() {
         const channel = supabase
             .channel(`classement-conseiller-${periode}`)
             .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventes" }, () => {
-                charger(periode);
+                charger(periode, { silencieux: true });
             })
             .subscribe();
 
-        return () => { supabase.removeChannel(channel); };
+        // Filet de sécurité : si le canal live décroche (perte réseau, onglet resté ouvert
+        // longtemps...), on ne reste jamais bloqué plus d'une minute sur un total périmé
+        const interval = setInterval(() => charger(periode, { silencieux: true }), 60_000);
+
+        return () => { supabase.removeChannel(channel); clearInterval(interval); };
     }, [periode]);
 
     // Objectif par conseiller × produit :
