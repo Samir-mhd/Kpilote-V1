@@ -188,6 +188,11 @@ export default function Dashboard() {
         details?: { produit: string; duree: number; objectif: number; adversaire: string };
     } | null>(null);
 
+    // Bandeau plein écran pour le boost individuel automatique (bien plus visible que le
+    // "+X€" discret de la cagnotte).
+    const [boostToast, setBoostToast] = useState<{ key: number; label: string; montant: number } | null>(null);
+    const boostTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     async function chargerMissions() {
         if (!conseillerId) return;
         const data = await getMissionsReelles(conseillerId);
@@ -513,6 +518,9 @@ export default function Dashboard() {
                     setTimeout(() => {
                         setCagnotteFlash({ key: Date.now(), montant: famille.montantBoost, label: "de boost !" });
                     }, 1200);
+                    if (boostTimerRef.current) clearTimeout(boostTimerRef.current);
+                    setBoostToast({ key: Date.now(), label: famille.label, montant: famille.montantBoost });
+                    boostTimerRef.current = setTimeout(() => setBoostToast(null), 4200);
                 }
             }
         } catch { /* silencieux — la cagnotte n'est pas critique pour l'usage courant */ }
@@ -721,6 +729,41 @@ export default function Dashboard() {
                         @keyframes slideDown {
                             from { opacity: 0; transform: translateY(-24px) scale(.95); }
                             to   { opacity: 1; transform: translateY(0) scale(1); }
+                        }
+                    `}</style>
+                </div>
+            )}
+
+            {/* ── Bandeau boost individuel automatique ──────────────────── */}
+            {boostToast && (
+                <div
+                    key={boostToast.key}
+                    className="fixed inset-x-4 top-4 z-[60] mx-auto max-w-sm"
+                    style={{ animation: "boostSlide .5s cubic-bezier(.34,1.56,.64,1)" }}
+                >
+                    <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-amber-400 via-orange-500 to-amber-600 p-6 text-center shadow-[0_16px_56px_rgba(217,119,6,.55)]">
+                        <div className="pointer-events-none absolute -left-8 -top-8 h-32 w-32 rounded-full bg-white/25 blur-2xl" />
+                        <div className="pointer-events-none absolute -right-8 -bottom-8 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
+                        <div className="relative">
+                            <p className="text-4xl" style={{ animation: "boostPop .6s ease-out" }}>🚀</p>
+                            <p className="mt-2 text-xs font-black uppercase tracking-[0.25em] text-white/80">
+                                {boostToast.label} déclenché !
+                            </p>
+                            <p className="mt-1 text-3xl font-black text-white tabular-nums">
+                                +{boostToast.montant.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                            </p>
+                            <p className="mt-1 text-xs font-bold text-white/70">Seuil dépassé — ajouté à ta cagnotte du jour</p>
+                        </div>
+                    </div>
+                    <style>{`
+                        @keyframes boostSlide {
+                            from { opacity: 0; transform: translateY(-30px) scale(.9); }
+                            to   { opacity: 1; transform: translateY(0) scale(1); }
+                        }
+                        @keyframes boostPop {
+                            0%   { transform: scale(.4) rotate(-15deg); }
+                            60%  { transform: scale(1.25) rotate(8deg); }
+                            100% { transform: scale(1) rotate(0deg); }
                         }
                     `}</style>
                 </div>
