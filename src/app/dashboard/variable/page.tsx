@@ -19,7 +19,7 @@ import {
     moisCourant,
     BonusVolumes,
 } from "@/services/variableConseiller";
-import { CATEGORIES_VENTES, NumberField, CardShell, BonusManuelsCard, DetailResultatsCard } from "@/components/variable/variableUi";
+import { CATEGORIES_VENTES, NumberField, CardShell, BonusManuelsCard, BonusManuelsInline, DetailResultatsCard } from "@/components/variable/variableUi";
 
 function VariableInner() {
     const searchParams = useSearchParams();
@@ -168,6 +168,16 @@ function VariableInner() {
                                     />
                                 ))}
                             </div>
+                            {bonusManuels.some((b) => b.categorie === cat.categorieKey) && (
+                                <div className="mt-4 border-t border-white/10 pt-4">
+                                    <BonusManuelsInline
+                                        items={bonusManuels.filter((b) => b.categorie === cat.categorieKey)}
+                                        mode="declaration"
+                                        volumes={bonusVolumes}
+                                        onVolumeChange={(id, v) => setBonusVolumes((prev) => ({ ...prev, [id]: v }))}
+                                    />
+                                </div>
+                            )}
                         </CardShell>
                     ))}
 
@@ -203,6 +213,16 @@ function VariableInner() {
                                 onChange={setTauxPresencePct}
                             />
                         </div>
+                        {bonusManuels.some((b) => b.categorie === "satisfd") && (
+                            <div className="mt-4 border-t border-white/10 pt-4">
+                                <BonusManuelsInline
+                                    items={bonusManuels.filter((b) => b.categorie === "satisfd")}
+                                    mode="declaration"
+                                    volumes={bonusVolumes}
+                                    onVolumeChange={(id, v) => setBonusVolumes((prev) => ({ ...prev, [id]: v }))}
+                                />
+                            </div>
+                        )}
                     </CardShell>
 
                     {/* Contexte boutique */}
@@ -218,7 +238,7 @@ function VariableInner() {
                     </CardShell>
 
                     <BonusManuelsCard
-                        items={bonusManuels}
+                        items={bonusManuels.filter((b) => !b.categorie || b.categorie === "destockage")}
                         mode="declaration"
                         volumes={bonusVolumes}
                         onVolumeChange={(id, v) => setBonusVolumes((prev) => ({ ...prev, [id]: v }))}

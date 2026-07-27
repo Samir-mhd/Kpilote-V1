@@ -92,6 +92,7 @@ export type BonusManuel = {
     id: string;
     label: string;
     montant: number;
+    categorie: string | null;
 };
 
 // bonusId -> volume déclaré par le conseiller
@@ -338,13 +339,14 @@ export async function sauvegarderBareme(bareme: BaremeVariable): Promise<void> {
 export async function getBonusManuels(): Promise<BonusManuel[]> {
     const { data } = await supabase
         .from("variable_bonus_manuels")
-        .select("id, label, montant")
+        .select("id, label, montant, categorie")
         .order("created_at", { ascending: true });
     return data ?? [];
 }
 
-export async function ajouterBonusManuel(label: string, montant: number): Promise<void> {
-    await supabase.from("variable_bonus_manuels").insert({ label, montant });
+/** `categorie` rattache l'item à une carte du barème (ex: "box", "forfaits"...) ; `null`/"destockage" = carte générale Boost constructeur/déstockage. */
+export async function ajouterBonusManuel(label: string, montant: number, categorie: string | null = null): Promise<void> {
+    await supabase.from("variable_bonus_manuels").insert({ label, montant, categorie });
 }
 
 export async function supprimerBonusManuel(id: string): Promise<void> {
@@ -422,6 +424,7 @@ export type ActeJour = {
     champ?: keyof VenteConseiller;
     bonusManuelId?: string;
     produitCode?: string;
+    lieActeId?: string;
 };
 
 export function jourCourant(): string {
@@ -439,10 +442,11 @@ function mapActe(r: any): ActeJour {
         champ: r.champ ?? undefined,
         bonusManuelId: r.bonus_manuel_id ?? undefined,
         produitCode: r.produit_code ?? undefined,
+        lieActeId: r.lie_acte_id ?? undefined,
     };
 }
 
-const SELECT_ACTE = "id, label, montant, created_at, quantite, champ, bonus_manuel_id, produit_code";
+const SELECT_ACTE = "id, label, montant, created_at, quantite, champ, bonus_manuel_id, produit_code, lie_acte_id";
 
 export async function getCagnotteJour(conseillerId: string, jour: string): Promise<ActeJour[]> {
     const { data } = await supabase
@@ -467,7 +471,8 @@ export async function enregistrerActeJour(
     montant: number,
     champ?: keyof VenteConseiller,
     bonusManuelId?: string,
-    produitCode?: string
+    produitCode?: string,
+    lieActeId?: string
 ): Promise<ActeJour> {
     const jour = jourCourant();
     const { data, error } = await supabase
@@ -475,6 +480,7 @@ export async function enregistrerActeJour(
         .insert({
             conseiller_id: conseillerId, jour, label, montant, quantite: 1,
             champ: champ ?? null, bonus_manuel_id: bonusManuelId ?? null, produit_code: produitCode ?? null,
+            lie_acte_id: lieActeId ?? null,
         })
         .select(SELECT_ACTE)
         .single();
@@ -521,23 +527,42 @@ export async function annulerActeJour(conseillerId: string, acte: ActeJour): Pro
 }
 
 /**
+ * Retrouve l'acte cagnotte lié à une vente (même produit, à moins de 15s) et, s'il en a déclenché
+ * un, le boost individuel automatique qui l'accompagne (acte sans produit lié à celui-ci via lieActeId).
+ */
+export async function trouverActeEtBoostLies(
+    conseillerId: string,
+    produitCode: string,
+    venteCreatedAtIso: string
+): Promise<{ acte: ActeJour | null; boost: ActeJour | null }> {
+    const actes = await getCagnotteJour(conseillerId, jourCourant());
+    const liesAuProduit = actes.filter((a) => a.produitCode === produitCode);
+    if (liesAuProduit.length === 0) return { acte: null, boost: null };
+
+    const dernier = liesAuProduit[liesAuProduit.length - 1];
+    const diff = Math.abs(new Date(dernier.created_at).getTime() - new Date(venteCreatedAtIso).getTime());
+    if (diff > 15000) return { acte: null, boost: null };
+
+    const boost = actes.find((a) => a.lieActeId === dernier.id) ?? null;
+    return { acte: dernier, boost };
+}
+
+/**
  * Annule le dernier acte du jour pour ce produit, si posé à moins de 15s de la vente qu'on annule
- * (les deux sont créés dans le même geste "J'ai vendu → sous-choix"). Ne fait rien sinon.
+ * (les deux sont créés dans le même geste "J'ai vendu → sous-choix"), ainsi que le boost individuel
+ * automatique qu'il a déclenché le cas échéant. Ne fait rien sinon.
  */
 export async function annulerDernierActeLie(
     conseillerId: string,
     produitCode: string,
     venteCreatedAtIso: string
-): Promise<void> {
-    const actes = await getCagnotteJour(conseillerId, jourCourant());
-    const liesAuProduit = actes.filter((a) => a.produitCode === produitCode);
-    if (liesAuProduit.length === 0) return;
+): Promise<{ acte: ActeJour | null; boost: ActeJour | null }> {
+    const { acte, boost } = await trouverActeEtBoostLies(conseillerId, produitCode, venteCreatedAtIso);
+    if (!acte) return { acte: null, boost: null };
 
-    const dernier = liesAuProduit[liesAuProduit.length - 1];
-    const diff = Math.abs(new Date(dernier.created_at).getTime() - new Date(venteCreatedAtIso).getTime());
-    if (diff > 15000) return;
-
-    await annulerActeJour(conseillerId, dernier);
+    if (boost) await annulerActeJour(conseillerId, boost);
+    await annulerActeJour(conseillerId, acte);
+    return { acte, boost };
 }
 
 /**

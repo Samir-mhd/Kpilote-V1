@@ -16,15 +16,17 @@ import {
     ajouterBonusManuel,
     supprimerBonusManuel,
 } from "@/services/variableConseiller";
-import { CATEGORIES_VENTES, NumberField, CardShell, BonusManuelsCard, DetailResultatsCard } from "@/components/variable/variableUi";
+import { CATEGORIES_VENTES, NumberField, CardShell, BonusManuelsCard, BonusManuelsInline, DetailResultatsCard } from "@/components/variable/variableUi";
 
 type ChampBareme = { key: keyof BaremeVariable; label: string };
 
 // ── Barème mensuel (montants € éditables) ───────────────────────────────────
-const CATEGORIES_BAREME: { titre: string; accent: string; champs: ChampBareme[] }[] = [
+// `categorieKey` rattache la carte aux items manuels ajoutés par le manager sur cette même carte.
+const CATEGORIES_BAREME: { titre: string; accent: string; categorieKey: string; champs: ChampBareme[] }[] = [
     {
         titre: "Box",
         accent: "text-emerald-400",
+        categorieKey: "box",
         champs: [
             { key: "box_ultra", label: "Ultra / Ultra Essentiel" },
             { key: "box_pop", label: "POP" },
@@ -37,6 +39,7 @@ const CATEGORIES_BAREME: { titre: string; accent: string; champs: ChampBareme[] 
     {
         titre: "Forfaits 5G",
         accent: "text-blue-400",
+        categorieKey: "forfaits",
         champs: [
             { key: "forfait_free_serie", label: "Forfait Free / Série Free" },
             { key: "forfait_free_max", label: "Forfait Free Max" },
@@ -50,6 +53,7 @@ const CATEGORIES_BAREME: { titre: string; accent: string; champs: ChampBareme[] 
     {
         titre: "Smartphones",
         accent: "text-violet-400",
+        categorieKey: "smartphones",
         champs: [
             { key: "smartphone", label: "Prime par smartphone" },
             { key: "seuil_smartphone", label: "Seuil individuel du mois (nb smartphones)" },
@@ -60,6 +64,7 @@ const CATEGORIES_BAREME: { titre: string; accent: string; champs: ChampBareme[] 
     {
         titre: "Autres primes",
         accent: "text-amber-400",
+        categorieKey: "autres_primes",
         champs: [
             { key: "cross_sell_4p", label: "Cross-sell 4P" },
             { key: "migration_adsl_fibre", label: "Migration ADSL → Fibre" },
@@ -79,6 +84,7 @@ const CATEGORIES_BAREME: { titre: string; accent: string; champs: ChampBareme[] 
     {
         titre: "SatisFD",
         accent: "text-rose-400",
+        categorieKey: "satisfd",
         champs: [
             { key: "satisfd_individuelle_base", label: "Base à 90% (individuelle)" },
             { key: "satisfd_individuelle_par_point", label: "Par % supplémentaire" },
@@ -128,8 +134,8 @@ export default function VariableSimulationPage() {
         sauvegarderBareme(BAREME_DEFAUT);
     }
 
-    async function handleAjouterBonus(label: string, montant: number) {
-        await ajouterBonusManuel(label, montant);
+    async function handleAjouterBonus(label: string, montant: number, categorie: string | null = null) {
+        await ajouterBonusManuel(label, montant, categorie);
         setBonusManuels(await getBonusManuels());
     }
 
@@ -217,13 +223,21 @@ export default function VariableSimulationPage() {
                                     />
                                 ))}
                             </div>
+                            <div className="mt-4 border-t border-white/10 pt-4">
+                                <BonusManuelsInline
+                                    items={bonusManuels.filter((b) => b.categorie === cat.categorieKey)}
+                                    mode="gestion"
+                                    onAdd={(label, montant) => handleAjouterBonus(label, montant, cat.categorieKey)}
+                                    onRemove={handleSupprimerBonus}
+                                />
+                            </div>
                         </CardShell>
                     ))}
 
                     <BonusManuelsCard
-                        items={bonusManuels}
+                        items={bonusManuels.filter((b) => !b.categorie || b.categorie === "destockage")}
                         mode="gestion"
-                        onAdd={handleAjouterBonus}
+                        onAdd={(label, montant) => handleAjouterBonus(label, montant, "destockage")}
                         onRemove={handleSupprimerBonus}
                     />
                 </div>
@@ -246,6 +260,16 @@ export default function VariableSimulationPage() {
                                         />
                                     ))}
                                 </div>
+                                {bonusManuels.some((b) => b.categorie === cat.categorieKey) && (
+                                    <div className="mt-4 border-t border-white/10 pt-4">
+                                        <BonusManuelsInline
+                                            items={bonusManuels.filter((b) => b.categorie === cat.categorieKey)}
+                                            mode="declaration"
+                                            volumes={bonusVolumes}
+                                            onVolumeChange={(id, v) => setBonusVolumes((prev) => ({ ...prev, [id]: v }))}
+                                        />
+                                    </div>
+                                )}
                             </CardShell>
                         ))}
 
@@ -281,6 +305,16 @@ export default function VariableSimulationPage() {
                                     onChange={setTauxPresencePct}
                                 />
                             </div>
+                            {bonusManuels.some((b) => b.categorie === "satisfd") && (
+                                <div className="mt-4 border-t border-white/10 pt-4">
+                                    <BonusManuelsInline
+                                        items={bonusManuels.filter((b) => b.categorie === "satisfd")}
+                                        mode="declaration"
+                                        volumes={bonusVolumes}
+                                        onVolumeChange={(id, v) => setBonusVolumes((prev) => ({ ...prev, [id]: v }))}
+                                    />
+                                </div>
+                            )}
                         </CardShell>
 
                         {/* Contexte boutique */}
@@ -296,7 +330,7 @@ export default function VariableSimulationPage() {
                         </CardShell>
 
                         <BonusManuelsCard
-                            items={bonusManuels}
+                            items={bonusManuels.filter((b) => !b.categorie || b.categorie === "destockage")}
                             mode="declaration"
                             volumes={bonusVolumes}
                             onVolumeChange={(id, v) => setBonusVolumes((prev) => ({ ...prev, [id]: v }))}

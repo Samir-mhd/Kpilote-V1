@@ -6,10 +6,12 @@ import { VenteConseiller, BonusManuel, DetailVariable } from "@/services/variabl
 type ChampVente = { key: keyof VenteConseiller; label: string };
 
 // ── Formulaire des actes — partagé simulateur manager / vue conseiller ─────
-export const CATEGORIES_VENTES: { titre: string; accent: string; champs: ChampVente[] }[] = [
+// `categorieKey` rattache la carte aux items manuels ajoutés par le manager sur cette même carte.
+export const CATEGORIES_VENTES: { titre: string; accent: string; categorieKey: string; champs: ChampVente[] }[] = [
     {
         titre: "Box",
         accent: "text-emerald-400",
+        categorieKey: "box",
         champs: [
             { key: "box_ultra", label: "Ultra / Ultra Essentiel" },
             { key: "box_pop", label: "POP" },
@@ -19,6 +21,7 @@ export const CATEGORIES_VENTES: { titre: string; accent: string; champs: ChampVe
     {
         titre: "Forfaits 5G",
         accent: "text-blue-400",
+        categorieKey: "forfaits",
         champs: [
             { key: "forfait_free_serie", label: "Forfait Free / Série Free" },
             { key: "forfait_free_max", label: "Forfait Free Max" },
@@ -29,6 +32,7 @@ export const CATEGORIES_VENTES: { titre: string; accent: string; champs: ChampVe
     {
         titre: "Smartphones & cross-sell",
         accent: "text-violet-400",
+        categorieKey: "smartphones",
         champs: [
             { key: "smartphones", label: "Smartphones vendus" },
             { key: "cross_sell_4p", label: "Cross-sell / vente rebond 4P" },
@@ -38,6 +42,7 @@ export const CATEGORIES_VENTES: { titre: string; accent: string; champs: ChampVe
     {
         titre: "Autres actes",
         accent: "text-amber-400",
+        categorieKey: "autres_primes",
         champs: [
             { key: "actes_ast_box", label: "Nb actes AST box (Siebel)" },
             { key: "assurance_nouveau_mobile", label: "Assurance Nouveau Mobile" },
@@ -116,8 +121,8 @@ export function CardShell({ children }: { children: ReactNode }) {
     );
 }
 
-/** Carte "Boost constructeur / déstockage" — éditable côté manager, lecture seule côté conseiller. */
-type BonusManuelsCardProps =
+/** Liste d'items manuels (label + montant) — éditable côté manager, lecture seule/saisie de volume côté conseiller. */
+type BonusManuelsInlineProps =
     | {
           items: BonusManuel[];
           mode: "gestion";
@@ -132,10 +137,12 @@ type BonusManuelsCardProps =
       };
 
 /**
- * "gestion" (manager, onglet Barème) : nommer / fixer le montant unitaire / supprimer.
- * "declaration" (conseiller + simulateur manager) : montant unitaire figé, saisie du volume par boost.
+ * Contenu réutilisable (sans CardShell propre) : peut être embarqué dans n'importe quelle carte
+ * du barème pour lui ajouter des items manuels (nom + montant), avec suppression via une croix.
+ * "gestion" (manager) : nommer / fixer le montant unitaire / supprimer.
+ * "declaration" (conseiller + simulateur manager) : montant unitaire figé, saisie du volume.
  */
-export function BonusManuelsCard(props: BonusManuelsCardProps) {
+export function BonusManuelsInline(props: BonusManuelsInlineProps) {
     const { items } = props;
     const [nouveauLabel, setNouveauLabel] = useState("");
     const [nouveauMontant, setNouveauMontant] = useState("");
@@ -150,58 +157,55 @@ export function BonusManuelsCard(props: BonusManuelsCardProps) {
     }
 
     return (
-        <CardShell>
-            <p className="mb-4 text-xs font-black uppercase tracking-widest text-orange-400">
-                Boost constructeur / déstockage
-            </p>
-            <div className="space-y-2">
-                {items.map((b) => (
-                    <div key={b.id} className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3">
-                        <div>
-                            <p className="text-sm font-semibold text-white/80">{b.label}</p>
-                            <p className="text-xs font-black text-white/30">{fmtEuro(b.montant)} / unité</p>
-                        </div>
-                        {props.mode === "gestion" ? (
-                            <button
-                                onClick={() => props.onRemove(b.id)}
-                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white/50 hover:bg-red-500/20 hover:text-red-300"
-                                title="Supprimer"
-                            >
-                                ×
-                            </button>
-                        ) : (
-                            <div className="flex items-center gap-3">
-                                <span className="text-sm font-black text-emerald-300 tabular-nums">
-                                    {fmtEuro(b.montant * (props.volumes[b.id] ?? 0))}
-                                </span>
-                                <input
-                                    type="number"
-                                    min={0}
-                                    value={props.volumes[b.id] || ""}
-                                    onChange={(e) => props.onVolumeChange(b.id, Math.max(0, Number(e.target.value) || 0))}
-                                    placeholder="0"
-                                    className="h-10 w-16 shrink-0 rounded-xl border border-white/10 bg-slate-950 text-center text-sm font-black text-white outline-none focus:border-violet-400"
-                                />
-                            </div>
-                        )}
+        <div className="space-y-2">
+            {items.length === 0 && props.mode === "declaration" && (
+                <p className="py-2 text-sm text-white/30">Aucun bonus en cours.</p>
+            )}
+            {items.map((b) => (
+                <div key={b.id} className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3">
+                    <div>
+                        <p className="text-sm font-semibold text-white/80">{b.label}</p>
+                        <p className="text-xs font-black text-white/30">{fmtEuro(b.montant)} / unité</p>
                     </div>
-                ))}
-                {items.length === 0 && <p className="py-2 text-sm text-white/30">Aucun bonus en cours.</p>}
-            </div>
+                    {props.mode === "gestion" ? (
+                        <button
+                            onClick={() => props.onRemove(b.id)}
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white/50 hover:bg-red-500/20 hover:text-red-300"
+                            title="Supprimer"
+                        >
+                            ×
+                        </button>
+                    ) : (
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm font-black text-emerald-300 tabular-nums">
+                                {fmtEuro(b.montant * (props.volumes[b.id] ?? 0))}
+                            </span>
+                            <input
+                                type="number"
+                                min={0}
+                                value={props.volumes[b.id] || ""}
+                                onChange={(e) => props.onVolumeChange(b.id, Math.max(0, Number(e.target.value) || 0))}
+                                placeholder="0"
+                                className="h-10 w-16 shrink-0 rounded-xl border border-white/10 bg-slate-950 text-center text-sm font-black text-white outline-none focus:border-violet-400"
+                            />
+                        </div>
+                    )}
+                </div>
+            ))}
             {props.mode === "gestion" && (
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <div className="flex flex-col gap-2 sm:flex-row">
                     <input
                         value={nouveauLabel}
                         onChange={(e: ChangeEvent<HTMLInputElement>) => setNouveauLabel(e.target.value)}
-                        placeholder="Nom du bonus (ex: Déstockage iPhone 13)"
+                        placeholder="+ Ajouter un item (nom)"
                         className="h-10 flex-1 rounded-xl border border-white/10 bg-slate-950 px-3 text-sm text-white outline-none focus:border-violet-400"
                     />
                     <input
                         type="number"
                         value={nouveauMontant}
                         onChange={(e: ChangeEvent<HTMLInputElement>) => setNouveauMontant(e.target.value)}
-                        placeholder="Montant € / unité"
-                        className="h-10 w-full rounded-xl border border-white/10 bg-slate-950 px-3 text-sm text-white outline-none focus:border-violet-400 sm:w-36"
+                        placeholder="Montant €"
+                        className="h-10 w-full rounded-xl border border-white/10 bg-slate-950 px-3 text-sm text-white outline-none focus:border-violet-400 sm:w-32"
                     />
                     <button
                         onClick={ajouter}
@@ -211,6 +215,20 @@ export function BonusManuelsCard(props: BonusManuelsCardProps) {
                     </button>
                 </div>
             )}
+        </div>
+    );
+}
+
+/** Carte pleine "Boost constructeur / déstockage" — bucket général (items sans carte dédiée). */
+type BonusManuelsCardProps = BonusManuelsInlineProps;
+
+export function BonusManuelsCard(props: BonusManuelsCardProps) {
+    return (
+        <CardShell>
+            <p className="mb-4 text-xs font-black uppercase tracking-widest text-orange-400">
+                Boost constructeur / déstockage
+            </p>
+            <BonusManuelsInline {...props} />
         </CardShell>
     );
 }

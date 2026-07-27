@@ -523,7 +523,7 @@ export default function Dashboard() {
             if (famille && famille.montantBoost > 0) {
                 const totalMois = await compterActesMoisParChamp(conseillerId, famille.champs);
                 if (totalMois > famille.seuil) {
-                    const acteBoost = await enregistrerActeJour(conseillerId, famille.label, famille.montantBoost);
+                    const acteBoost = await enregistrerActeJour(conseillerId, famille.label, famille.montantBoost, undefined, undefined, undefined, acte.id);
                     setCagnotteTotal((prev) => prev + famille.montantBoost);
                     setCagnotteActes((prev) => [...prev, acteBoost]);
                     // Décalé pour laisser le temps au "+X€" de la vente de s'afficher d'abord

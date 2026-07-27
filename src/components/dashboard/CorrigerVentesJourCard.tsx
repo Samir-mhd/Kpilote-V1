@@ -6,10 +6,12 @@ import {
     BAREME_DEFAUT,
     VenteConseiller,
     CorrectionChamp,
+    ActeJour,
     getBareme,
     compterActesJourParChamp,
     corrigerProduitJour,
     annulerDernierActeLie,
+    trouverActeEtBoostLies,
 } from "@/services/variableConseiller";
 import { annulerVente, corrigerVentesJour } from "@/services/ventes";
 
@@ -65,10 +67,24 @@ export default function CorrigerVentesJourCard({ conseillerId, ventesAujourdhui,
     const [sauvegarde, setSauvegarde] = useState(false);
     const [confirmAnnulation, setConfirmAnnulation] = useState(false);
     const [annulationEnCours, setAnnulationEnCours] = useState(false);
+    const [boostLie, setBoostLie] = useState<ActeJour | null>(null);
 
     useEffect(() => { getBareme().then(setBareme); }, []);
 
     const derniereVente = ventesAujourdhui[ventesAujourdhui.length - 1];
+
+    // Détecte si la dernière vente a déclenché un boost individuel automatique, pour adapter
+    // le libellé du bouton et l'annuler avec la vente.
+    useEffect(() => {
+        if (!derniereVente) { setBoostLie(null); return; }
+        const code = derniereVente.produits?.code as string | undefined;
+        if (!code) { setBoostLie(null); return; }
+        let annule = false;
+        trouverActeEtBoostLies(conseillerId, code, derniereVente.created_at).then(({ boost }) => {
+            if (!annule) setBoostLie(boost);
+        });
+        return () => { annule = true; };
+    }, [conseillerId, derniereVente?.id]);
 
     async function ouvrirPanel(def: ProduitDef) {
         setPanelOuvert(def.code);
@@ -138,10 +154,13 @@ export default function CorrigerVentesJourCard({ conseillerId, ventesAujourdhui,
                 {derniereVente ? (
                     <div className="flex items-center justify-between gap-3">
                         <div>
-                            <p className="text-sm font-black text-slate-800">Dernière vente saisie</p>
+                            <p className="text-sm font-black text-slate-800">
+                                {boostLie ? "Dernière vente boostée" : "Dernière vente saisie"}
+                            </p>
                             <p className="text-xs text-slate-400">
                                 {derniereVente.produits?.nom ?? derniereVente.produits?.code ?? "—"} à{" "}
                                 {new Date(derniereVente.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                                {boostLie && ` · +${boostLie.montant.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} € de boost inclus`}
                             </p>
                         </div>
                         {!confirmAnnulation ? (
@@ -149,7 +168,7 @@ export default function CorrigerVentesJourCard({ conseillerId, ventesAujourdhui,
                                 onClick={() => setConfirmAnnulation(true)}
                                 className="shrink-0 rounded-xl border border-red-200 bg-white px-4 py-2 text-xs font-black text-red-500 transition-all hover:bg-red-50"
                             >
-                                Annuler cette vente
+                                {boostLie ? "Annuler la dernière vente boostée" : "Annuler cette vente"}
                             </button>
                         ) : (
                             <div className="flex shrink-0 gap-2">
