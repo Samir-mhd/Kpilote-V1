@@ -84,6 +84,11 @@ export type BaremeVariable = {
     lead_box: number;
     lead_forfait: number;
     lead_coms_pro: number;
+
+    /** Clés BaremeVariable retirées de la vente par le manager : masquées du barème et
+     *  de la carte Accueil (sous-choix). Le champ reste dans le barème (valeur conservée),
+     *  simplement invisible/inactif tant qu'il n'est pas remis en vente. */
+    champsMasques: string[];
 };
 
 // ── Bonus manuels (constructeur / déstockage) : liste libre nommée par le manager,
@@ -288,6 +293,8 @@ export const BAREME_DEFAUT: BaremeVariable = {
     lead_box: 10,
     lead_forfait: 5,
     lead_coms_pro: 10,
+
+    champsMasques: [],
 };
 
 export const VENTES_VIDES: VenteConseiller = {

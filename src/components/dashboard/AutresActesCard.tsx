@@ -40,14 +40,16 @@ export default function AutresActesCard({ bareme, bonusManuels, onChoisir, derni
     // le conseiller les déclare lui-même sur /dashboard/variable — seule la cagnotte du jour est alimentée ici.
     // Les boosts individuels (box/forfait/smartphone) ne sont plus déclarés ici : ils s'ajoutent
     // automatiquement à la cagnotte dès que le seuil défini par le manager est dépassé.
+    // Un produit "retiré de la vente" par le manager (croix sur /manager/variable) disparaît d'ici aussi.
+    const masques = bareme.champsMasques ?? [];
     const optionsPrincipales: ChoixActe[] = [
-        { label: "Canal+ Option 1", montant: bareme.canal_option1 },
-        { label: "Canal+ Option 2", montant: bareme.canal_option2 },
-        { label: "Canal+ Option 3", montant: bareme.canal_option3 },
+        !masques.includes("canal_option1") && { label: "Canal+ Option 1", montant: bareme.canal_option1 },
+        !masques.includes("canal_option2") && { label: "Canal+ Option 2", montant: bareme.canal_option2 },
+        !masques.includes("canal_option3") && { label: "Canal+ Option 3", montant: bareme.canal_option3 },
         { label: "Boost déstockage / constructeur", bonusManuelId: DESTOCKAGE_SENTINEL },
-        { label: "Vente 4P", montant: bareme.cross_sell_4p },
-        { label: "Assurance essentielle", montant: bareme.assurance_essentielle, champ: "assurance_essentielle" },
-    ];
+        !masques.includes("cross_sell_4p") && { label: "Vente 4P", montant: bareme.cross_sell_4p },
+        !masques.includes("assurance_essentielle") && { label: "Assurance essentielle", montant: bareme.assurance_essentielle, champ: "assurance_essentielle" },
+    ].filter(Boolean) as ChoixActe[];
 
     const optionsDestockage: ChoixActe[] = bonusManuels.map((b) => ({
         label: b.label,

@@ -568,6 +568,10 @@ export default function Dashboard() {
     const TELEPHONE_ACTE: ChoixActe = { label: "Smartphone", montant: bareme.smartphone, champ: "smartphones", produitCode: "telephones" };
     const ASSURANCE_ACTE: ChoixActe = { label: "Assurance Nouveau Mobile", montant: bareme.assurance_nouveau_mobile, champ: "assurance_nouveau_mobile", produitCode: "assurance" };
 
+    // Un produit "retiré de la vente" par le manager (croix sur /manager/variable) disparaît
+    // aussi des sous-choix Accueil — la valeur reste en base, prête à être remise en vente.
+    const champMasque = (champ?: string) => !!champ && (bareme.champsMasques ?? []).includes(champ);
+
     // Sans accents pour matcher "Téléphones"/"telephones" indifféremment
     function normaliser(s: string): string {
         return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -575,17 +579,17 @@ export default function Dashboard() {
 
     function sousChoixPour(titre: string): ChoixActe[] | undefined {
         switch (normaliser(titre)) {
-            case "box": return BOX_CHOIX;
-            case "forfaits": return FORFAIT_CHOIX;
-            case "mcafee": return MCAFEE_CHOIX;
+            case "box": return BOX_CHOIX.filter((c) => !champMasque(c.champ));
+            case "forfaits": return FORFAIT_CHOIX.filter((c) => !champMasque(c.champ));
+            case "mcafee": return MCAFEE_CHOIX.filter((c) => !champMasque(c.champ));
             default: return undefined;
         }
     }
 
     function acteDirectPour(titre: string): ChoixActe | undefined {
         switch (normaliser(titre)) {
-            case "telephones": return TELEPHONE_ACTE;
-            case "assurance": return ASSURANCE_ACTE;
+            case "telephones": return champMasque(TELEPHONE_ACTE.champ) ? undefined : TELEPHONE_ACTE;
+            case "assurance": return champMasque(ASSURANCE_ACTE.champ) ? undefined : ASSURANCE_ACTE;
             default: return undefined;
         }
     }

@@ -18,7 +18,7 @@ import {
 } from "@/services/variableConseiller";
 import { CATEGORIES_VENTES, NumberField, CardShell, BonusManuelsCard, BonusManuelsInline, DetailResultatsCard } from "@/components/variable/variableUi";
 
-type ChampBareme = { key: keyof BaremeVariable; label: string };
+type ChampBareme = { key: Exclude<keyof BaremeVariable, "champsMasques">; label: string };
 
 // ── Barème mensuel (montants € éditables) ───────────────────────────────────
 // `categorieKey` rattache la carte aux items manuels ajoutés par le manager sur cette même carte.
@@ -129,6 +129,18 @@ export default function VariableSimulationPage() {
         });
     }
 
+    // Retire/remet en vente un champ fixe du barème (Box Ultra, Forfait Free Max...) : masqué
+    // du barème ET de la carte Accueil (sous-choix) tant qu'il n'est pas remis en vente.
+    function toggleChampMasque(key: keyof BaremeVariable) {
+        setBareme((prev) => {
+            const masques = new Set(prev.champsMasques ?? []);
+            if (masques.has(key)) masques.delete(key); else masques.add(key);
+            const next = { ...prev, champsMasques: Array.from(masques) };
+            sauvegarderBareme(next);
+            return next;
+        });
+    }
+
     function reinitialiserBareme() {
         setBareme(BAREME_DEFAUT);
         sauvegarderBareme(BAREME_DEFAUT);
@@ -207,22 +219,45 @@ export default function VariableSimulationPage() {
                             Réinitialiser aux valeurs officielles
                         </button>
                     </div>
-                    {CATEGORIES_BAREME.map((cat) => (
+                    {CATEGORIES_BAREME.map((cat) => {
+                        const masques = bareme.champsMasques ?? [];
+                        const champsVisibles = cat.champs.filter((c) => !masques.includes(c.key));
+                        const champsCaches = cat.champs.filter((c) => masques.includes(c.key));
+                        return (
                         <CardShell key={cat.titre}>
                             <p className={`mb-4 text-xs font-black uppercase tracking-widest ${cat.accent}`}>
                                 {cat.titre}
                             </p>
                             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                                {cat.champs.map((c) => (
+                                {champsVisibles.map((c) => (
                                     <NumberField
                                         key={c.key}
                                         label={c.label}
                                         value={bareme[c.key]}
                                         step={0.5}
                                         onChange={(v) => updateBareme(c.key, v)}
+                                        onRemove={() => toggleChampMasque(c.key)}
                                     />
                                 ))}
                             </div>
+                            {champsCaches.length > 0 && (
+                                <details className="mt-3">
+                                    <summary className="cursor-pointer text-xs font-bold text-white/40 hover:text-white/60">
+                                        Retirés de la vente ({champsCaches.length})
+                                    </summary>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {champsCaches.map((c) => (
+                                            <button
+                                                key={c.key}
+                                                onClick={() => toggleChampMasque(c.key)}
+                                                className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/60 hover:bg-emerald-500/20 hover:text-emerald-300"
+                                            >
+                                                + Remettre en vente : {c.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </details>
+                            )}
                             <div className="mt-4 border-t border-white/10 pt-4">
                                 <BonusManuelsInline
                                     items={bonusManuels.filter((b) => b.categorie === cat.categorieKey)}
@@ -232,7 +267,8 @@ export default function VariableSimulationPage() {
                                 />
                             </div>
                         </CardShell>
-                    ))}
+                        );
+                    })}
 
                     <BonusManuelsCard
                         items={bonusManuels.filter((b) => !b.categorie || b.categorie === "destockage")}

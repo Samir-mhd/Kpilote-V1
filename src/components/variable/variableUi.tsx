@@ -91,24 +91,38 @@ export function NumberField({
     value,
     onChange,
     step = 1,
+    onRemove,
 }: {
     label: string;
     value: number;
     onChange: (v: number) => void;
     step?: number;
+    /** Si fourni, affiche une petite croix pour retirer ce champ de la vente (masquage). */
+    onRemove?: () => void;
 }) {
     return (
         <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3">
             <p className="text-sm font-semibold text-white/80">{label}</p>
-            <input
-                type="number"
-                min={0}
-                step={step}
-                value={value === 0 ? "" : value}
-                onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
-                placeholder="0"
-                className="h-10 w-20 shrink-0 rounded-xl border border-white/10 bg-slate-950 text-center text-sm font-black text-white outline-none focus:border-violet-400"
-            />
+            <div className="flex shrink-0 items-center gap-2">
+                <input
+                    type="number"
+                    min={0}
+                    step={step}
+                    value={value === 0 ? "" : value}
+                    onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
+                    placeholder="0"
+                    className="h-10 w-20 shrink-0 rounded-xl border border-white/10 bg-slate-950 text-center text-sm font-black text-white outline-none focus:border-violet-400"
+                />
+                {onRemove && (
+                    <button
+                        onClick={onRemove}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white/50 hover:bg-red-500/20 hover:text-red-300"
+                        title="Retirer de la vente"
+                    >
+                        ×
+                    </button>
+                )}
+            </div>
         </div>
     );
 }
