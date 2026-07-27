@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { fetchToutesLesLignes } from "@/utils/supabasePaging";
 
 import { construireClassementManager } from "./classementManager";
 import { construireCoachManager } from "./coachManager";
@@ -28,16 +29,22 @@ export async function construireDashboardManager() {
       )
     `);
 
-  const { data: ventes } = await supabase
-    .from("ventes")
-    .select(`
-      quantite,
-      conseiller_id,
-      produits(
-        nom,
-        code
-      )
-    `);
+  // Paginé : au-delà de 1000 lignes (plafond Supabase par défaut), les ventes de toute
+  // l'équipe seraient coupées silencieusement, sans tri garanti.
+  const ventes = await fetchToutesLesLignes((from, to) =>
+    supabase
+      .from("ventes")
+      .select(`
+        quantite,
+        conseiller_id,
+        produits(
+          nom,
+          code
+        )
+      `)
+      .order("created_at", { ascending: true })
+      .range(from, to)
+  );
 
   const classement = await construireClassementManager();
   const coach = await construireCoachManager();

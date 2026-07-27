@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { fetchToutesLesLignes } from "@/utils/supabasePaging";
 
 export type CoachManagerResult = {
   message: string;
@@ -18,11 +19,15 @@ export async function construireCoachManager(): Promise<CoachManagerResult> {
 
   if (objectifsError) throw objectifsError;
 
-  const { data: ventes, error: ventesError } = await supabase
-    .from("ventes")
-    .select("quantite, conseiller_id, produits(code)");
-
-  if (ventesError) throw ventesError;
+  // Paginé : au-delà de 1000 lignes (plafond Supabase par défaut), les ventes de toute
+  // l'équipe seraient coupées silencieusement, sans tri garanti.
+  const ventes = await fetchToutesLesLignes((from, to) =>
+    supabase
+      .from("ventes")
+      .select("quantite, conseiller_id, produits(code)")
+      .order("created_at", { ascending: true })
+      .range(from, to)
+  );
 
   // Spiderhome = historisation, pas un acte commercial → exclu des totaux
   const objectifGlobal = (objectifs ?? []).reduce((total: number, o: any) => {

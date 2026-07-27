@@ -5,6 +5,7 @@
 import { supabase } from "@/lib/supabase";
 import { PRODUITS_ORDRE, ProduitCode } from "@/utils/produits";
 import { Periode, dateDebutPeriode } from "@/utils/periodes";
+import { fetchToutesLesLignes } from "@/utils/supabasePaging";
 
 export type ConseillerStats = {
     id: string;
@@ -19,22 +20,39 @@ export async function construireClassementPeriode(
 ): Promise<ConseillerStats[]> {
     const debut = dateDebutPeriode(periode);
 
-    const [consRes, ventesRes, objRes] = await Promise.all([
+    const [consRes, objRes] = await Promise.all([
         supabase.from("conseillers").select("id, nom, profil_actif"),
-        supabase
-            .from("ventes")
-            .select("conseiller_id, quantite, produits(code)")
-            .gte("created_at", debut),
         supabase
             .from("objectifs_mensuels")
             .select("conseiller_id, objectif, produits(code)"),
     ]);
 
-    // Fallback created_at absent
-    let ventes = ventesRes.data;
-    if (ventesRes.error?.message?.includes("created_at")) {
-        const fallback = await supabase.from("ventes").select("conseiller_id, quantite, produits(code)");
-        ventes = fallback.data;
+    // Paginé : au-delà de 1000 lignes (plafond Supabase par défaut), les ventes de toute
+    // l'équipe sur un mois seraient sinon coupées silencieusement, sans tri garanti —
+    // ce qui faisait varier les totaux d'un appel à l'autre.
+    let ventes: any[];
+    try {
+        ventes = await fetchToutesLesLignes((from, to) =>
+            supabase
+                .from("ventes")
+                .select("conseiller_id, quantite, produits(code)")
+                .gte("created_at", debut)
+                .order("created_at", { ascending: true })
+                .range(from, to)
+        );
+    } catch (e: any) {
+        // Fallback created_at absent
+        if (e?.message?.includes("created_at")) {
+            ventes = await fetchToutesLesLignes((from, to) =>
+                supabase
+                    .from("ventes")
+                    .select("conseiller_id, quantite, produits(code)")
+                    .order("conseiller_id", { ascending: true })
+                    .range(from, to)
+            );
+        } else {
+            throw e;
+        }
     }
 
     const conseillers = consRes.data ?? [];

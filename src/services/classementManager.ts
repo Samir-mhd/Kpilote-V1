@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { fetchToutesLesLignes } from "@/utils/supabasePaging";
 
 export type ObjectifsProduits = {
   box: number;
@@ -130,19 +131,23 @@ export async function construireClassementManager() {
   const debutMois = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const finMois   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
 
-  const { data: ventes, error: ventesError } = await supabase
-    .from("ventes")
-    .select(`
-      conseiller_id,
-      quantite,
-      produits (
-        code
-      )
-    `)
-    .gte("created_at", debutMois)
-    .lte("created_at", finMois);
-
-  if (ventesError) throw ventesError;
+  // Paginé : au-delà de 1000 lignes (plafond Supabase par défaut), les ventes de toute
+  // l'équipe sur un mois seraient coupées silencieusement, sans tri garanti.
+  const ventes = await fetchToutesLesLignes((from, to) =>
+    supabase
+      .from("ventes")
+      .select(`
+        conseiller_id,
+        quantite,
+        produits (
+          code
+        )
+      `)
+      .gte("created_at", debutMois)
+      .lte("created_at", finMois)
+      .order("created_at", { ascending: true })
+      .range(from, to)
+  );
 
   const { data: objectifs, error: objectifsError } = await supabase
     .from("objectifs_mensuels")

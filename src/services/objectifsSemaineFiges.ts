@@ -7,6 +7,7 @@
 import { supabase } from "@/lib/supabase";
 import { PRODUITS_ORDRE, ProduitCode } from "@/utils/produits";
 import { getJoursTravailPlageTous, getJoursTravailSemaineTous } from "@/services/planningService";
+import { fetchToutesLesLignes } from "@/utils/supabasePaging";
 
 function dateStr(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -65,14 +66,20 @@ export async function getObjectifsSemaineFiges(
     debutMois.setDate(1);
     debutMois.setHours(0, 0, 0, 0);
 
-    const { data: ventesMois } = await supabase
-        .from("ventes")
-        .select("conseiller_id, quantite, produits(code)")
-        .in("conseiller_id", conseillerIds)
-        .gte("created_at", debutMois.toISOString());
+    // Paginé : au-delà de 1000 lignes (plafond Supabase par défaut), les ventes de l'équipe
+    // sur un mois seraient coupées silencieusement, sans tri garanti.
+    const ventesMois = await fetchToutesLesLignes((from, to) =>
+        supabase
+            .from("ventes")
+            .select("conseiller_id, quantite, produits(code)")
+            .in("conseiller_id", conseillerIds)
+            .gte("created_at", debutMois.toISOString())
+            .order("created_at", { ascending: true })
+            .range(from, to)
+    );
 
     const realiseMap: Record<string, Record<string, number>> = {};
-    (ventesMois ?? []).forEach((v: any) => {
+    ventesMois.forEach((v: any) => {
         const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code;
         if (!code || code === "spiderhome") return;
         if (!realiseMap[v.conseiller_id]) realiseMap[v.conseiller_id] = {};
