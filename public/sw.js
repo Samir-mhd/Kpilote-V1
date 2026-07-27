@@ -1,7 +1,7 @@
 // KPILOTE Service Worker
 // Stratégie : cache-first pour les assets statiques, network-first pour les données
 
-const CACHE_VERSION = 'kpilote-v3';
+const CACHE_VERSION = 'kpilote-v4';
 
 const STATIC_ASSETS = [
   '/',
@@ -53,7 +53,7 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('supabase.in');
 
   if (bypassCache) {
-    event.respondWith(fetch(event.request));
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
     return;
   }
 
