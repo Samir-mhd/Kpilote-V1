@@ -38,10 +38,9 @@ export default function AutresActesCard({ bareme, bonusManuels, onChoisir, derni
 
     // Box, Canal+, migration fibre et 4P sont payés à M+2 : pas de sync avec le simulateur mensuel,
     // le conseiller les déclare lui-même sur /dashboard/variable — seule la cagnotte du jour est alimentée ici.
+    // Les boosts individuels (box/forfait/smartphone) ne sont plus déclarés ici : ils s'ajoutent
+    // automatiquement à la cagnotte dès que le seuil défini par le manager est dépassé.
     const optionsPrincipales: ChoixActe[] = [
-        { label: "Boost indiv. smartphone", montant: bareme.boost_individuel_smartphone },
-        { label: "Boost indiv. forfait", montant: bareme.boost_individuel_forfait },
-        { label: "Boost indiv. box", montant: bareme.boost_individuel_box },
         { label: "Canal+ Option 1", montant: bareme.canal_option1 },
         { label: "Canal+ Option 2", montant: bareme.canal_option2 },
         { label: "Canal+ Option 3", montant: bareme.canal_option3 },

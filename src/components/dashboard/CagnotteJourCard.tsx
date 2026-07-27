@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 type Props = {
     total: number;
-    flash: { key: number; montant: number } | null;
+    flash: { key: number; montant: number; label?: string } | null;
 };
 
 function fmtEuro(n: number) {
@@ -12,12 +12,12 @@ function fmtEuro(n: number) {
 }
 
 export default function CagnotteJourCard({ total, flash }: Props) {
-    const [visible, setVisible] = useState<{ key: number; montant: number } | null>(null);
+    const [visible, setVisible] = useState<{ key: number; montant: number; label?: string } | null>(null);
 
     useEffect(() => {
         if (!flash) return;
         setVisible(flash);
-        const t = setTimeout(() => setVisible(null), 1400);
+        const t = setTimeout(() => setVisible(null), flash.label ? 2200 : 1400);
         return () => clearTimeout(t);
     }, [flash]);
 
@@ -36,10 +36,10 @@ export default function CagnotteJourCard({ total, flash }: Props) {
             {visible && (
                 <span
                     key={visible.key}
-                    className="pointer-events-none absolute right-7 top-4 text-lg font-black text-emerald-200"
-                    style={{ animation: "cagnotteFloat 1.4s ease-out forwards" }}
+                    className={`pointer-events-none absolute right-7 top-4 font-black text-emerald-200 ${visible.label ? "text-base" : "text-lg"}`}
+                    style={{ animation: `cagnotteFloat ${visible.label ? "2.2s" : "1.4s"} ease-out forwards` }}
                 >
-                    +{fmtEuro(visible.montant)}
+                    +{fmtEuro(visible.montant)}{visible.label ? ` ${visible.label}` : ""}
                 </span>
             )}
 

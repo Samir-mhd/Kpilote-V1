@@ -38,7 +38,9 @@ import {
     getCagnotteJour,
     enregistrerActeJour,
     annulerActeJour,
+    compterActesMoisParChamp,
     jourCourant,
+    VenteConseiller,
 } from "@/services/variableConseiller";
 
 const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
@@ -118,7 +120,7 @@ export default function Dashboard() {
     const [bareme, setBareme] = useState<BaremeVariable>(BAREME_DEFAUT);
     const [bonusManuels, setBonusManuels] = useState<BonusManuel[]>([]);
     const [cagnotteTotal, setCagnotteTotal] = useState(0);
-    const [cagnotteFlash, setCagnotteFlash] = useState<{ key: number; montant: number } | null>(null);
+    const [cagnotteFlash, setCagnotteFlash] = useState<{ key: number; montant: number; label?: string } | null>(null);
     const [cagnotteActes, setCagnotteActes] = useState<ActeJour[]>([]);
 
     const [heroMessage, setHeroMessage] = useState("Chargement de ta journée...");
@@ -476,6 +478,38 @@ export default function Dashboard() {
         }
     }
 
+    // Boost individuel automatique : dès que le volume du MOIS déclaré en cagnotte (indépendant
+    // de la synchronisation M+2 du simulateur) dépasse le seuil défini par le manager, chaque
+    // unité suivante ajoute le boost individuel correspondant, sans action du conseiller.
+    function familleBoostPour(champ?: keyof VenteConseiller) {
+        if (!champ) return undefined;
+        if (champ === "box_ultra" || champ === "box_pop" || champ === "box_pop_s_revolution_5g") {
+            return {
+                champs: ["box_ultra", "box_pop", "box_pop_s_revolution_5g"] as (keyof VenteConseiller)[],
+                seuil: bareme.seuil_box,
+                montantBoost: bareme.boost_individuel_box,
+                label: "Boost individuel box",
+            };
+        }
+        if (champ === "forfait_free_serie" || champ === "forfait_free_max") {
+            return {
+                champs: ["forfait_free_serie", "forfait_free_max"] as (keyof VenteConseiller)[],
+                seuil: bareme.seuil_forfait,
+                montantBoost: bareme.boost_individuel_forfait,
+                label: "Boost individuel forfait",
+            };
+        }
+        if (champ === "smartphones") {
+            return {
+                champs: ["smartphones"] as (keyof VenteConseiller)[],
+                seuil: bareme.seuil_smartphone,
+                montantBoost: bareme.boost_individuel_smartphone,
+                label: "Boost individuel smartphone",
+            };
+        }
+        return undefined;
+    }
+
     async function ajouterActeVariable(option: ChoixActe) {
         if (!conseillerId) return;
         const montant = option.montant ?? 0;
@@ -484,6 +518,20 @@ export default function Dashboard() {
             setCagnotteTotal((prev) => prev + montant);
             setCagnotteFlash({ key: Date.now(), montant });
             setCagnotteActes((prev) => [...prev, acte]);
+
+            const famille = familleBoostPour(option.champ);
+            if (famille && famille.montantBoost > 0) {
+                const totalMois = await compterActesMoisParChamp(conseillerId, famille.champs);
+                if (totalMois > famille.seuil) {
+                    const acteBoost = await enregistrerActeJour(conseillerId, famille.label, famille.montantBoost);
+                    setCagnotteTotal((prev) => prev + famille.montantBoost);
+                    setCagnotteActes((prev) => [...prev, acteBoost]);
+                    // Décalé pour laisser le temps au "+X€" de la vente de s'afficher d'abord
+                    setTimeout(() => {
+                        setCagnotteFlash({ key: Date.now(), montant: famille.montantBoost, label: "de boost !" });
+                    }, 1200);
+                }
+            }
         } catch { /* silencieux — la cagnotte n'est pas critique pour l'usage courant */ }
     }
 

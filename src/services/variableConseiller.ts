@@ -540,6 +540,31 @@ export async function annulerDernierActeLie(
     await annulerActeJour(conseillerId, dernier);
 }
 
+/**
+ * Compte, pour le mois en cours (toutes les journées confondues), le volume déjà déclaré
+ * par sous-type via la cagnotte accueil — sert à détecter le franchissement d'un seuil de
+ * boost individuel (ex: seuil_box) indépendamment de la synchronisation M+2 du simulateur.
+ */
+export async function compterActesMoisParChamp(
+    conseillerId: string,
+    champs: (keyof VenteConseiller)[]
+): Promise<number> {
+    const mois = moisCourant();
+    const [annee, moisNum] = mois.split("-").map(Number);
+    const finMois = new Date(annee, moisNum, 0);
+    const finStr = `${finMois.getFullYear()}-${String(finMois.getMonth() + 1).padStart(2, "0")}-${String(finMois.getDate()).padStart(2, "0")}`;
+
+    const { data } = await supabase
+        .from("variable_actes_jour")
+        .select("quantite")
+        .eq("conseiller_id", conseillerId)
+        .in("champ", champs as string[])
+        .gte("jour", mois)
+        .lte("jour", finStr);
+
+    return (data ?? []).reduce((t: number, r: any) => t + (r.quantite ?? 1), 0);
+}
+
 /** Compte, pour aujourd'hui, le volume déjà déclaré par sous-type (pour préremplir un formulaire de correction). */
 export async function compterActesJourParChamp(
     conseillerId: string,
