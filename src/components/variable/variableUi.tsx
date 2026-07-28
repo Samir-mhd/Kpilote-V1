@@ -92,6 +92,7 @@ export function NumberField({
     onChange,
     step = 1,
     onRemove,
+    readOnly,
 }: {
     label: string;
     value: number;
@@ -99,10 +100,12 @@ export function NumberField({
     step?: number;
     /** Si fourni, affiche une petite croix pour retirer ce champ de la vente (masquage). */
     onRemove?: () => void;
+    /** Champ verrouillé (ex: box après bascule sur le raccordement) — affiché mais non modifiable. */
+    readOnly?: boolean;
 }) {
     return (
-        <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3">
-            <p className="text-sm font-semibold text-white/80">{label}</p>
+        <div className={`flex items-center justify-between gap-3 rounded-2xl px-4 py-3 ${readOnly ? "bg-white/[0.03]" : "bg-white/5"}`}>
+            <p className={`text-sm font-semibold ${readOnly ? "text-white/40" : "text-white/80"}`}>{label}</p>
             <div className="flex shrink-0 items-center gap-2">
                 <input
                     type="number"
@@ -110,8 +113,13 @@ export function NumberField({
                     step={step}
                     value={value === 0 ? "" : value}
                     onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
+                    disabled={readOnly}
                     placeholder="0"
-                    className="h-10 w-20 shrink-0 rounded-xl border border-white/10 bg-slate-950 text-center text-sm font-black text-white outline-none focus:border-violet-400"
+                    className={`h-10 w-20 shrink-0 rounded-xl border text-center text-sm font-black outline-none ${
+                        readOnly
+                            ? "cursor-not-allowed border-white/5 bg-slate-900 text-white/40"
+                            : "border-white/10 bg-slate-950 text-white focus:border-violet-400"
+                    }`}
                 />
                 {onRemove && (
                     <button
@@ -247,7 +255,11 @@ export function BonusManuelsCard(props: BonusManuelsCardProps) {
     );
 }
 
-export function DetailResultatsCard({ detail }: { detail: DetailVariable }) {
+/** `extra` : contributions figées (box raccordées, bonus 4P différé...) — ajoutées au total, hors du calcul pur. */
+export function DetailResultatsCard({ detail, extra }: { detail: DetailVariable; extra?: { label: string; montant: number }[] }) {
+    const lignesExtra = (extra ?? []).filter((l) => l.montant > 0);
+    const totalExtra = lignesExtra.reduce((t, l) => t + l.montant, 0);
+    const total = detail.total + totalExtra;
     return (
         <CardShell>
             <p className="mb-4 text-xs font-black uppercase tracking-widest text-violet-400">Détail de la variable</p>
@@ -262,14 +274,20 @@ export function DetailResultatsCard({ detail }: { detail: DetailVariable }) {
                         </div>
                     );
                 })}
-                {LIGNES_DETAIL.every((l) => (detail[l.key] as number) === 0) && (
+                {lignesExtra.map((l, i) => (
+                    <div key={i} className="flex items-center justify-between py-1.5 text-sm">
+                        <span className="text-white/60">{l.label}</span>
+                        <span className="font-black text-white tabular-nums">{fmtEuro(l.montant)}</span>
+                    </div>
+                ))}
+                {LIGNES_DETAIL.every((l) => (detail[l.key] as number) === 0) && lignesExtra.length === 0 && (
                     <p className="py-4 text-center text-sm text-white/30">Saisir des actes pour voir le détail.</p>
                 )}
             </div>
 
             <div className="mt-6 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 p-6 text-center shadow-[0_12px_32px_rgba(139,92,246,.35)]">
                 <p className="text-xs font-black uppercase tracking-widest text-white/70">Total variable</p>
-                <p className="mt-1 text-4xl font-black text-white tabular-nums">{fmtEuro(detail.total)}</p>
+                <p className="mt-1 text-4xl font-black text-white tabular-nums">{fmtEuro(total)}</p>
             </div>
         </CardShell>
     );

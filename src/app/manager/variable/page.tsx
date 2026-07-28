@@ -17,6 +17,14 @@ import {
     supprimerBonusManuel,
 } from "@/services/variableConseiller";
 import { CATEGORIES_VENTES, NumberField, CardShell, BonusManuelsCard, BonusManuelsInline, DetailResultatsCard } from "@/components/variable/variableUi";
+import { nomMois } from "@/services/boxRaccordement";
+
+// Mois M-2 : les box payées ce mois-ci reflètent le R/O du mois où elles ont été vendues.
+function moisM2Actuel(): string {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
 
 type ChampBareme = { key: Exclude<keyof BaremeVariable, "champsMasques">; label: string };
 
@@ -359,10 +367,17 @@ export default function VariableSimulationPage() {
                                 Contexte boutique (R/O du mois)
                             </p>
                             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                                <NumberField label="R/O box boutique (%)" value={boost.ro_box_boutique} onChange={(v) => updateBoost("ro_box_boutique", v)} />
+                                <NumberField
+                                    label={`R/O box boutique — ${nomMois(moisM2Actuel())} (%)`}
+                                    value={boost.ro_box_boutique}
+                                    onChange={(v) => updateBoost("ro_box_boutique", v)}
+                                />
                                 <NumberField label="R/O forfait boutique (%)" value={boost.ro_forfait_boutique} onChange={(v) => updateBoost("ro_forfait_boutique", v)} />
                                 <NumberField label="R/O smartphone boutique (%)" value={boost.ro_smartphone_boutique} onChange={(v) => updateBoost("ro_smartphone_boutique", v)} />
                             </div>
+                            <p className="mt-2 text-[11px] text-white/30">
+                                Box payée à M+2 : le boost collectif box se base sur le R/O du mois de vente ({nomMois(moisM2Actuel())}), pas sur le R/O du mois affiché.
+                            </p>
                         </CardShell>
 
                         <BonusManuelsCard

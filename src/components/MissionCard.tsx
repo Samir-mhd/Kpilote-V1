@@ -40,6 +40,10 @@ const articlesMap: Record<string, string> = {
 };
 function getArticle(t: string) { return articlesMap[t.toLowerCase()] ?? "un(e)"; }
 
+// Affichage au singulier — la logique interne continue d'utiliser le titre d'origine.
+const SINGULIER: Record<string, string> = { "Téléphones": "Téléphone", "Forfaits": "Forfait" };
+function getDisplayTitre(t: string) { return SINGULIER[t] ?? t; }
+
 const CELEBRATIONS = ["🎉", "🔥", "⚡", "🚀", "💪", "🏆"];
 
 // Uniquement des messages neutres/encourageants — le retard est déjà géré par le hero/coach au-dessus.
@@ -106,6 +110,7 @@ export default function MissionCard({
     const pal   = PALETTE[couleur] ?? DEFAULT_PAL;
     const pct   = objectif > 0 ? Math.min(Math.round((realise / objectif) * 100), 100) : 0;
     const article = getArticle(titre);
+    const displayTitre = getDisplayTitre(titre);
     const isHistorisation = titre.toLowerCase() === "spiderhome";
     const status = getStatus(pct, realise, objectif, isHistorisation);
 
@@ -215,7 +220,7 @@ export default function MissionCard({
                             Objectif du jour
                         </p>
                         <h2 className="mt-2 truncate text-2xl font-black text-white">
-                            {titre}
+                            {displayTitre}
                         </h2>
                     </div>
 
@@ -265,7 +270,7 @@ export default function MissionCard({
                         className="rounded-xl px-4 py-2.5 text-sm font-black text-white"
                         style={{ background: `${pal.hex}22`, border: `1px solid ${pal.hex}40` }}
                     >
-                        ✅ {isHistorisation ? "Une historisation" : `${article.charAt(0).toUpperCase() + article.slice(1)} ${titre}`} de plus — excellent !
+                        ✅ {isHistorisation ? "Une historisation" : `${article.charAt(0).toUpperCase() + article.slice(1)} ${displayTitre}`} de plus — excellent !
                     </div>
                 </div>
 
@@ -276,7 +281,7 @@ export default function MissionCard({
                     className={`group mt-6 flex w-full items-center justify-between rounded-2xl bg-gradient-to-r ${pal.gradient} px-6 py-4 text-sm font-black text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50`}
                     style={{ boxShadow: `0 4px 20px ${pal.glow}` }}
                 >
-                    <span>{isHistorisation ? "J'ai fait une historisation" : `J'ai vendu ${article} ${titre}`}</span>
+                    <span>{isHistorisation ? "J'ai fait une historisation" : `J'ai vendu ${article} ${displayTitre}`}</span>
                     <svg
                         width="16" height="16"
                         viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -291,7 +296,7 @@ export default function MissionCard({
 
             {modalOuverte && sousChoix && (
                 <ChoixActeModal
-                    titre={`J'ai vendu ${article} ${titre}`}
+                    titre={`J'ai vendu ${article} ${displayTitre}`}
                     options={sousChoix}
                     onChoisir={handleChoix}
                     onClose={() => setModalOuverte(false)}

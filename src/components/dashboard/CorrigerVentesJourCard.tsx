@@ -12,6 +12,9 @@ import {
     corrigerProduitJour,
     annulerDernierActeLie,
     trouverActeEtBoostLies,
+    getCagnotteJour,
+    annulerActeJour,
+    jourCourant,
 } from "@/services/variableConseiller";
 import { annulerVente, corrigerVentesJour } from "@/services/ventes";
 
@@ -68,8 +71,22 @@ export default function CorrigerVentesJourCard({ conseillerId, ventesAujourdhui,
     const [confirmAnnulation, setConfirmAnnulation] = useState(false);
     const [annulationEnCours, setAnnulationEnCours] = useState(false);
     const [boostLie, setBoostLie] = useState<ActeJour | null>(null);
+    const [dernierActeAutre, setDernierActeAutre] = useState<ActeJour | null>(null);
+    const [confirmAnnulationAutre, setConfirmAnnulationAutre] = useState(false);
+    const [annulationAutreEnCours, setAnnulationAutreEnCours] = useState(false);
 
     useEffect(() => { getBareme().then(setBareme); }, []);
+
+    // Dernier acte "annexe" (Canal+, déstockage, assurance essentielle, 4P, boost auto) — tout
+    // ce qui n'est pas rattaché à une carte produit (celles-là se corrigent via les cartes ci-dessous).
+    async function chargerDernierActeAutre() {
+        if (!conseillerId) return;
+        const actes = await getCagnotteJour(conseillerId, jourCourant());
+        const sansProduit = actes.filter((a) => !a.produitCode);
+        setDernierActeAutre(sansProduit[sansProduit.length - 1] ?? null);
+    }
+
+    useEffect(() => { chargerDernierActeAutre(); }, [conseillerId]);
 
     const derniereVente = ventesAujourdhui[ventesAujourdhui.length - 1];
 
@@ -120,6 +137,7 @@ export default function CorrigerVentesJourCard({ conseillerId, ventesAujourdhui,
             await corrigerVentesJour(conseillerId, def.code, deltaTotal);
             fermerPanel();
             onCorrige();
+            chargerDernierActeAutre();
         } finally {
             setSauvegarde(false);
         }
@@ -134,8 +152,21 @@ export default function CorrigerVentesJourCard({ conseillerId, ventesAujourdhui,
             if (code) await annulerDernierActeLie(conseillerId, code, derniereVente.created_at);
             setConfirmAnnulation(false);
             onCorrige();
+            chargerDernierActeAutre();
         } finally {
             setAnnulationEnCours(false);
+        }
+    }
+
+    async function handleAnnulerDernierActeAutre() {
+        if (!dernierActeAutre) return;
+        setAnnulationAutreEnCours(true);
+        try {
+            await annulerActeJour(conseillerId, dernierActeAutre);
+            setConfirmAnnulationAutre(false);
+            await chargerDernierActeAutre();
+        } finally {
+            setAnnulationAutreEnCours(false);
         }
     }
 
@@ -145,9 +176,6 @@ export default function CorrigerVentesJourCard({ conseillerId, ventesAujourdhui,
                 🛠️ Corriger mes ventes du jour
             </p>
             <p className="mt-1 font-black text-slate-900">Une erreur de saisie aujourd'hui ?</p>
-            <p className="mt-1 text-sm text-slate-400">
-                Rien n'est supprimé de ton historique — seuls les totaux du jour sont corrigés.
-            </p>
 
             {/* Annuler la dernière vente */}
             <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-4">
@@ -192,6 +220,45 @@ export default function CorrigerVentesJourCard({ conseillerId, ventesAujourdhui,
                     <p className="text-sm text-slate-400">Pas encore de vente aujourd'hui.</p>
                 )}
             </div>
+
+            {/* Annuler le dernier acte annexe (Canal+, déstockage, assurance essentielle, 4P, boost) */}
+            {dernierActeAutre && (
+                <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-sm font-black text-slate-800">Dernier acte annexe</p>
+                            <p className="text-xs text-slate-400">
+                                {dernierActeAutre.label} · +{dernierActeAutre.montant.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} € à{" "}
+                                {new Date(dernierActeAutre.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                        </div>
+                        {!confirmAnnulationAutre ? (
+                            <button
+                                onClick={() => setConfirmAnnulationAutre(true)}
+                                className="shrink-0 rounded-xl border border-red-200 bg-white px-4 py-2 text-xs font-black text-red-500 transition-all hover:bg-red-50"
+                            >
+                                Annuler cet acte
+                            </button>
+                        ) : (
+                            <div className="flex shrink-0 gap-2">
+                                <button
+                                    onClick={() => setConfirmAnnulationAutre(false)}
+                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500"
+                                >
+                                    Non
+                                </button>
+                                <button
+                                    onClick={handleAnnulerDernierActeAutre}
+                                    disabled={annulationAutreEnCours}
+                                    className="rounded-xl bg-red-500 px-3 py-2 text-xs font-black text-white hover:bg-red-600 disabled:opacity-60"
+                                >
+                                    {annulationAutreEnCours ? "…" : "Confirmer"}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Corriger une carte */}
             <div className="mt-4 flex flex-wrap gap-2">

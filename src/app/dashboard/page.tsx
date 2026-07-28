@@ -37,10 +37,11 @@ import {
     getBonusManuels,
     getCagnotteJour,
     enregistrerActeJour,
-    annulerActeJour,
     compterVentesMoisParProduit,
     jourCourant,
 } from "@/services/variableConseiller";
+import { creerFicheBoxRaccordement } from "@/services/boxRaccordement";
+import { creerForfait4PDiffere } from "@/services/forfait4P";
 
 const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
 
@@ -518,6 +519,13 @@ export default function Dashboard() {
             setCagnotteFlash({ key: Date.now(), montant });
             setCagnotteActes((prev) => [...prev, acte]);
 
+            // Box payée au raccordement (M+2) : une fiche de suivi est créée immédiatement,
+            // avec le barème du mois figé — indépendant du barème qui sera en vigueur au
+            // moment où le conseiller validera le raccordement.
+            if (option.champ === "box_ultra" || option.champ === "box_pop" || option.champ === "box_pop_s_revolution_5g") {
+                creerFicheBoxRaccordement(conseillerId, option.champ, bareme).catch(() => {});
+            }
+
             const famille = familleBoostPour(option.produitCode);
             if (famille && famille.montantBoost > 0) {
                 const totalMois = await compterVentesMoisParProduit(conseillerId, famille.produitCode);
@@ -529,19 +537,6 @@ export default function Dashboard() {
             }
         } catch { /* silencieux — la cagnotte n'est pas critique pour l'usage courant */ }
         return undefined;
-    }
-
-    // Annule le dernier acte "Autres actes" — uniquement s'il s'agit bien du tout dernier acte
-    // du jour (pas rattaché à une carte produit, qui elle se corrige sur /dashboard/stats).
-    async function annulerDernierActeAutre() {
-        if (!conseillerId) return;
-        const dernier = cagnotteActes[cagnotteActes.length - 1];
-        if (!dernier || dernier.produitCode) return;
-        try {
-            await annulerActeJour(conseillerId, dernier);
-            setCagnotteTotal((prev) => prev - dernier.montant);
-            setCagnotteActes((prev) => prev.slice(0, -1));
-        } catch { /* silencieux */ }
     }
 
     // Box et McAfee sont payés à M+2 : le champ identifie le sous-type (pour la cagnotte et la
@@ -571,6 +566,16 @@ export default function Dashboard() {
     // Sans accents pour matcher "Téléphones"/"telephones" indifféremment
     function normaliser(s: string): string {
         return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    }
+
+    // Ordre d'affichage des cartes Accueil : Box - McAfee / Téléphones - Assurance / Forfaits - Spiderhome
+    const ORDRE_ACCUEIL = ["box", "mcafee", "telephones", "assurance", "forfaits", "spiderhome"];
+    function ordonnerAccueil(liste: MissionDashboard[]): MissionDashboard[] {
+        return [...liste].sort((a, b) => {
+            const ia = ORDRE_ACCUEIL.indexOf(normaliser(a.produit));
+            const ib = ORDRE_ACCUEIL.indexOf(normaliser(b.produit));
+            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
     }
 
     function sousChoixPour(titre: string): ChoixActe[] | undefined {
@@ -948,7 +953,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="grid gap-5 sm:grid-cols-2">
-                    {missions.map((mission) => (
+                    {ordonnerAccueil(missions).map((mission) => (
                         <MissionCard
                             key={mission.produit}
                             titre={mission.produit}
@@ -961,7 +966,14 @@ export default function Dashboard() {
                             onChoixVariable={variableActivee ? ajouterActeVariable : undefined}
                             demanderCrossSell4P={variableActivee ? demanderCrossSell4PPour(mission.produit) : false}
                             montantCrossSell4P={bareme.cross_sell_4p}
-                            onCrossSell4P={variableActivee ? async () => { await ajouterActeVariable(VENTE_4P_ACTE); } : undefined}
+                            onCrossSell4P={variableActivee ? async () => {
+                                await ajouterActeVariable(VENTE_4P_ACTE);
+                                // Le forfait lui-même reste sur le mois en cours ; seul son bonus 4P
+                                // est différé à M+2 (le 4P sur box est déjà géré via le raccordement).
+                                if (normaliser(mission.produit) === "forfaits" && conseillerId) {
+                                    creerForfait4PDiffere(conseillerId, bareme.cross_sell_4p).catch(() => {});
+                                }
+                            } : undefined}
                             onBoostReady={afficherBoostToast}
                         />
                     ))}
@@ -973,8 +985,6 @@ export default function Dashboard() {
                     bareme={bareme}
                     bonusManuels={bonusManuels}
                     onChoisir={ajouterActeVariable}
-                    dernierActe={cagnotteActes[cagnotteActes.length - 1]}
-                    onAnnulerDernier={annulerDernierActeAutre}
                 />
             )}
 

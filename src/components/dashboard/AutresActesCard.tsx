@@ -2,39 +2,19 @@
 
 import { useState } from "react";
 import ChoixActeModal, { ChoixActe } from "./ChoixActeModal";
-import { BaremeVariable, BonusManuel, ActeJour } from "@/services/variableConseiller";
+import { BaremeVariable, BonusManuel } from "@/services/variableConseiller";
 
 type Props = {
     bareme: BaremeVariable;
     bonusManuels: BonusManuel[];
     onChoisir: (option: ChoixActe) => void;
-    /** Dernier acte de la journée (toutes cartes confondues) — l'annulation n'est proposée
-     * que si celui-ci vient bien d'"Autres actes" (pas rattaché à une carte produit). */
-    dernierActe?: ActeJour;
-    onAnnulerDernier: () => Promise<void>;
 };
 
 const DESTOCKAGE_SENTINEL = "__destockage__";
 
-function fmtEuro(n: number) {
-    return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
-}
-
-export default function AutresActesCard({ bareme, bonusManuels, onChoisir, dernierActe, onAnnulerDernier }: Props) {
+export default function AutresActesCard({ bareme, bonusManuels, onChoisir }: Props) {
     const [open, setOpen] = useState(false);
     const [sousMenu, setSousMenu] = useState(false);
-    const [annulationEnCours, setAnnulationEnCours] = useState(false);
-
-    const peutAnnuler = !!dernierActe && !dernierActe.produitCode;
-
-    async function handleAnnuler() {
-        setAnnulationEnCours(true);
-        try {
-            await onAnnulerDernier();
-        } finally {
-            setAnnulationEnCours(false);
-        }
-    }
 
     // Box, Canal+ et migration fibre sont payés à M+2 : pas de sync avec le simulateur mensuel,
     // le conseiller les déclare lui-même sur /dashboard/variable — seule la cagnotte du jour est alimentée ici.
@@ -91,21 +71,6 @@ export default function AutresActesCard({ bareme, bonusManuels, onChoisir, derni
                         + Déclarer
                     </button>
                 </div>
-
-                {peutAnnuler && dernierActe && (
-                    <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
-                        <span className="text-xs font-semibold text-slate-500">
-                            Dernier ajout : {dernierActe.label} (+{fmtEuro(dernierActe.montant)})
-                        </span>
-                        <button
-                            onClick={handleAnnuler}
-                            disabled={annulationEnCours}
-                            className="shrink-0 rounded-xl border border-red-200 bg-white px-3 py-1.5 text-xs font-black text-red-500 transition-all hover:bg-red-50 disabled:opacity-60"
-                        >
-                            {annulationEnCours ? "…" : "Annuler"}
-                        </button>
-                    </div>
-                )}
             </section>
 
             {open && (

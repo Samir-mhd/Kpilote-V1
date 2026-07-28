@@ -20,6 +20,13 @@ import {
     BonusVolumes,
 } from "@/services/variableConseiller";
 import { CATEGORIES_VENTES, NumberField, CardShell, BonusManuelsCard, BonusManuelsInline, DetailResultatsCard } from "@/components/variable/variableUi";
+import BoxRaccordementTab from "@/components/variable/BoxRaccordementTab";
+import { getContributionBoxMoisPaiement, nomMois, ContributionBoxMoisPaiement } from "@/services/boxRaccordement";
+import { getContributionForfait4PMoisPaiement, ContributionForfait4P } from "@/services/forfait4P";
+
+// Le temps de prendre du recul sur le raccordement M+2, la saisie manuelle de la box reste
+// ouverte jusqu'à cette date — ensuite, seuls les raccordements alimentent la box.
+const VERROUILLAGE_BOX = new Date(2026, 8, 1); // 01/09/2026
 
 function VariableInner() {
     const searchParams = useSearchParams();
@@ -34,8 +41,18 @@ function VariableInner() {
     const [loading, setLoading] = useState(true);
     const [enregistre, setEnregistre] = useState(true);
     const [variableActivee, setVariableActivee] = useState(true);
+    const [ongletBox, setOngletBox] = useState(false);
+    const [contributionBox, setContributionBox] = useState<ContributionBoxMoisPaiement | null>(null);
+    const [contributionForfait4P, setContributionForfait4P] = useState<ContributionForfait4P | null>(null);
 
     const mois = useMemo(() => moisCourant(), []);
+    // Mois M-2 : les box payées ce mois-ci reflètent le R/O du mois où elles ont été vendues.
+    const moisM2 = useMemo(() => {
+        const [y, m] = mois.split("-").map(Number);
+        const d = new Date(y, m - 1 - 2, 1);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+    }, [mois]);
+    const boxVerrouille = useMemo(() => new Date() >= VERROUILLAGE_BOX, []);
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const chargeInitiale = useRef(true);
 
@@ -65,6 +82,13 @@ function VariableInner() {
             }
         );
     }, [conseillerId, mois]);
+
+    // Contributions figées (box raccordées + bonus 4P forfait) ce mois — M+2, indépendantes du barème affiché.
+    useEffect(() => {
+        if (!conseillerId) return;
+        getContributionBoxMoisPaiement(conseillerId, mois).then(setContributionBox).catch(() => {});
+        getContributionForfait4PMoisPaiement(conseillerId, mois).then(setContributionForfait4P).catch(() => {});
+    }, [conseillerId, mois, ongletBox]);
 
     // Live : les boosts constructeur/déstockage ajoutés par le manager apparaissent sans recharger la page
     useEffect(() => {
@@ -144,16 +168,37 @@ function VariableInner() {
                             Saisis tes actes au fil du mois, le montant se met à jour tout seul.
                         </p>
                     </div>
-                    <span className={`shrink-0 rounded-2xl px-4 py-2 text-xs font-black ${enregistre ? "bg-emerald-500/15 text-emerald-300" : "bg-white/8 text-white/40"}`}>
-                        {enregistre ? "Enregistré ✓" : "Enregistrement…"}
-                    </span>
+                    <div className="flex flex-col items-end gap-3">
+                        <span className={`shrink-0 rounded-2xl px-4 py-2 text-xs font-black ${enregistre ? "bg-emerald-500/15 text-emerald-300" : "bg-white/8 text-white/40"}`}>
+                            {enregistre ? "Enregistré ✓" : "Enregistrement…"}
+                        </span>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setOngletBox(false)}
+                                className={`rounded-2xl px-4 py-2.5 text-sm font-bold transition-all ${!ongletBox ? "bg-white text-slate-900" : "bg-white/8 text-white/60 hover:bg-white/15"}`}
+                            >
+                                Simulation
+                            </button>
+                            <button
+                                onClick={() => setOngletBox(true)}
+                                className={`rounded-2xl px-4 py-2.5 text-sm font-bold transition-all ${ongletBox ? "bg-white text-slate-900" : "bg-white/8 text-white/60 hover:bg-white/15"}`}
+                            >
+                                📦 Mes box
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
+            {ongletBox ? (
+                <BoxRaccordementTab conseillerId={conseillerId} bareme={bareme} />
+            ) : (
             <div className="grid grid-cols-1 gap-7 lg:grid-cols-[1.3fr_1fr]">
                 {/* ── Formulaire ─────────────────────────────────────────────── */}
                 <div className="space-y-6">
-                    {CATEGORIES_VENTES.map((cat) => (
+                    {CATEGORIES_VENTES.map((cat) => {
+                        const champVerrouille = cat.categorieKey === "box" && boxVerrouille;
+                        return (
                         <CardShell key={cat.titre}>
                             <p className={`mb-4 text-xs font-black uppercase tracking-widest ${cat.accent}`}>
                                 {cat.titre}
@@ -165,9 +210,15 @@ function VariableInner() {
                                         label={c.label}
                                         value={ventes[c.key]}
                                         onChange={(v) => updateVente(c.key, v)}
+                                        readOnly={champVerrouille}
                                     />
                                 ))}
                             </div>
+                            {champVerrouille && (
+                                <p className="mt-3 text-[11px] text-white/30">
+                                    🔒 Depuis le 01/09/2026, la box n'est plus déclarée ici — elle est alimentée automatiquement par tes raccordements (onglet "📦 Mes box").
+                                </p>
+                            )}
                             {bonusManuels.some((b) => b.categorie === cat.categorieKey) && (
                                 <div className="mt-4 border-t border-white/10 pt-4">
                                     <BonusManuelsInline
@@ -179,7 +230,8 @@ function VariableInner() {
                                 </div>
                             )}
                         </CardShell>
-                    ))}
+                        );
+                    })}
 
                     {/* Satisfaction & présence */}
                     <CardShell>
@@ -231,10 +283,17 @@ function VariableInner() {
                             Contexte boutique (R/O du mois)
                         </p>
                         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                            <NumberField label="R/O box boutique (%)" value={boost.ro_box_boutique} onChange={(v) => updateBoost("ro_box_boutique", v)} />
+                            <NumberField
+                                label={`R/O box boutique — ${nomMois(moisM2)} (%)`}
+                                value={boost.ro_box_boutique}
+                                onChange={(v) => updateBoost("ro_box_boutique", v)}
+                            />
                             <NumberField label="R/O forfait boutique (%)" value={boost.ro_forfait_boutique} onChange={(v) => updateBoost("ro_forfait_boutique", v)} />
                             <NumberField label="R/O smartphone boutique (%)" value={boost.ro_smartphone_boutique} onChange={(v) => updateBoost("ro_smartphone_boutique", v)} />
                         </div>
+                        <p className="mt-2 text-[11px] text-white/30">
+                            Les box sont payées à M+2 : le boost collectif box de ce mois se base sur le R/O du mois où elles ont été vendues ({nomMois(moisM2)}), pas sur le R/O de ce mois-ci.
+                        </p>
                     </CardShell>
 
                     <BonusManuelsCard
@@ -247,9 +306,28 @@ function VariableInner() {
 
                 {/* ── Résultats ──────────────────────────────────────────────── */}
                 <div className="lg:sticky lg:top-7 lg:self-start">
-                    <DetailResultatsCard detail={detail} />
+                    <DetailResultatsCard
+                        detail={detail}
+                        extra={(() => {
+                            const nb4PBox = contributionBox?.nb4P ?? 0;
+                            const nb4PForfait = contributionForfait4P?.nb ?? 0;
+                            const nb4PTotal = nb4PBox + nb4PForfait;
+                            const montant4PTotal = (contributionBox?.prime4P ?? 0) + (contributionForfait4P?.montantTotal ?? 0);
+                            const boxHors4P = (contributionBox?.total ?? 0) - (contributionBox?.prime4P ?? 0);
+                            return [
+                                { label: `Box raccordées (${nomMois(moisM2)}, figé)`, montant: boxHors4P },
+                                {
+                                    label: nb4PTotal > 0
+                                        ? `${nb4PTotal} abonnés 4P en ${nomMois(moisM2)} dont ${nb4PForfait} sur le forfait et ${nb4PBox} sur la box`
+                                        : "",
+                                    montant: montant4PTotal,
+                                },
+                            ];
+                        })()}
+                    />
                 </div>
             </div>
+            )}
         </main>
     );
 }

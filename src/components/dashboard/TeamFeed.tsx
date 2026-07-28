@@ -16,7 +16,7 @@ type Entry = {
     message: string;
 };
 
-type Counts = Record<string, { total: number; byCode: Record<string, number> }>;
+type Counts = Record<string, { total: number }>;
 
 function timeAgo(iso: string): string {
     const diff = Date.now() - new Date(iso).getTime();
@@ -57,17 +57,17 @@ function computeRanks(counts: Counts): Record<string, number> {
     return ranks;
 }
 
+// Priorité au nombre réalisé (countToday) : le message reflète toujours l'ampleur réelle de
+// la journée, jamais éclipsé par une répétition sur un même produit.
 function buildMessage(
     prenom: string,
     produitCode: string,
     produitNom: string,
     countToday: number,
-    codeCountToday: number,
     rankAfter: number,
     rankBefore: number,
     genre?: string | null,
 ): string {
-    const il = genre === "F" ? "elle" : genre === "H" ? "il" : "il/elle";
     const e = feedEmoji(produitCode);
     const label = produitLabel(produitCode, produitNom);
 
@@ -119,24 +119,26 @@ function buildMessage(
         ]);
     }
 
-    if (codeCountToday >= 3) {
-        return pick("streak3", [
-            `${prenom} enchaîne ${codeCountToday} ${label} aujourd'hui — machine ! ${e}`,
-            `${codeCountToday} ${label} pour ${prenom} ce jour — incroyable ! ${e}`,
-            `${prenom} est devenu expert ${label} aujourd'hui ! ${e}`,
-            `${prenom} avec son ${codeCountToday}ème ${label} du jour — imparable ! ${e}`,
-            `${label} x${codeCountToday} pour ${prenom} aujourd'hui ! ${e}`,
-            `${prenom} adore le ${label} — ${codeCountToday} dans la journée ! ${e}`,
+    if (countToday === 3) {
+        return pick("triple", [
+            `${prenom} signe sa 3ème vente du jour ! ${e}`,
+            `Triplé pour ${prenom} aujourd'hui ! ${e}`,
+            `${prenom} enchaîne les ventes — 3 au compteur ! ${e}`,
+            `Hat-trick pour ${prenom} ! ${e}`,
+            `3 ventes pour ${prenom} — belle journée en vue ! ${e}`,
+            `${prenom} à 3 ventes et ça sent bon ! ${e}`,
+            `Le triplé pour ${prenom} — respect ! ${e}`,
         ]);
     }
 
-    if (codeCountToday === 2) {
-        return pick("streak2", [
-            `${prenom} remet ça avec un ${label} ! ${e}`,
-            `2ème ${label} pour ${prenom} aujourd'hui — ça colle bien ! ${e}`,
-            `${prenom} confirme sur le ${label}, 2 dans la journée ! ${e}`,
-            `${label} x2 pour ${prenom} — ${il} maîtrise ! ${e}`,
-            `${prenom} double la mise sur le ${label} ! ${e}`,
+    if (countToday >= 4 && countToday < 6) {
+        return pick("fire4", [
+            `${prenom} signe sa ${ord(countToday)} vente du jour — en feu ! 🔥`,
+            `${prenom} enchaîne, ${countToday} ventes dans la journée ! 💪`,
+            `${ord(countToday)} pour ${prenom} — la machine tourne ! ${e}`,
+            `${prenom} continue sur sa lancée — ${countToday} ventes ! ${e}`,
+            `${prenom} régale l'équipe — ${countToday} ventes aujourd'hui ! 💪`,
+            `Série en cours pour ${prenom} — ${countToday} au compteur ! ${e}`,
         ]);
     }
 
@@ -148,29 +150,6 @@ function buildMessage(
             `${prenom} cartonne — ${countToday} ventes ce jour ! 🏆`,
             `${countToday} ventes pour ${prenom} — légende de la journée ! 🔥`,
             `${prenom} déchire tout — ${countToday} ventes et ça continue ! 💥`,
-        ]);
-    }
-
-    if (countToday >= 4) {
-        return pick("fire4", [
-            `${prenom} signe sa ${ord(countToday)} vente du jour — en feu ! 🔥`,
-            `${prenom} enchaîne, ${countToday} ventes dans la journée ! 💪`,
-            `${ord(countToday)} pour ${prenom} — la machine tourne ! ${e}`,
-            `${prenom} continue sur sa lancée — ${countToday} ventes ! ${e}`,
-            `${prenom} régale l'équipe — ${countToday} ventes aujourd'hui ! 💪`,
-            `Série en cours pour ${prenom} — ${countToday} au compteur ! ${e}`,
-        ]);
-    }
-
-    if (countToday === 3) {
-        return pick("triple", [
-            `${prenom} signe sa 3ème vente du jour ! ${e}`,
-            `Triplé pour ${prenom} aujourd'hui ! ${e}`,
-            `${prenom} enchaîne les ventes — 3 au compteur ! ${e}`,
-            `Hat-trick pour ${prenom} ! ${e}`,
-            `3 ventes pour ${prenom} — belle journée en vue ! ${e}`,
-            `${prenom} à 3 ventes et ça sent bon ! ${e}`,
-            `Le triplé pour ${prenom} — respect ! ${e}`,
         ]);
     }
 
@@ -196,7 +175,6 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
     const [entries, setEntries] = useState<Entry[]>([]);
     const [dbError, setDbError] = useState<string | null>(null);
     const namesRef    = useRef<Record<string, string>>({});
-    const genresRef   = useRef<Record<string, string | null>>({});
     const countsRef   = useRef<Counts>({});
     const ranksRef    = useRef<Record<string, number>>({});
     const produitsRef = useRef<Record<string, string>>({}); // produit_id -> code (pour le realtime, sans jointure)
@@ -236,16 +214,6 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
             });
             namesRef.current = map;
             actifsRef.current = amap;
-
-            // Fetch genre séparément — résistant si la colonne n'existe pas encore
-            const gmap: Record<string, string | null> = {};
-            try {
-                const resG = await supabase.from("conseillers").select("id, genre");
-                if (!resG.error && resG.data) {
-                    resG.data.forEach((c: any) => { gmap[c.id] = c.genre ?? null; });
-                }
-            } catch { /* colonne absente ou erreur réseau — on ignore */ }
-            genresRef.current = gmap;
 
             // Spiderhome = historisation, profil désactivé = restreint → exclus du feed (comme partout ailleurs)
             const rawVentes = (resV.data ?? []).filter((v: any) =>
@@ -287,9 +255,8 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
 
                 const rankBefore = tempRanks[cid] ?? nbConseillers;
 
-                if (!tempCounts[cid]) tempCounts[cid] = { total: 0, byCode: {} };
+                if (!tempCounts[cid]) tempCounts[cid] = { total: 0 };
                 tempCounts[cid].total++;
-                tempCounts[cid].byCode[produitCode] = (tempCounts[cid].byCode[produitCode] ?? 0) + 1;
 
                 const newRanks = computeRanks(tempCounts);
                 Object.assign(tempRanks, newRanks);
@@ -308,10 +275,8 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
                         produitCode,
                         produitNom,
                         tempCounts[cid].total,
-                        tempCounts[cid].byCode[produitCode],
                         rankAfter,
                         rankBefore,
-                        gmap[cid],
                     ),
                 });
             });
@@ -368,9 +333,8 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
                 const produitCode = v.produit_code ?? "";
                 const produitNom = v.produit_nom ?? produitCode;
 
-                if (!countsRef.current[cid]) countsRef.current[cid] = { total: 0, byCode: {} };
+                if (!countsRef.current[cid]) countsRef.current[cid] = { total: 0 };
                 countsRef.current[cid].total++;
-                countsRef.current[cid].byCode[produitCode] = (countsRef.current[cid].byCode[produitCode] ?? 0) + 1;
 
                 ranksRef.current = computeRanks(countsRef.current);
                 const rankAfter = ranksRef.current[cid] ?? 1;
@@ -388,10 +352,8 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
                         produitCode,
                         produitNom,
                         countsRef.current[cid].total,
-                        countsRef.current[cid].byCode[produitCode],
                         rankAfter,
                         rankBefore,
-                        genresRef.current[cid],
                     ),
                 };
                 setEntries(prev => [entry, ...prev].slice(0, 15));
