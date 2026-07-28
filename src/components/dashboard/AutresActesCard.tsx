@@ -81,7 +81,7 @@ export default function AutresActesCard({ bareme, bonusManuels, onChoisir, derni
                         </p>
                         <h3 className="mt-1 text-lg font-black text-slate-900">Autres actes</h3>
                         <p className="mt-1 text-sm text-slate-500">
-                            Boosts, Canal+, vente 4P, assurance essentielle, déstockage…
+                            Canal+, assurance essentielle, déstockage…
                         </p>
                     </div>
                     <button
