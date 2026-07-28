@@ -12,6 +12,10 @@ type Props = {
     sousChoix?: ChoixActe[];
     acteDirect?: ChoixActe;
     onChoixVariable?: (option: ChoixActe) => void | Promise<void>;
+    /** Après le choix du modèle (Box/Forfait), propose "T'as fait une 4P ?" */
+    demanderCrossSell4P?: boolean;
+    montantCrossSell4P?: number;
+    onCrossSell4P?: () => void | Promise<void>;
 };
 
 // Mapping couleur Tailwind → hex (pour le SVG arc) + gradient (pour la barre/bouton)
@@ -83,11 +87,16 @@ function genParticles(): Particle[] {
     }));
 }
 
-export default function MissionCard({ titre, realise, objectif, couleur, onSale, sousChoix, acteDirect, onChoixVariable }: Props) {
+export default function MissionCard({
+    titre, realise, objectif, couleur, onSale, sousChoix, acteDirect, onChoixVariable,
+    demanderCrossSell4P, montantCrossSell4P, onCrossSell4P,
+}: Props) {
     const [celebrating, setCelebrating] = useState(false);
     const [celebEmoji, setCelebEmoji] = useState("🎉");
     const [particles,  setParticles]  = useState<Particle[]>([]);
     const [modalOuverte, setModalOuverte] = useState(false);
+    const [question4POuverte, setQuestion4POuverte] = useState(false);
+    const [envoi4PEnCours, setEnvoi4PEnCours] = useState(false);
 
     const pal   = PALETTE[couleur] ?? DEFAULT_PAL;
     const pct   = objectif > 0 ? Math.min(Math.round((realise / objectif) * 100), 100) : 0;
@@ -105,6 +114,8 @@ export default function MissionCard({ titre, realise, objectif, couleur, onSale,
         if (choix) await onChoixVariable?.(choix);
         setTimeout(() => setParticles([]), 750);
         setTimeout(() => setCelebrating(false), 1600);
+        // Uniquement après un choix de modèle (Box/Forfait) — pas sur les cartes à acte direct
+        if (choix && demanderCrossSell4P) setQuestion4POuverte(true);
     }
 
     function handleSale() {
@@ -119,6 +130,17 @@ export default function MissionCard({ titre, realise, objectif, couleur, onSale,
     function handleChoix(choix: ChoixActe) {
         setModalOuverte(false);
         declencherVente(choix);
+    }
+
+    async function handleReponse4P(oui: boolean) {
+        if (!oui) { setQuestion4POuverte(false); return; }
+        setEnvoi4PEnCours(true);
+        try {
+            await onCrossSell4P?.();
+        } finally {
+            setEnvoi4PEnCours(false);
+            setQuestion4POuverte(false);
+        }
     }
 
     return (
@@ -259,6 +281,37 @@ export default function MissionCard({ titre, realise, objectif, couleur, onSale,
                     onChoisir={handleChoix}
                     onClose={() => setModalOuverte(false)}
                 />
+            )}
+
+            {question4POuverte && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                    onClick={() => !envoi4PEnCours && setQuestion4POuverte(false)}
+                >
+                    <div
+                        className="mx-4 w-full max-w-xs rounded-[28px] bg-slate-900 p-7 text-center shadow-[0_24px_64px_rgba(0,0,0,.5)]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <p className="text-4xl">🔀</p>
+                        <p className="mt-3 text-lg font-black text-white">T'as fait une 4P ?</p>
+                        <div className="mt-6 flex gap-3">
+                            <button
+                                onClick={() => handleReponse4P(false)}
+                                disabled={envoi4PEnCours}
+                                className="flex-1 rounded-2xl border-2 border-white/15 py-3 text-sm font-bold text-white/60 transition-all hover:bg-white/5 disabled:opacity-50"
+                            >
+                                Non
+                            </button>
+                            <button
+                                onClick={() => handleReponse4P(true)}
+                                disabled={envoi4PEnCours}
+                                className="flex-1 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 py-3 text-sm font-black text-white transition-all hover:opacity-90 disabled:opacity-60"
+                            >
+                                {envoi4PEnCours ? "…" : `Oui +${(montantCrossSell4P ?? 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             <style>{`

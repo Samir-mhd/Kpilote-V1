@@ -36,10 +36,11 @@ export default function AutresActesCard({ bareme, bonusManuels, onChoisir, derni
         }
     }
 
-    // Box, Canal+, migration fibre et 4P sont payés à M+2 : pas de sync avec le simulateur mensuel,
+    // Box, Canal+ et migration fibre sont payés à M+2 : pas de sync avec le simulateur mensuel,
     // le conseiller les déclare lui-même sur /dashboard/variable — seule la cagnotte du jour est alimentée ici.
     // Les boosts individuels (box/forfait/smartphone) ne sont plus déclarés ici : ils s'ajoutent
     // automatiquement à la cagnotte dès que le seuil défini par le manager est dépassé.
+    // La vente 4P se déclare désormais juste après une vente box/forfait ("T'as fait une 4P ?").
     // Un produit "retiré de la vente" par le manager (croix sur /manager/variable) disparaît d'ici aussi.
     const masques = bareme.champsMasques ?? [];
     const optionsPrincipales: ChoixActe[] = [
@@ -47,7 +48,6 @@ export default function AutresActesCard({ bareme, bonusManuels, onChoisir, derni
         !masques.includes("canal_option2") && { label: "Canal+ Option 2", montant: bareme.canal_option2 },
         !masques.includes("canal_option3") && { label: "Canal+ Option 3", montant: bareme.canal_option3 },
         { label: "Boost déstockage / constructeur", bonusManuelId: DESTOCKAGE_SENTINEL },
-        !masques.includes("cross_sell_4p") && { label: "Vente 4P", montant: bareme.cross_sell_4p },
         !masques.includes("assurance_essentielle") && { label: "Assurance essentielle", montant: bareme.assurance_essentielle, champ: "assurance_essentielle" },
     ].filter(Boolean) as ChoixActe[];
 

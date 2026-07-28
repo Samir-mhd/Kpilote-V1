@@ -585,6 +585,15 @@ export default function Dashboard() {
         }
     }
 
+    // Après le choix du modèle sur Box ou Forfait : question de rebond "T'as fait une 4P ?"
+    // (remplace l'ancienne déclaration manuelle dans "Autres actes").
+    const VENTE_4P_ACTE: ChoixActe = { label: "Vente 4P", montant: bareme.cross_sell_4p };
+    function demanderCrossSell4PPour(titre: string): boolean {
+        if (champMasque("cross_sell_4p")) return false;
+        const n = normaliser(titre);
+        return n === "box" || n === "forfaits";
+    }
+
     return (
         <div className="space-y-8">
 
@@ -945,6 +954,9 @@ export default function Dashboard() {
                             sousChoix={variableActivee ? sousChoixPour(mission.produit) : undefined}
                             acteDirect={variableActivee ? acteDirectPour(mission.produit) : undefined}
                             onChoixVariable={variableActivee ? ajouterActeVariable : undefined}
+                            demanderCrossSell4P={variableActivee ? demanderCrossSell4PPour(mission.produit) : false}
+                            montantCrossSell4P={bareme.cross_sell_4p}
+                            onCrossSell4P={variableActivee ? () => ajouterActeVariable(VENTE_4P_ACTE) : undefined}
                         />
                     ))}
                 </div>
