@@ -1,6 +1,7 @@
 type LignePDF = {
     nom: string;
     cellules: Record<string, { objectif: number } | undefined>;
+    photoUrl?: string | null;
 };
 
 type ColonnePDF = { label: string; code: string };
@@ -9,6 +10,26 @@ const MOIS_FR = [
     "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
     "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
 ];
+
+// Même palette/logique que InitialesAvatar.tsx, transposée en CSS pur pour le PDF imprimé.
+const GRADIENTS_AVATAR = [
+    ["#8b5cf6", "#9333ea"], ["#3b82f6", "#0891b2"], ["#10b981", "#16a34a"],
+    ["#f97316", "#f59e0b"], ["#ec4899", "#e11d48"], ["#6366f1", "#2563eb"],
+    ["#14b8a6", "#059669"], ["#d946ef", "#7c3aed"],
+];
+function gradientPourNom(nom: string): [string, string] {
+    let h = 0;
+    for (const c of nom) h = (h * 31 + c.charCodeAt(0)) & 0xffff;
+    return GRADIENTS_AVATAR[h % GRADIENTS_AVATAR.length] as [string, string];
+}
+function avatarHTML(nom: string, photoUrl?: string | null): string {
+    if (photoUrl) {
+        return `<img class="avatar" src="${photoUrl}" alt="${nom}" width="34" height="34" />`;
+    }
+    const [c1, c2] = gradientPourNom(nom);
+    const initiale = (nom ?? "?").charAt(0).toUpperCase();
+    return `<div class="avatar avatar-fallback" style="background: linear-gradient(135deg, ${c1}, ${c2});">${initiale}</div>`;
+}
 
 function construireEtOuvrirPDF(titre: string, sousTitre: string, lignes: LignePDF[], colonnes: ColonnePDF[]): void {
     const dateGen = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
@@ -20,7 +41,7 @@ function construireEtOuvrirPDF(titre: string, sousTitre: string, lignes: LignePD
                 ? `<td><span class="chip">${val}</span></td>`
                 : `<td><span class="empty">—</span></td>`;
         }).join("");
-        return `<tr class="${i % 2 === 1 ? "alt" : ""}"><td class="nom">${ligne.nom}</td>${cellules}</tr>`;
+        return `<tr class="${i % 2 === 1 ? "alt" : ""}"><td class="nom"><div class="nom-cell">${avatarHTML(ligne.nom, ligne.photoUrl)}<span>${ligne.nom}</span></div></td>${cellules}</tr>`;
     }).join("");
 
     const headersCols = colonnes.map(c => `<th>${c.label}</th>`).join("");
@@ -85,6 +106,9 @@ function construireEtOuvrirPDF(titre: string, sousTitre: string, lignes: LignePD
       text-transform: uppercase; color: rgba(255,255,255,0.65);
     }
 
+    .header-top {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+    }
     .header h1 {
       font-size: 30px; font-weight: 900; color: #fff; line-height: 1.15;
       letter-spacing: -0.5px;
@@ -93,6 +117,15 @@ function construireEtOuvrirPDF(titre: string, sousTitre: string, lignes: LignePD
       margin-top: 5px; font-size: 13px;
       color: rgba(255,255,255,0.6); font-weight: 500;
     }
+    .header-badge {
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.14);
+      border-radius: 14px;
+      padding: 10px 18px;
+      text-align: center;
+    }
+    .header-badge .n { font-size: 22px; font-weight: 900; color: #fff; }
+    .header-badge .lbl { font-size: 9px; font-weight: 800; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(255,255,255,0.6); }
 
     /* ─── Contenu ─── */
     .content {
@@ -100,40 +133,64 @@ function construireEtOuvrirPDF(titre: string, sousTitre: string, lignes: LignePD
     }
 
     /* ─── Table ─── */
+    .table-wrap {
+      border-radius: 18px;
+      border: 1px solid #ececf4;
+      box-shadow: 0 8px 28px rgba(76, 29, 149, 0.08);
+      overflow: hidden;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
     }
     thead th {
-      padding: 10px 14px;
+      padding: 13px 14px;
       font-size: 9.5px; font-weight: 800;
       letter-spacing: 0.22em; text-transform: uppercase;
-      color: #94a3b8; text-align: center;
-      border-bottom: 2px solid #e2e8f0;
+      color: #7c3aed; text-align: center;
+      background: #f8f6ff;
+      border-bottom: 1px solid #ececf4;
     }
     thead th:first-child { text-align: left; }
 
     tbody tr { border-bottom: 1px solid #f1f5f9; }
-    tbody tr.alt td { background: #fafbfe; }
+    tbody tr.alt td { background: #fbfafe; }
     tbody tr:last-child { border-bottom: none; }
 
     tbody td {
-      padding: 12px 14px;
+      padding: 10px 14px;
       text-align: center;
       vertical-align: middle;
     }
     td.nom {
       text-align: left;
-      font-size: 15px; font-weight: 800; color: #1e293b;
       white-space: nowrap;
+    }
+    .nom-cell {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .nom-cell span {
+      font-size: 14.5px; font-weight: 800; color: #1e293b;
+    }
+    .avatar {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow: 0 0 0 2px #fff, 0 0 0 3px #ece7fc;
+      flex-shrink: 0;
+    }
+    .avatar-fallback {
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: 900; font-size: 14px;
     }
 
     .chip {
       display: inline-block;
-      background: #f1f5f9;
-      border-radius: 10px;
-      padding: 6px 18px;
-      font-size: 17px; font-weight: 900; color: #1e293b;
+      background: linear-gradient(180deg, #f8f6ff, #f1edfe);
+      border: 1px solid #ece5fc;
+      border-radius: 12px;
+      padding: 7px 20px;
+      font-size: 17px; font-weight: 900; color: #4c1d95;
       min-width: 54px;
     }
     .empty { color: #cbd5e1; font-size: 14px; }
@@ -169,11 +226,20 @@ function construireEtOuvrirPDF(titre: string, sousTitre: string, lignes: LignePD
       <div class="logo-box">K</div>
       <span class="logo-label">KPILOTE Manager</span>
     </div>
-    <h1>${titre}</h1>
-    <p class="sub">${sousTitre}</p>
+    <div class="header-top">
+      <div>
+        <h1>${titre}</h1>
+        <p class="sub">${sousTitre}</p>
+      </div>
+      <div class="header-badge">
+        <div class="n">${lignes.length}</div>
+        <div class="lbl">Conseiller${lignes.length > 1 ? "s" : ""}</div>
+      </div>
+    </div>
   </div>
 
   <div class="content">
+    <div class="table-wrap">
     <table>
       <thead>
         <tr>
@@ -185,6 +251,7 @@ function construireEtOuvrirPDF(titre: string, sousTitre: string, lignes: LignePD
         ${lignesHTML}
       </tbody>
     </table>
+    </div>
   </div>
 
   <div class="footer">
@@ -224,17 +291,24 @@ export function exporterObjectifsPDF(
     );
 }
 
-/** Imprime les objectifs de la semaine (lundi → dimanche fournis), même mise en page que le mensuel. */
+/**
+ * Imprime les objectifs de la semaine (début → fin fournis), même mise en page que le mensuel.
+ * `fin` par défaut = début + 6 jours, mais peut être tronquée (changement de mois en semaine).
+ */
 export function exporterObjectifsSemainePDF(
     lignes: LignePDF[],
     colonnes: ColonnePDF[],
-    lundi: Date
+    debut: Date,
+    fin?: Date
 ): void {
-    const dimanche = new Date(lundi);
-    dimanche.setDate(lundi.getDate() + 6);
+    const finEffective = fin ?? (() => {
+        const d = new Date(debut);
+        d.setDate(debut.getDate() + 6);
+        return d;
+    })();
 
     const fmt = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
-    const periodeLabel = `Semaine du ${fmt(lundi)} au ${fmt(dimanche)} ${dimanche.getFullYear()}`;
+    const periodeLabel = `Semaine du ${fmt(debut)} au ${fmt(finEffective)} ${finEffective.getFullYear()}`;
 
     construireEtOuvrirPDF(
         `Objectifs de la semaine`,

@@ -17,13 +17,19 @@ const CODES_MANUELS = PRODUITS_ORDRE.filter((p) => p.code !== "spiderhome").map(
 
 export async function getObjectifsSemaineFiges(
     conseillerIds: string[],
-    lundi: Date
+    debut: Date,
+    finSemaine?: Date
 ): Promise<Record<string, Record<ProduitCode, number>>> {
     const result: Record<string, Record<string, number>> = {};
     conseillerIds.forEach((id) => { result[id] = {}; });
     if (conseillerIds.length === 0) return result as Record<string, Record<ProduitCode, number>>;
 
-    const semaineDebut = dateStr(lundi);
+    const finSemaineEffective = finSemaine ?? (() => {
+        const d = new Date(debut);
+        d.setDate(debut.getDate() + 6);
+        return d;
+    })();
+    const semaineDebut = dateStr(debut);
 
     const { data: existants } = await supabase
         .from("objectifs_semaine_figes")
@@ -86,13 +92,15 @@ export async function getObjectifsSemaineFiges(
         realiseMap[v.conseiller_id][code] = (realiseMap[v.conseiller_id][code] ?? 0) + (v.quantite ?? 1);
     });
 
-    // Jours PLANIFIÉS restants du mois (à partir de ce lundi, planning réel) et jours planifiés
-    // de cette semaine précise (peut être < 6 selon le planning du conseiller).
-    const finDuMois = new Date(lundi.getFullYear(), lundi.getMonth() + 1, 0);
+    // Jours PLANIFIÉS restants du mois en cours (à partir du début de cette période, planning
+    // réel) et jours planifiés de cette semaine précise (peut être < 6 selon le planning du
+    // conseiller, ou tronquée par un changement de mois en milieu de semaine).
+    const maintenant = new Date();
+    const finDuMois = new Date(maintenant.getFullYear(), maintenant.getMonth() + 1, 0);
     const idsConcernes = [...new Set(manquants.map((m) => m.conseillerId))];
     const [joursRestantsMoisParConseiller, joursSemaineParConseiller] = await Promise.all([
-        getJoursTravailPlageTous(idsConcernes, lundi, finDuMois),
-        getJoursTravailSemaineTous(idsConcernes, lundi),
+        getJoursTravailPlageTous(idsConcernes, debut, finDuMois),
+        getJoursTravailSemaineTous(idsConcernes, debut, finSemaineEffective),
     ]);
 
     const aInserer = manquants

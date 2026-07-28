@@ -319,17 +319,22 @@ export async function getJoursTravailPlage(conseillerId: string, debut: Date, fi
 }
 
 /**
- * Retourne le nombre de jours "present" de la semaine (lundi → dimanche fourni) pour chaque
+ * Retourne le nombre de jours "present" de la semaine (début → fin fournis) pour chaque
  * conseiller. Utilisé pour l'objectif Spiderhome hebdomadaire et le nombre de jours planifiés
- * de la semaine dans le calcul de l'objectif semaine figé.
+ * de la semaine dans le calcul de l'objectif semaine figé. `fin` par défaut = début + 6 jours,
+ * mais peut être tronquée (ex: changement de mois en milieu de semaine).
  */
 export async function getJoursTravailSemaineTous(
     conseillerIds: string[],
-    lundi: Date
+    debut: Date,
+    fin?: Date
 ): Promise<Record<string, number>> {
-    const dimanche = new Date(lundi);
-    dimanche.setDate(lundi.getDate() + 6);
-    return getJoursTravailPlageTous(conseillerIds, lundi, dimanche);
+    const finEffective = fin ?? (() => {
+        const d = new Date(debut);
+        d.setDate(debut.getDate() + 6);
+        return d;
+    })();
+    return getJoursTravailPlageTous(conseillerIds, debut, finEffective);
 }
 
 // ─── Lecture planning ──────────────────────────────────────────────────────────

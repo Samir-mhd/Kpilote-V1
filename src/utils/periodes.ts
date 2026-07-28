@@ -13,19 +13,35 @@ export function dateDebutPeriode(periode: Periode): string {
         return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     }
     if (periode === "semaine") {
-        const dow = now.getDay();
-        const diffLundi = dow === 0 ? -6 : 1 - dow;
-        return new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffLundi).toISOString();
+        return periodeSemaineEffective(now).debut.toISOString();
     }
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 }
 
-/** Lundi de la semaine en cours (minuit local). */
-export function lundiCourant(): Date {
-    const now = new Date();
-    const dow = now.getDay();
+/** Lundi de la semaine ISO contenant `reference` (minuit local). */
+export function lundiCourant(reference: Date = new Date()): Date {
+    const dow = reference.getDay();
     const diff = dow === 0 ? -6 : 1 - dow;
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
+    return new Date(reference.getFullYear(), reference.getMonth(), reference.getDate() + diff);
+}
+
+/**
+ * Période d'objectif "semaine" : normalement lundi → dimanche, mais tronquée aux bornes du
+ * mois. Si un changement de mois tombe au milieu de la semaine ISO, la période s'arrête au
+ * dernier jour de l'ancien mois (ou démarre au 1er du nouveau mois) — un objectif semaine ne
+ * chevauche jamais deux mois différents ; un nouveau cycle (souvent redéfini manuellement)
+ * démarre au 1er du mois même si ce n'est pas un lundi.
+ */
+export function periodeSemaineEffective(reference: Date = new Date()): { debut: Date; fin: Date } {
+    const lundi = lundiCourant(reference);
+    const dimanche = new Date(lundi);
+    dimanche.setDate(lundi.getDate() + 6);
+    const premierMois = new Date(reference.getFullYear(), reference.getMonth(), 1);
+    const dernierMois = new Date(reference.getFullYear(), reference.getMonth() + 1, 0);
+    return {
+        debut: lundi > premierMois ? lundi : premierMois,
+        fin: dimanche < dernierMois ? dimanche : dernierMois,
+    };
 }
 
 /** Couleur CSS selon le taux d'avancement. */

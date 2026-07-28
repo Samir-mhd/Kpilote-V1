@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { PRODUITS_ORDRE } from "@/utils/produits";
-import { Periode, PERIODE_LABELS, couleurTaux, lundiCourant } from "@/utils/periodes";
+import { Periode, PERIODE_LABELS, couleurTaux, periodeSemaineEffective } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import { getJoursTravailPlageTous } from "@/services/planningService";
@@ -45,20 +45,18 @@ function ClassementInner() {
 
             // "semaine" et "jour" ont tous les deux besoin de l'objectif semaine figé (le jour s'y recale)
             if (p === "semaine" || p === "jour") {
-                const lundi = lundiCourant();
-                const figes = await getObjectifsSemaineFiges(ids, lundi).catch(() => ({}));
+                const { debut, fin } = periodeSemaineEffective();
+                const figes = await getObjectifsSemaineFiges(ids, debut, fin).catch(() => ({}));
                 setObjSemaine(figes);
             }
 
             // "jour" a en plus besoin du cumul de la semaine (avant aujourd'hui) et des jours
             // planifiés restants de la semaine, selon le planning réel de chaque conseiller
             if (p === "jour") {
-                const lundi = lundiCourant();
-                const dimanche = new Date(lundi);
-                dimanche.setDate(lundi.getDate() + 6);
+                const { fin } = periodeSemaineEffective();
                 const [semaineData, joursRestants] = await Promise.all([
                     construireClassementPeriode("semaine").catch(() => [] as ConseillerStats[]),
-                    getJoursTravailPlageTous(ids, new Date(), dimanche).catch(() => ({})),
+                    getJoursTravailPlageTous(ids, new Date(), fin).catch(() => ({})),
                 ]);
                 setSemaineMap(new Map(semaineData.map(c => [c.id, c])));
                 setJoursRestantsSemaine(joursRestants);

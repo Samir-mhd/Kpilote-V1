@@ -22,8 +22,13 @@ const menu = [
         icon: "trophy" as const,
     },
     {
-        label: "Objectifs",
+        label: "Objectifs boutique",
         href: "/manager/objectifs",
+        icon: "target" as const,
+    },
+    {
+        label: "Objectifs conseiller",
+        href: "/manager/objectifs-conseiller",
         icon: "target" as const,
     },
     {

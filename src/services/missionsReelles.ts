@@ -3,7 +3,7 @@ import { getVentesDuJour, getVentesDuMois, getVentesDepuisLundi } from "@/servic
 import { getJoursTravail, getJoursTravailPlage } from "@/services/planningService";
 import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import { calculerObjectifs, EtatObjectif } from "@/engine/objectifEngine";
-import { lundiCourant } from "@/utils/periodes";
+import { periodeSemaineEffective } from "@/utils/periodes";
 import type { ProduitCode } from "@/utils/produits";
 import { supabase } from "@/lib/supabase";
 
@@ -96,16 +96,15 @@ export async function getMissionsReelles(conseillerId: string) {
     const now   = new Date();
     const annee = now.getFullYear();
     const mois  = now.getMonth() + 1;
-    const lundi = lundiCourant();
-    const dimanche = new Date(lundi);
-    dimanche.setDate(lundi.getDate() + 6);
+    // Semaine tronquée aux bornes du mois : ne chevauche jamais un changement de mois.
+    const { debut, fin } = periodeSemaineEffective(now);
 
     const [resultats, ventesJour, objSemaineParConseiller, ventesSemaine, joursRestantsSemaine] = await Promise.all([
         calcul(conseillerId, annee, mois, getVentesDuMois), // conserve le calcul mensuel (Spiderhome + messages)
         getVentesDuJour(conseillerId),
-        getObjectifsSemaineFiges([conseillerId], lundi),
-        getVentesDepuisLundi(conseillerId, lundi),
-        getJoursTravailPlage(conseillerId, now, dimanche), // jours planifiés restants de la semaine, aujourd'hui inclus
+        getObjectifsSemaineFiges([conseillerId], debut, fin),
+        getVentesDepuisLundi(conseillerId, debut),
+        getJoursTravailPlage(conseillerId, now, fin), // jours planifiés restants de la semaine, aujourd'hui inclus
     ]);
 
     // Index des ventes d'aujourd'hui par code produit
