@@ -498,8 +498,19 @@ export default function Dashboard() {
         return undefined;
     }
 
-    async function ajouterActeVariable(option: ChoixActe) {
-        if (!conseillerId) return;
+    // Affiche le bandeau boost — appelé immédiatement, ou différé après la question "4P ?"
+    // sur Box/Forfait pour ne pas se superposer à la question.
+    function afficherBoostToast(info?: { label: string; montant: number }) {
+        if (!info) return;
+        setCagnotteTotal((prev) => prev + info.montant);
+        setCagnotteFlash({ key: Date.now(), montant: info.montant, label: "de boost !" });
+        if (boostTimerRef.current) clearTimeout(boostTimerRef.current);
+        setBoostToast({ key: Date.now(), label: info.label, montant: info.montant });
+        boostTimerRef.current = setTimeout(() => setBoostToast(null), 4200);
+    }
+
+    async function ajouterActeVariable(option: ChoixActe): Promise<{ label: string; montant: number } | undefined> {
+        if (!conseillerId) return undefined;
         const montant = option.montant ?? 0;
         try {
             const acte = await enregistrerActeJour(conseillerId, option.label, montant, option.champ, option.bonusManuelId, option.produitCode);
@@ -512,18 +523,12 @@ export default function Dashboard() {
                 const totalMois = await compterVentesMoisParProduit(conseillerId, famille.produitCode);
                 if (totalMois > famille.seuil) {
                     const acteBoost = await enregistrerActeJour(conseillerId, famille.label, famille.montantBoost, undefined, undefined, undefined, acte.id);
-                    setCagnotteTotal((prev) => prev + famille.montantBoost);
                     setCagnotteActes((prev) => [...prev, acteBoost]);
-                    // Décalé pour laisser le temps au "+X€" de la vente de s'afficher d'abord
-                    setTimeout(() => {
-                        setCagnotteFlash({ key: Date.now(), montant: famille.montantBoost, label: "de boost !" });
-                    }, 1200);
-                    if (boostTimerRef.current) clearTimeout(boostTimerRef.current);
-                    setBoostToast({ key: Date.now(), label: famille.label, montant: famille.montantBoost });
-                    boostTimerRef.current = setTimeout(() => setBoostToast(null), 4200);
+                    return { label: famille.label, montant: famille.montantBoost };
                 }
             }
         } catch { /* silencieux — la cagnotte n'est pas critique pour l'usage courant */ }
+        return undefined;
     }
 
     // Annule le dernier acte "Autres actes" — uniquement s'il s'agit bien du tout dernier acte
@@ -956,7 +961,8 @@ export default function Dashboard() {
                             onChoixVariable={variableActivee ? ajouterActeVariable : undefined}
                             demanderCrossSell4P={variableActivee ? demanderCrossSell4PPour(mission.produit) : false}
                             montantCrossSell4P={bareme.cross_sell_4p}
-                            onCrossSell4P={variableActivee ? () => ajouterActeVariable(VENTE_4P_ACTE) : undefined}
+                            onCrossSell4P={variableActivee ? async () => { await ajouterActeVariable(VENTE_4P_ACTE); } : undefined}
+                            onBoostReady={afficherBoostToast}
                         />
                     ))}
                 </div>

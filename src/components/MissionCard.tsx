@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import ChoixActeModal, { ChoixActe } from "@/components/dashboard/ChoixActeModal";
+
+type BoostInfo = { label: string; montant: number };
 
 type Props = {
     titre: string;
@@ -11,11 +13,13 @@ type Props = {
     onSale: (produit: string) => void | Promise<void>;
     sousChoix?: ChoixActe[];
     acteDirect?: ChoixActe;
-    onChoixVariable?: (option: ChoixActe) => void | Promise<void>;
+    onChoixVariable?: (option: ChoixActe) => void | Promise<void | BoostInfo | undefined>;
     /** Après le choix du modèle (Box/Forfait), propose "T'as fait une 4P ?" */
     demanderCrossSell4P?: boolean;
     montantCrossSell4P?: number;
     onCrossSell4P?: () => void | Promise<void>;
+    /** Affiche le bandeau boost — appelé après la question 4P si elle est posée, sinon immédiatement. */
+    onBoostReady?: (info?: BoostInfo) => void;
 };
 
 // Mapping couleur Tailwind → hex (pour le SVG arc) + gradient (pour la barre/bouton)
@@ -89,7 +93,7 @@ function genParticles(): Particle[] {
 
 export default function MissionCard({
     titre, realise, objectif, couleur, onSale, sousChoix, acteDirect, onChoixVariable,
-    demanderCrossSell4P, montantCrossSell4P, onCrossSell4P,
+    demanderCrossSell4P, montantCrossSell4P, onCrossSell4P, onBoostReady,
 }: Props) {
     const [celebrating, setCelebrating] = useState(false);
     const [celebEmoji, setCelebEmoji] = useState("🎉");
@@ -97,6 +101,7 @@ export default function MissionCard({
     const [modalOuverte, setModalOuverte] = useState(false);
     const [question4POuverte, setQuestion4POuverte] = useState(false);
     const [envoi4PEnCours, setEnvoi4PEnCours] = useState(false);
+    const boostEnAttenteRef = useRef<BoostInfo | undefined>(undefined);
 
     const pal   = PALETTE[couleur] ?? DEFAULT_PAL;
     const pct   = objectif > 0 ? Math.min(Math.round((realise / objectif) * 100), 100) : 0;
@@ -110,12 +115,19 @@ export default function MissionCard({
         setCelebEmoji(CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)]);
         setCelebrating(true);
         setParticles(genParticles());
+        let boostInfo: BoostInfo | undefined;
         await onSale(titre);
-        if (choix) await onChoixVariable?.(choix);
+        if (choix) boostInfo = (await onChoixVariable?.(choix)) || undefined;
         setTimeout(() => setParticles([]), 750);
         setTimeout(() => setCelebrating(false), 1600);
-        // Uniquement après un choix de modèle (Box/Forfait) — pas sur les cartes à acte direct
-        if (choix && demanderCrossSell4P) setQuestion4POuverte(true);
+        // Uniquement après un choix de modèle (Box/Forfait) — pas sur les cartes à acte direct.
+        // Le bandeau boost est différé après la question 4P pour ne pas se superposer.
+        if (choix && demanderCrossSell4P) {
+            boostEnAttenteRef.current = boostInfo;
+            setQuestion4POuverte(true);
+        } else {
+            onBoostReady?.(boostInfo);
+        }
     }
 
     function handleSale() {
@@ -133,14 +145,17 @@ export default function MissionCard({
     }
 
     async function handleReponse4P(oui: boolean) {
-        if (!oui) { setQuestion4POuverte(false); return; }
-        setEnvoi4PEnCours(true);
-        try {
-            await onCrossSell4P?.();
-        } finally {
-            setEnvoi4PEnCours(false);
-            setQuestion4POuverte(false);
+        if (oui) {
+            setEnvoi4PEnCours(true);
+            try {
+                await onCrossSell4P?.();
+            } finally {
+                setEnvoi4PEnCours(false);
+            }
         }
+        setQuestion4POuverte(false);
+        onBoostReady?.(boostEnAttenteRef.current);
+        boostEnAttenteRef.current = undefined;
     }
 
     return (
