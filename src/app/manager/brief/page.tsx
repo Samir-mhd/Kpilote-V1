@@ -208,7 +208,12 @@ export default function BriefPage() {
             ]);
 
             const tousConseillers = resC.data ?? [];
-            const ventesHier = (resV.data ?? []).filter((v: any) => v.source !== "cerebro_check");
+            // Spiderhome = historisation, pas une vente commerciale → exclu du bilan d'hier
+            const ventesHier = (resV.data ?? []).filter((v: any) => {
+                if (v.source === "cerebro_check") return false;
+                const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code;
+                return code !== "spiderhome";
+            });
 
             // Objectifs boutique par code produit
             const objMap: Record<string, number> = {};

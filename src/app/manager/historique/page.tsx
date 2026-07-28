@@ -153,7 +153,9 @@ export default function HistoriquePage() {
             const lundiPrec = new Date(lundi);
             lundiPrec.setDate(lundi.getDate() - 7);
 
-            const filtre = selectedId === "boutique" ? {} : { conseiller_id: selectedId };
+            // Spiderhome = historisation, pas une vente commerciale → exclu partout ici
+            const { data: spiderhomeProduit } = await supabase.from("produits").select("id").eq("code", "spiderhome").maybeSingle();
+            const spiderhomeId = spiderhomeProduit?.id;
 
             let q30j  = supabase.from("ventes").select("id,conseiller_id,created_at,produits(nom,code)")
                 .or("source.neq.cerebro_check,source.is.null")
@@ -176,11 +178,16 @@ export default function HistoriquePage() {
                 qsemC = (qsemC as any).eq("conseiller_id", selectedId);
                 qsemP = (qsemP as any).eq("conseiller_id", selectedId);
             }
+            if (spiderhomeId) {
+                qsemC = (qsemC as any).neq("produit_id", spiderhomeId);
+                qsemP = (qsemP as any).neq("produit_id", spiderhomeId);
+            }
 
             const [r30j, rauj, rsemC, rsemP] = await Promise.all([q30j, qauj, qsemC, qsemP]);
 
-            const ventes30j  = (r30j.data  ?? []) as Vente[];
-            const ventesAuj  = (rauj.data  ?? []) as Vente[];
+            const estSpiderhome = (v: any) => (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code === "spiderhome";
+            const ventes30j  = ((r30j.data  ?? []) as Vente[]).filter(v => !estSpiderhome(v));
+            const ventesAuj  = ((rauj.data  ?? []) as Vente[]).filter(v => !estSpiderhome(v));
             const semC = rsemC.count ?? 0;
             const semP = rsemP.count ?? 0;
 
