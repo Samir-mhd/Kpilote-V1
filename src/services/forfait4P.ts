@@ -28,6 +28,15 @@ export async function creerForfait4PDiffere(conseillerId: string, montant: numbe
     });
 }
 
+/** Nombre total (à vie) de bonus 4P différés créés pour ce conseiller — pour les badges de collection. */
+export async function getNbForfait4PDifferesConseiller(conseillerId: string): Promise<number> {
+    const { data } = await supabase
+        .from("forfait_4p_differes")
+        .select("id")
+        .eq("conseiller_id", conseillerId);
+    return (data ?? []).length;
+}
+
 export type ContributionForfait4P = { nb: number; montantTotal: number };
 
 export async function getContributionForfait4PMoisPaiement(

@@ -22,6 +22,7 @@ import InitialesAvatar from "@/components/avatar/InitialesAvatar";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { getPhotosByIds } from "@/services/photoService";
 import LancerDefiCard from "@/components/manager/LancerDefiCard";
+import DefiEquipeSection from "@/components/defis/DefiEquipeSection";
 
 // ─── Chrono live ──────────────────────────────────────────────────────────────
 
@@ -171,7 +172,7 @@ export default function DefisPage() {
     const [photos, setPhotos]             = useState<Record<string, string | null>>({});
     const [conseillers, setConseillers]   = useState<{ id: string; prenom: string }[]>([]);
     const [loading, setLoading]           = useState(true);
-    const [onglet, setOnglet]             = useState<"boutique" | "classement">("boutique");
+    const [onglet, setOnglet]             = useState<"boutique" | "classement" | "equipes">("boutique");
 
     async function charger() {
         try {
@@ -262,12 +263,12 @@ export default function DefisPage() {
 
             {/* ── Onglets ────────────────────────────────────────────────── */}
             <div className="flex gap-3">
-                {(["boutique", "classement"] as const).map((v) => (
+                {(["boutique", "classement", "equipes"] as const).map((v) => (
                     <button key={v} onClick={() => setOnglet(v)}
                         className={`rounded-2xl px-5 py-2.5 text-sm font-black transition-all ${
                             onglet === v ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
                         }`}>
-                        {v === "boutique" ? "⚔️ Boutique" : "📊 Classement"}
+                        {v === "boutique" ? "⚔️ Boutique" : v === "classement" ? "📊 Classement" : "🛡️ Défis d'équipe"}
                     </button>
                 ))}
             </div>
@@ -504,6 +505,11 @@ export default function DefisPage() {
                         );
                     })}
                 </div>
+            )}
+
+            {/* ── Défis d'équipe ────────────────────────────────────────── */}
+            {onglet === "equipes" && (
+                <DefiEquipeSection creePar="00000000-0000-0000-0000-000000000001" />
             )}
 
         </main>

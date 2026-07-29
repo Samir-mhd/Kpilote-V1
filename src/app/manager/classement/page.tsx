@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { PRODUITS_ORDRE } from "@/utils/produits";
+import { PRODUITS_CLASSEMENT } from "@/utils/produits";
 import { Periode, PERIODE_LABELS } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 import type { ProduitCode } from "@/utils/produits";
@@ -233,7 +233,7 @@ export default function ClassementPage() {
                                     <tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-300">
                                         <th className="w-8 px-3 pb-2">#</th>
                                         <th className="px-3 pb-2">Conseiller</th>
-                                        {PRODUITS_ORDRE.map((p) => (
+                                        {PRODUITS_CLASSEMENT.map((p) => (
                                             <th key={p.key} className="px-3 pb-2 text-center">
                                                 {p.emoji} {p.label}
                                             </th>
@@ -269,7 +269,7 @@ export default function ClassementPage() {
                                                     </td>
 
                                                     {/* Par produit */}
-                                                    {PRODUITS_ORDRE.map((p) => {
+                                                    {PRODUITS_CLASSEMENT.map((p) => {
                                                         const realise  = c.produits[p.key] ?? 0;
                                                         const objectif = getObjDynamic(c, p.key);
                                                         const taux     = objectif > 0
@@ -317,7 +317,7 @@ export default function ClassementPage() {
                                                 {/* Félicitation inline */}
                                                 {ouvert && (
                                                     <tr>
-                                                        <td colSpan={PRODUITS_ORDRE.length + 4} className="px-3 pb-3">
+                                                        <td colSpan={PRODUITS_CLASSEMENT.length + 4} className="px-3 pb-3">
                                                             <FelicitationCard
                                                                 conseillerId={c.id}
                                                                 conseiller={prenom}

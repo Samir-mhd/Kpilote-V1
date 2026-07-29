@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { uploadPhoto, getPhotoUrl } from "@/services/photoService";
 import ThemePicker from "@/components/dashboard/ThemePicker";
+import { getMoisDisponibles, getRecapMensuel, RecapMensuel } from "@/services/recapMensuelService";
 
 function ProfilInner() {
     const searchParams = useSearchParams();
@@ -20,6 +21,20 @@ function ProfilInner() {
     const [succes, setSucces] = useState(false);
     const [erreur, setErreur] = useState<string | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
+
+    const [moisSelectionne, setMoisSelectionne] = useState<string | null>(null);
+    const [recap, setRecap] = useState<RecapMensuel | null>(null);
+    const [chargementRecap, setChargementRecap] = useState(false);
+    const moisDisponibles = getMoisDisponibles(12);
+
+    useEffect(() => {
+        if (!moisSelectionne || !conseillerId) return;
+        setChargementRecap(true);
+        getRecapMensuel(conseillerId, moisSelectionne)
+            .then(setRecap)
+            .catch(() => setRecap(null))
+            .finally(() => setChargementRecap(false));
+    }, [moisSelectionne, conseillerId]);
 
 
     useEffect(() => {
@@ -185,6 +200,73 @@ function ProfilInner() {
 
             {/* Palette de couleurs */}
             <ThemePicker conseillerId={conseillerId} />
+
+            {/* Mes récaps */}
+            <div className="rounded-[24px] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
+                <p className="mb-5 text-xs font-bold uppercase tracking-[0.2em] text-slate-400">📅 Mes récaps</p>
+
+                <div className="mb-5 flex flex-wrap gap-2">
+                    {moisDisponibles.map((m) => (
+                        <button
+                            key={m.valeur}
+                            onClick={() => setMoisSelectionne(m.valeur)}
+                            className={`rounded-2xl px-4 py-2 text-xs font-bold transition-all ${
+                                moisSelectionne === m.valeur ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                            }`}
+                        >
+                            {m.label}
+                        </button>
+                    ))}
+                </div>
+
+                {!moisSelectionne && (
+                    <p className="text-sm text-slate-400">Choisis un mois ci-dessus pour revoir ton récap.</p>
+                )}
+
+                {moisSelectionne && chargementRecap && (
+                    <div className="flex h-32 items-center justify-center">
+                        <div className="h-6 w-6 animate-spin rounded-full border-4 border-violet-600 border-t-transparent" />
+                    </div>
+                )}
+
+                {moisSelectionne && !chargementRecap && recap && (
+                    <div className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700 p-7 text-white">
+                        <div className="absolute -top-10 -right-10 h-36 w-36 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+                        <div className="relative">
+                            <p className="text-xs font-bold uppercase tracking-[0.3em] text-white/60">Ton mois de</p>
+                            <p className="text-2xl font-black">{recap.label}</p>
+
+                            <div className="mt-5 flex items-end gap-3">
+                                <p className="text-6xl font-black tabular-nums leading-none">{recap.totalVentes}</p>
+                                <p className="pb-2 text-sm font-semibold text-white/70">
+                                    vente{recap.totalVentes > 1 ? "s" : ""} au total
+                                </p>
+                            </div>
+
+                            <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-5">
+                                {recap.parProduit.map((p) => (
+                                    <div key={p.code} className="rounded-2xl bg-white/10 p-3 text-center backdrop-blur">
+                                        <div className="text-xl">{p.emoji}</div>
+                                        <p className="mt-1 text-lg font-black">{p.nombre}</p>
+                                        <p className="text-[10px] font-semibold text-white/60">{p.label}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="mt-6 flex flex-wrap gap-3">
+                                {recap.meilleurJour && (
+                                    <span className="rounded-full bg-white/15 px-4 py-2 text-xs font-black backdrop-blur">
+                                        🌟 Meilleur jour : {new Date(recap.meilleurJour.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} avec {recap.meilleurJour.nombre} vente{recap.meilleurJour.nombre > 1 ? "s" : ""}
+                                    </span>
+                                )}
+                                <span className="rounded-full bg-white/15 px-4 py-2 text-xs font-black backdrop-blur">
+                                    📆 {recap.joursActifs} jour{recap.joursActifs > 1 ? "s" : ""} actif{recap.joursActifs > 1 ? "s" : ""}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {/* Compte */}
             <div className="rounded-[24px] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,.07)]">

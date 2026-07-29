@@ -9,11 +9,11 @@ export type StatutJour =
     | "ferie";
 
 // Seul "present" compte comme jour de vente pour les objectifs
-const STATUTS_VENDEUR: StatutJour[] = ["present"];
+export const STATUTS_VENDEUR: StatutJour[] = ["present"];
 
 // ─── Helpers date ──────────────────────────────────────────────────────────────
 
-function jourStr(d: Date): string {
+export function jourStr(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
@@ -21,7 +21,7 @@ function jourStrParts(annee: number, mois: number, jour: number): string {
     return `${annee}-${String(mois).padStart(2, "0")}-${String(jour).padStart(2, "0")}`;
 }
 
-function estWeekend(d: Date): boolean {
+export function estWeekend(d: Date): boolean {
     return d.getDay() === 0 || d.getDay() === 6;
 }
 

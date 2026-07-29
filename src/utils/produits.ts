@@ -9,3 +9,6 @@ export const PRODUITS_ORDRE = [
 ] as const;
 
 export type ProduitCode = typeof PRODUITS_ORDRE[number]["code"];
+
+/** Spiderhome = historisation, pas un acte commercial → absent de tous les classements/rankings. */
+export const PRODUITS_CLASSEMENT = PRODUITS_ORDRE.filter((p) => p.code !== "spiderhome");

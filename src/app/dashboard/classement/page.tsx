@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { PRODUITS_ORDRE } from "@/utils/produits";
+import { PRODUITS_CLASSEMENT } from "@/utils/produits";
 import { Periode, PERIODE_LABELS, couleurTaux, periodeSemaineEffective } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
@@ -203,7 +203,7 @@ function ClassementInner() {
                                     <tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-300">
                                         <th className="px-4 pb-2">#</th>
                                         <th className="px-4 pb-2">Conseiller</th>
-                                        {PRODUITS_ORDRE.map(p => (
+                                        {PRODUITS_CLASSEMENT.map(p => (
                                             <th key={p.code} className="px-3 pb-2 text-center">{p.emoji} {p.label}</th>
                                         ))}
                                         <th className="px-4 pb-2 text-right">Total</th>
@@ -213,7 +213,7 @@ function ClassementInner() {
                                 <tbody>
                                     {classement.map((c, idx) => {
                                         const isMoi   = c.id === conseillerId;
-                                        const totalObj = PRODUITS_ORDRE.reduce((t, p) => t + getObjDynamic(c, p.key), 0);
+                                        const totalObj = PRODUITS_CLASSEMENT.reduce((t, p) => t + getObjDynamic(c, p.key), 0);
                                         const taux    = totalObj > 0 ? Math.round((c.total / totalObj) * 100) : 0;
                                         const ct      = couleurTaux(c.total, totalObj);
                                         return (
@@ -231,7 +231,7 @@ function ClassementInner() {
                                                         </span>
                                                     </div>
                                                 </td>
-                                                {PRODUITS_ORDRE.map(p => {
+                                                {PRODUITS_CLASSEMENT.map(p => {
                                                     const val = c.produits[p.key];
                                                     const obj = getObjDynamic(c, p.key);
                                                     const col = couleurTaux(val, obj);

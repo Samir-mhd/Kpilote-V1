@@ -2,10 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { PRODUITS_ORDRE } from "@/utils/produits";
+import { PRODUITS_CLASSEMENT } from "@/utils/produits";
 import { construireClassementPeriode } from "@/services/classementService";
 import { getObjectifsBoutique } from "@/services/objectifs";
+import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
+import { periodeSemaineEffective } from "@/utils/periodes";
+import { jourStr } from "@/services/planningService";
+import { calculerStreak, STREAK_BADGES } from "@/services/streakService";
+import { PRODUIT_BADGES, BOX_BADGES, DEFI_BADGES } from "@/services/badgesService";
+import { getBadgesDebloquesLe, BadgeDebloqueLe } from "@/services/badgesManagerService";
+import { getPhotosByIds } from "@/services/photoService";
+import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import LancerDefiCard from "@/components/manager/LancerDefiCard";
+import AvanceeSection, { AvanceeProduit } from "@/components/manager/AvanceeSection";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
@@ -16,6 +25,8 @@ type ConseillerHier = {
 type ProduitHier  = { code: string; label: string; emoji: string; total: number };
 type ProduitMois  = { code: string; label: string; emoji: string; ventes: number; objectif: number; taux: number; dailyTarget: number };
 type Proposition  = { type: "feliciter" | "encourager" | "focus" | "alerte" | "defi"; emoji: string; titre: string; detail: string };
+type ClassementLigne = { id: string; nom: string; prenom: string; total: number };
+type StreakLigne = { id: string; nom: string; prenom: string; streak: number; risque: boolean };
 
 type BriefData = {
     dateHierLabel: string;
@@ -29,7 +40,18 @@ type BriefData = {
     scriptOral: string;
     propositions: Proposition[];
     conseillers: { id: string; prenom: string }[];
+    classementVendeur: ClassementLigne[];
+    streaks: StreakLigne[];
+    badgesHier: BadgeDebloqueLe[];
+    semaineAvancee: AvanceeProduit[];
+    moisAvancee: AvanceeProduit[];
+    photos: Record<string, string | null>;
 };
+
+const BADGE_INFO: Record<string, { label: string; emoji: string }> = {};
+[...STREAK_BADGES, ...PRODUIT_BADGES, ...BOX_BADGES, ...DEFI_BADGES].forEach((b) => {
+    BADGE_INFO[b.code] = { label: b.label, emoji: b.emoji };
+});
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 
@@ -251,14 +273,14 @@ export default function BriefPage() {
                 const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code ?? "";
                 prodHierMap[code] = (prodHierMap[code] ?? 0) + (v.quantite ?? 1);
             });
-            const parProduitHier: ProduitHier[] = PRODUITS_ORDRE.map(p => ({
+            const parProduitHier: ProduitHier[] = PRODUITS_CLASSEMENT.map(p => ({
                 code: p.code, label: p.label, emoji: p.emoji, total: prodHierMap[p.code] ?? 0,
             }));
 
             // Mensuel par produit (boutique)
             const totalMoisMap: Record<string, number> = {};
             moisData.forEach(c => {
-                PRODUITS_ORDRE.forEach(p => {
+                PRODUITS_CLASSEMENT.forEach(p => {
                     totalMoisMap[p.code] = (totalMoisMap[p.code] ?? 0) + (c.produits[p.key] ?? 0);
                 });
             });
@@ -269,12 +291,12 @@ export default function BriefPage() {
             const joursEcoules  = Math.max(workingDaysInRange(monthStart, yestD), 1);
 
             const totalMois     = moisData.reduce((t, c) => t + c.total, 0);
-            const totalObjectif = PRODUITS_ORDRE.reduce((t, p) => t + (objMap[p.code] ?? 0), 0);
+            const totalObjectif = PRODUITS_CLASSEMENT.reduce((t, p) => t + (objMap[p.code] ?? 0), 0);
             const tauxMois      = totalObjectif > 0 ? Math.min(Math.round((totalMois / totalObjectif) * 100), 100) : 0;
             const rythmeActuel  = totalMois / joursEcoules;
             const rythmeNecessaire = joursRestants > 0 ? Math.ceil(Math.max(totalObjectif - totalMois, 0) / joursRestants) : 0;
 
-            const produitsMois: ProduitMois[] = PRODUITS_ORDRE.map(p => {
+            const produitsMois: ProduitMois[] = PRODUITS_CLASSEMENT.map(p => {
                 const ventes   = totalMoisMap[p.code] ?? 0;
                 const objectif = objMap[p.code] ?? 0;
                 const taux     = objectif > 0 ? Math.min(Math.round((ventes / objectif) * 100), 100) : ventes > 0 ? 100 : 0;
@@ -282,10 +304,49 @@ export default function BriefPage() {
                 return { code: p.code, label: p.label, emoji: p.emoji, ventes, objectif, taux, dailyTarget };
             });
 
+            // Classement vendeur (mois en cours)
+            const classementVendeur: ClassementLigne[] = moisData
+                .map(c => ({ id: c.id, nom: c.nom, prenom: c.nom.split(" ")[0], total: c.total }))
+                .sort((a, b) => b.total - a.total);
+
+            // Avancée semaine / mois (même logique que "Objectifs boutique")
+            const ids = tousConseillers.map((c: any) => c.id);
+            const { debut, fin } = periodeSemaineEffective();
+            const [semaineData, figes, badgesHierRaw, streaksRaw, photos] = await Promise.all([
+                construireClassementPeriode("semaine"),
+                ids.length > 0 ? getObjectifsSemaineFiges(ids, debut, fin).catch(() => ({})) : Promise.resolve({}),
+                getBadgesDebloquesLe(jourStr(yest)),
+                Promise.all(ids.map((id: string) => calculerStreak(id).catch(() => null))),
+                ids.length > 0 ? getPhotosByIds(ids).catch(() => ({})) : Promise.resolve({}),
+            ]);
+
+            const objSemaineMap: Record<string, number> = {};
+            PRODUITS_CLASSEMENT.forEach(p => {
+                objSemaineMap[p.code] = ids.reduce((t: number, id: string) => t + ((figes as any)[id]?.[p.code] ?? 0), 0);
+            });
+            const semaineAvancee: AvanceeProduit[] = PRODUITS_CLASSEMENT.map(p => ({
+                code: p.code, label: p.label, emoji: p.emoji,
+                realise: semaineData.reduce((t, c) => t + (c.produits[p.key] ?? 0), 0),
+                objectif: objSemaineMap[p.code] ?? 0,
+            }));
+            const moisAvancee: AvanceeProduit[] = PRODUITS_CLASSEMENT.map(p => ({
+                code: p.code, label: p.label, emoji: p.emoji,
+                realise: totalMoisMap[p.code] ?? 0,
+                objectif: objMap[p.code] ?? 0,
+            }));
+
+            const streaks: StreakLigne[] = tousConseillers
+                .map((c: any, i: number) => {
+                    const s = streaksRaw[i];
+                    return { id: c.id, nom: c.nom, prenom: c.nom.split(" ")[0], streak: s?.streakActuel ?? 0, risque: s?.risqueAujourdhui ?? false };
+                })
+                .sort((a: StreakLigne, b: StreakLigne) => b.streak - a.streak);
+
             const partial = {
                 dateHierLabel: dateLabel(yest), totalHier, topPerformers, enDifficulte,
                 parProduitHier, produitsMois, totalMois, totalObjectif, tauxMois,
                 joursRestants, rythmeNecessaire, rythmeActuel,
+                classementVendeur, streaks, badgesHier: badgesHierRaw, semaineAvancee, moisAvancee, photos,
             };
 
             setData({
@@ -456,6 +517,78 @@ export default function BriefPage() {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* ── Classement vendeur & Séries en cours ──────────────────────── */}
+            <div className="grid gap-6 xl:grid-cols-2">
+
+                {/* Classement vendeur */}
+                <div className="rounded-[24px] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
+                    <p className="text-xs font-black uppercase tracking-[0.25em] text-violet-500 mb-5">🏆 Classement vendeur — mois en cours</p>
+                    {data.classementVendeur.length === 0 ? (
+                        <p className="text-sm text-slate-400">Aucune donnée pour le moment.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {data.classementVendeur.slice(0, 8).map((c, i) => {
+                                const medals = ["🥇", "🥈", "🥉"];
+                                return (
+                                    <div key={c.id} className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 ${i === 0 ? "bg-violet-50" : "bg-slate-50"}`}>
+                                        <span className="w-6 flex-shrink-0 text-center text-sm">{medals[i] ?? i + 1}</span>
+                                        <PhotoAvatar nom={c.nom} photoUrl={data.photos[c.id]} size={30} />
+                                        <span className="flex-1 truncate font-black text-sm text-slate-800">{c.prenom}</span>
+                                        <span className="text-sm font-black text-slate-700">{c.total}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Séries en cours */}
+                <div className="rounded-[24px] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
+                    <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-500 mb-5">🔥 Séries en cours</p>
+                    {data.streaks.every(s => s.streak === 0) ? (
+                        <p className="text-sm text-slate-400">Personne n'a de série en cours.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {data.streaks.filter(s => s.streak > 0).slice(0, 8).map(s => (
+                                <div key={s.id} className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-2.5">
+                                    <PhotoAvatar nom={s.nom} photoUrl={data.photos[s.id]} size={30} />
+                                    <span className="flex-1 truncate font-black text-sm text-slate-800">{s.prenom}</span>
+                                    {s.risque && <span className="text-xs font-bold text-amber-500">⚠️ en jeu</span>}
+                                    <span className="text-sm font-black text-orange-600">🔥 {s.streak}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* ── Badges débloqués hier ──────────────────────────────────────── */}
+            {data.badgesHier.length > 0 && (
+                <div className="rounded-[24px] border border-amber-100 bg-gradient-to-br from-amber-50 to-orange-50 p-7">
+                    <p className="text-xs font-black uppercase tracking-[0.25em] text-amber-600 mb-4">🏅 Badges débloqués hier</p>
+                    <div className="flex flex-wrap gap-3">
+                        {data.badgesHier.map((b, i) => {
+                            const info = BADGE_INFO[b.badgeCode] ?? { label: b.badgeCode, emoji: "🏅" };
+                            return (
+                                <div key={i} className="flex items-center gap-2.5 rounded-2xl bg-white px-4 py-2.5 shadow-sm">
+                                    <PhotoAvatar nom={b.nom} photoUrl={data.photos[b.conseillerId]} size={28} />
+                                    <div>
+                                        <p className="text-xs font-black text-slate-800">{b.nom.split(" ")[0]}</p>
+                                        <p className="text-[10px] text-slate-400">{info.emoji} {info.label}</p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* ── Avancée semaine & mois ─────────────────────────────────────── */}
+            <div className="space-y-6">
+                <AvanceeSection titre="Avancée de la semaine" badge="Semaine en cours" produits={data.semaineAvancee} />
+                <AvanceeSection titre="Avancée du mois" badge="Mois en cours" produits={data.moisAvancee} />
             </div>
 
             {/* ── Situation du mois ─────────────────────────────────────────── */}

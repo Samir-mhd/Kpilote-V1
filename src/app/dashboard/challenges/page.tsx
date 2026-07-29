@@ -13,6 +13,7 @@ import { chargerClassementDefisEtChallenges, StatsConseiller } from "@/services/
 import { getPhotosByIds } from "@/services/photoService";
 import InitialesAvatar from "@/components/avatar/InitialesAvatar";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
+import DefiEquipeSection from "@/components/defis/DefiEquipeSection";
 
 const PRODUITS = ["Box", "Forfaits", "Téléphones", "McAfee", "Assurance"];
 const DUREES = [15, 30, 45, 60];
@@ -126,7 +127,7 @@ function ChallengesInner() {
     const [form, setForm] = useState({ adversaires: [] as string[], produit: "Box", duree: 30, objectif: 5 });
     const [envoi, setEnvoi] = useState(false);
     const [succes, setSucces] = useState<string | null>(null);
-    const [onglet, setOnglet] = useState<"historique" | "classement" | "envoyer">("historique");
+    const [onglet, setOnglet] = useState<"historique" | "classement" | "envoyer" | "equipes">("historique");
     const [classement, setClassement] = useState<StatsConseiller[]>([]);
     const [photos, setPhotos] = useState<Record<string, string | null>>({});
 
@@ -342,7 +343,7 @@ function ChallengesInner() {
 
             {/* ── Onglets ─────────────────────────────────────────────────────── */}
             <div className="flex gap-2">
-                {([["historique", "Historique"], ["classement", "Classement"], ["envoyer", "Lancer un défi"]] as const).map(([v, label]) => (
+                {([["historique", "Historique"], ["classement", "Classement"], ["envoyer", "Lancer un défi"], ["equipes", "Défis d'équipe"]] as const).map(([v, label]) => (
                     <button
                         key={v}
                         onClick={() => setOnglet(v)}
@@ -637,6 +638,11 @@ function ChallengesInner() {
                         </button>
                     </div>
                 </div>
+            )}
+
+            {/* ── Défis d'équipe ──────────────────────────────────────────────── */}
+            {onglet === "equipes" && (
+                <DefiEquipeSection conseillerId={conseillerId} creePar={conseillerId} />
             )}
 
         </div>

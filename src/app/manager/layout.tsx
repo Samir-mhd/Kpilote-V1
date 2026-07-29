@@ -37,6 +37,11 @@ const menu = [
         icon: "challenge" as const,
     },
     {
+        label: "Badges",
+        href: "/manager/badges",
+        icon: "flame" as const,
+    },
+    {
         label: "Variable",
         href: "/manager/variable",
         icon: "euro" as const,
