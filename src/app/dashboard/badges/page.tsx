@@ -6,7 +6,7 @@ import { calculerStreak, STREAK_BADGES, GELS_PAR_MOIS, StreakInfo } from "@/serv
 import {
     calculerBadgesConseiller, PALIERS_PRODUIT, TIER_LABELS, TIER_COULEURS,
     BOX_BADGES, DEFI_BADGES, PRODUIT_STREAK_BADGES, JOUR_PARFAIT_BADGES, SEMAINE_PARFAITE_BADGE,
-    Badge, EtatBadges,
+    SEUIL_SEMAINE, Badge, EtatBadges,
 } from "@/services/badgesService";
 import { PRODUITS_ORDRE } from "@/utils/produits";
 
@@ -203,7 +203,7 @@ function BadgesInner() {
                                 key={b.code}
                                 badge={b}
                                 obtenuLe={etat.debloques[b.code]}
-                                sousTitre={`${Math.min(streak, 7)}/7 jours d'affilée`}
+                                sousTitre={`${Math.min(streak, SEUIL_SEMAINE)}/${SEUIL_SEMAINE} jours d'affilée`}
                             />
                         );
                     })}
@@ -225,7 +225,7 @@ function BadgesInner() {
                     <CarteBadgeGenerique
                         badge={SEMAINE_PARFAITE_BADGE}
                         obtenuLe={etat.debloques[SEMAINE_PARFAITE_BADGE.code]}
-                        sousTitre={`${Math.min(etat.streakJoursParfaits, 7)}/7 jours d'affilée`}
+                        sousTitre={`${Math.min(etat.streakJoursParfaits, SEUIL_SEMAINE)}/${SEUIL_SEMAINE} jours d'affilée`}
                     />
                 </div>
             </div>
@@ -324,7 +324,7 @@ function BadgesInner() {
                         <div>
                             <p className="font-black text-sm text-slate-800">Semaines produit parfaites</p>
                             <p className="text-sm text-slate-500">
-                                Vends au moins un Box, un McAfee ou une Assurance chaque jour travaillé pendant 7 jours d'affilée pour débloquer le badge correspondant. Contrairement à la série générale, il n'y a pas de gel ici — un jour manqué remet le compteur à 0.
+                                Vends au moins un Box, un McAfee ou une Assurance chaque jour travaillé pendant {SEUIL_SEMAINE} jours d'affilée (une semaine de travail) pour débloquer le badge correspondant. Contrairement à la série générale, il n'y a pas de gel ici — un jour manqué remet le compteur à 0.
                             </p>
                         </div>
                     </div>
@@ -333,7 +333,7 @@ function BadgesInner() {
                         <div>
                             <p className="font-black text-sm text-slate-800">Objectifs jour</p>
                             <p className="text-sm text-slate-500">
-                                Un "jour parfait" est un jour où tu as atteint TOUS tes objectifs du jour, hors Spiderhome. Chaque jour parfait est compté à vie — les paliers (10/20/30/40/50) se débloquent au fil du cumul. "Semaine parfaite" demande 7 jours parfaits d'affilée (jours travaillés uniquement).
+                                Un "jour parfait" est un jour où tu as atteint TOUS tes objectifs du jour, hors Spiderhome. Chaque jour parfait est compté à vie — les paliers (10/20/30/40/50) se débloquent au fil du cumul. "Semaine parfaite" demande {SEUIL_SEMAINE} jours parfaits d'affilée (jours travaillés uniquement).
                             </p>
                         </div>
                     </div>

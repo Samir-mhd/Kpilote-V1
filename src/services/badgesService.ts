@@ -73,6 +73,9 @@ export const DEFI_BADGES: Badge[] = [
 
 // ─── Streak par produit (box / mcafee / assurance) ─────────────────────────────
 
+/** Une "semaine" ici = jours TRAVAILLÉS d'affilée, pas des jours calendaires (5 jours ouvrés). */
+export const SEUIL_SEMAINE = 5;
+
 export const PRODUITS_STREAK = ["box", "mcafee", "assurance"] as const;
 
 export const PRODUIT_STREAK_BADGES: Badge[] = PRODUITS_STREAK.map((code) => {
@@ -83,7 +86,7 @@ export const PRODUIT_STREAK_BADGES: Badge[] = PRODUITS_STREAK.map((code) => {
         emoji: produit.emoji,
         de: "#bbf7d0",
         a: "#16a34a",
-        description: `Au moins 1 vente ${produit.label} chaque jour travaillé pendant 7 jours`,
+        description: `Au moins 1 vente ${produit.label} chaque jour travaillé pendant ${SEUIL_SEMAINE} jours`,
     };
 });
 
@@ -113,7 +116,7 @@ export const SEMAINE_PARFAITE_BADGE: Badge = {
     emoji: "💯",
     de: "#ddd6fe",
     a: "#7c3aed",
-    description: "7 jours travaillés d'affilée avec tous les objectifs du jour atteints",
+    description: `${SEUIL_SEMAINE} jours travaillés d'affilée avec tous les objectifs du jour atteints`,
 };
 
 export type EtatBadges = {
@@ -342,7 +345,7 @@ export async function calculerBadgesConseiller(conseillerId: string): Promise<Et
 
     PRODUITS_STREAK.forEach((code) => {
         const badgeCode = `streak_${code}_semaine`;
-        if (streakParProduit[code] >= 7 && !debloques[badgeCode]) aDebloquer.push(badgeCode);
+        if (streakParProduit[code] >= SEUIL_SEMAINE && !debloques[badgeCode]) aDebloquer.push(badgeCode);
     });
 
     PALIERS_JOURS_PARFAITS.forEach((seuil) => {
@@ -350,7 +353,7 @@ export async function calculerBadgesConseiller(conseillerId: string): Promise<Et
         if (nbJoursParfaits >= seuil && !debloques[badgeCode]) aDebloquer.push(badgeCode);
     });
 
-    if (streakJoursParfaits >= 7 && !debloques["semaine_parfaite"]) aDebloquer.push("semaine_parfaite");
+    if (streakJoursParfaits >= SEUIL_SEMAINE && !debloques["semaine_parfaite"]) aDebloquer.push("semaine_parfaite");
 
     if (aDebloquer.length > 0) {
         const aujourdhui = new Date().toISOString().slice(0, 10);
