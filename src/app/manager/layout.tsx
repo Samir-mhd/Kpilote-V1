@@ -37,7 +37,7 @@ const menu = [
         icon: "challenge" as const,
     },
     {
-        label: "Badges",
+        label: "Trophées",
         href: "/manager/badges",
         icon: "flame" as const,
     },

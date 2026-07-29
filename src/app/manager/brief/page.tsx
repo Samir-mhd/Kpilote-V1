@@ -570,7 +570,7 @@ export default function BriefPage() {
             {/* ── Badges débloqués hier ──────────────────────────────────────── */}
             {data.badgesHier.length > 0 && (
                 <div className="rounded-[24px] border border-amber-100 bg-gradient-to-br from-amber-50 to-orange-50 p-7">
-                    <p className="text-xs font-black uppercase tracking-[0.25em] text-amber-600 mb-4">🏅 Badges débloqués hier</p>
+                    <p className="text-xs font-black uppercase tracking-[0.25em] text-amber-600 mb-4">🏅 Trophées débloqués hier</p>
                     <div className="flex flex-wrap gap-3">
                         {data.badgesHier.map((b, i) => {
                             const info = BADGE_INFO[b.badgeCode] ?? { label: b.badgeCode, emoji: "🏅" };

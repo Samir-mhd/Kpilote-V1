@@ -18,7 +18,7 @@ const menus = [
     { label: "Mes stats",     href: "/dashboard/stats",          Icon: LineChart },
     { label: "Ma variable",   href: "/dashboard/variable",      Icon: Euro },
     { label: "Challenges",    href: "/dashboard/challenges",    Icon: Swords },
-    { label: "Badges",        href: "/dashboard/badges",        Icon: Award },
+    { label: "Trophées",      href: "/dashboard/badges",        Icon: Award },
     { label: "Profil",        href: "/dashboard/profil",        Icon: User },
 ];
 

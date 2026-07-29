@@ -104,7 +104,7 @@ function BadgesInner() {
             {/* Header */}
             <div>
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-amber-600">Ma progression</p>
-                <h1 className="mt-1 text-3xl font-black text-slate-900">Badges</h1>
+                <h1 className="mt-1 text-3xl font-black text-slate-900">Trophées</h1>
             </div>
 
             {/* ── Hero streak ─────────────────────────────────────────────────── */}

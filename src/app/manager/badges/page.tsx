@@ -101,7 +101,7 @@ export default function BadgesManagerPage() {
         <main className="space-y-8">
             <div>
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-amber-600">Mur des trophées</p>
-                <h1 className="mt-1 text-4xl font-black text-slate-900">Badges</h1>
+                <h1 className="mt-1 text-4xl font-black text-slate-900">Trophées</h1>
                 <p className="mt-2 text-slate-400">Qui a débloqué quoi, dans toute l'équipe.</p>
             </div>
 
