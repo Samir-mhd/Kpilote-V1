@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { STREAK_BADGES } from "@/services/streakService";
-import { PRODUIT_BADGES, BOX_BADGES, DEFI_BADGES, Badge } from "@/services/badgesService";
+import {
+    PRODUIT_BADGES, BOX_BADGES, DEFI_BADGES, PRODUIT_STREAK_BADGES,
+    JOUR_PARFAIT_BADGES, SEMAINE_PARFAITE_BADGE, Badge,
+} from "@/services/badgesService";
 import { getDetenteursBadges, DetenteurBadge } from "@/services/badgesManagerService";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
@@ -103,6 +106,8 @@ export default function BadgesManagerPage() {
             </div>
 
             <Section titre="🔥 Série" badges={streakBadgesAffiches} parBadge={parBadge} photos={photos} />
+            <Section titre="📅 Semaines produit parfaites" badges={PRODUIT_STREAK_BADGES} parBadge={parBadge} photos={photos} />
+            <Section titre="🎯 Objectifs jour" badges={[...JOUR_PARFAIT_BADGES, SEMAINE_PARFAITE_BADGE]} parBadge={parBadge} photos={photos} />
             <Section titre="🏅 Maîtrise produit" badges={PRODUIT_BADGES} parBadge={parBadge} photos={photos} />
             <Section titre="📦 Box & 4P" badges={BOX_BADGES} parBadge={parBadge} photos={photos} />
             <Section titre="⚔️ Défis & compétition" badges={DEFI_BADGES} parBadge={parBadge} photos={photos} />

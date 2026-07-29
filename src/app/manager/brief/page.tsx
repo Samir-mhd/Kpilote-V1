@@ -9,7 +9,10 @@ import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import { periodeSemaineEffective } from "@/utils/periodes";
 import { jourStr } from "@/services/planningService";
 import { calculerStreak, STREAK_BADGES } from "@/services/streakService";
-import { PRODUIT_BADGES, BOX_BADGES, DEFI_BADGES } from "@/services/badgesService";
+import {
+    PRODUIT_BADGES, BOX_BADGES, DEFI_BADGES, PRODUIT_STREAK_BADGES,
+    JOUR_PARFAIT_BADGES, SEMAINE_PARFAITE_BADGE,
+} from "@/services/badgesService";
 import { getBadgesDebloquesLe, BadgeDebloqueLe } from "@/services/badgesManagerService";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
@@ -49,7 +52,7 @@ type BriefData = {
 };
 
 const BADGE_INFO: Record<string, { label: string; emoji: string }> = {};
-[...STREAK_BADGES, ...PRODUIT_BADGES, ...BOX_BADGES, ...DEFI_BADGES].forEach((b) => {
+[...STREAK_BADGES, ...PRODUIT_BADGES, ...BOX_BADGES, ...DEFI_BADGES, ...PRODUIT_STREAK_BADGES, ...JOUR_PARFAIT_BADGES, SEMAINE_PARFAITE_BADGE].forEach((b) => {
     BADGE_INFO[b.code] = { label: b.label, emoji: b.emoji };
 });
 

@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { calculerStreak, STREAK_BADGES, GELS_PAR_MOIS, StreakInfo } from "@/services/streakService";
 import {
     calculerBadgesConseiller, PALIERS_PRODUIT, TIER_LABELS, TIER_COULEURS,
-    BOX_BADGES, DEFI_BADGES, Badge, EtatBadges,
+    BOX_BADGES, DEFI_BADGES, PRODUIT_STREAK_BADGES, JOUR_PARFAIT_BADGES, SEMAINE_PARFAITE_BADGE,
+    Badge, EtatBadges,
 } from "@/services/badgesService";
 import { PRODUITS_ORDRE } from "@/utils/produits";
 
@@ -190,6 +191,45 @@ function BadgesInner() {
                 </div>
             </div>
 
+            {/* ── Streak produit ───────────────────────────────────────────────── */}
+            <div>
+                <p className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-slate-400">📅 Semaines produit parfaites</p>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    {PRODUIT_STREAK_BADGES.map((b, i) => {
+                        const code = ["box", "mcafee", "assurance"][i];
+                        const streak = etat.streakParProduit[code] ?? 0;
+                        return (
+                            <CarteBadgeGenerique
+                                key={b.code}
+                                badge={b}
+                                obtenuLe={etat.debloques[b.code]}
+                                sousTitre={`${Math.min(streak, 7)}/7 jours d'affilée`}
+                            />
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* ── Objectifs jour ───────────────────────────────────────────────── */}
+            <div>
+                <p className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-slate-400">🎯 Objectifs jour (hors Spiderhome)</p>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+                    {JOUR_PARFAIT_BADGES.map((b, i) => (
+                        <CarteBadgeGenerique
+                            key={b.code}
+                            badge={b}
+                            obtenuLe={etat.debloques[b.code]}
+                            sousTitre={`${etat.nbJoursParfaits}/${[10, 20, 30, 40, 50][i]} jours parfaits`}
+                        />
+                    ))}
+                    <CarteBadgeGenerique
+                        badge={SEMAINE_PARFAITE_BADGE}
+                        obtenuLe={etat.debloques[SEMAINE_PARFAITE_BADGE.code]}
+                        sousTitre={`${Math.min(etat.streakJoursParfaits, 7)}/7 jours d'affilée`}
+                    />
+                </div>
+            </div>
+
             {/* ── Box & 4P ─────────────────────────────────────────────────────── */}
             <div>
                 <p className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-slate-400">📦 Box & 4P</p>
@@ -276,6 +316,24 @@ function BadgesInner() {
                             <p className="font-black text-sm text-slate-800">Défis & compétition</p>
                             <p className="text-sm text-slate-500">
                                 Comptabilisent tes victoires en défis 1v1 et en défis d'équipe. "Invincible" demande d'avoir joué au moins 3 défis 1v1 sur un même mois et de tous les avoir gagnés.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex gap-4">
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-green-100 text-lg">📅</div>
+                        <div>
+                            <p className="font-black text-sm text-slate-800">Semaines produit parfaites</p>
+                            <p className="text-sm text-slate-500">
+                                Vends au moins un Box, un McAfee ou une Assurance chaque jour travaillé pendant 7 jours d'affilée pour débloquer le badge correspondant. Contrairement à la série générale, il n'y a pas de gel ici — un jour manqué remet le compteur à 0.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex gap-4">
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-lg">🎯</div>
+                        <div>
+                            <p className="font-black text-sm text-slate-800">Objectifs jour</p>
+                            <p className="text-sm text-slate-500">
+                                Un "jour parfait" est un jour où tu as atteint TOUS tes objectifs du jour, hors Spiderhome. Chaque jour parfait est compté à vie — les paliers (10/20/30/40/50) se débloquent au fil du cumul. "Semaine parfaite" demande 7 jours parfaits d'affilée (jours travaillés uniquement).
                             </p>
                         </div>
                     </div>

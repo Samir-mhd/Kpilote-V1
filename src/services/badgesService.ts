@@ -9,8 +9,11 @@ import { PRODUITS_ORDRE } from "@/utils/produits";
 import { getFichesBoxRaccordement, estPerdue, dateLimite, FicheBoxRaccordement } from "@/services/boxRaccordement";
 import { getNbForfait4PDifferesConseiller } from "@/services/forfait4P";
 import { getDefisEquipe, getScoreDefiEquipe } from "@/services/defisEquipeService";
+import { STATUTS_VENDEUR, estWeekend, jourStr, StatutJour } from "@/services/planningService";
+import { getMissionsReelles } from "@/services/missionsReelles";
 
 const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
+const PROFONDEUR_JOURS = 120;
 
 export type Badge = {
     code: string;
@@ -68,6 +71,51 @@ export const DEFI_BADGES: Badge[] = [
     { code: "defi_esprit_equipe", label: "Esprit d'équipe", emoji: "🤝", de: "#c7d2fe", a: "#4338ca", description: "3 victoires en défi d'équipe" },
 ];
 
+// ─── Streak par produit (box / mcafee / assurance) ─────────────────────────────
+
+export const PRODUITS_STREAK = ["box", "mcafee", "assurance"] as const;
+
+export const PRODUIT_STREAK_BADGES: Badge[] = PRODUITS_STREAK.map((code) => {
+    const produit = PRODUITS_ORDRE.find((p) => p.code === code)!;
+    return {
+        code: `streak_${code}_semaine`,
+        label: `Semaine ${produit.label} parfaite`,
+        emoji: produit.emoji,
+        de: "#bbf7d0",
+        a: "#16a34a",
+        description: `Au moins 1 vente ${produit.label} chaque jour travaillé pendant 7 jours`,
+    };
+});
+
+// ─── Objectifs jour (hors Spiderhome) ──────────────────────────────────────────
+
+export const PALIERS_JOURS_PARFAITS = [10, 20, 30, 40, 50];
+const JOUR_PARFAIT_COULEURS: [string, string][] = [
+    ["#e0f2fe", "#0284c7"],
+    ["#dbeafe", "#2563eb"],
+    ["#e0e7ff", "#4f46e5"],
+    ["#ede9fe", "#7c3aed"],
+    ["#fae8ff", "#a21caf"],
+];
+
+export const JOUR_PARFAIT_BADGES: Badge[] = PALIERS_JOURS_PARFAITS.map((seuil, i) => ({
+    code: `jour_parfait_${seuil}`,
+    label: `${seuil} jours parfaits`,
+    emoji: "🎯",
+    de: JOUR_PARFAIT_COULEURS[i][0],
+    a: JOUR_PARFAIT_COULEURS[i][1],
+    description: `${seuil} jours où tous les objectifs du jour (hors Spiderhome) ont été atteints`,
+}));
+
+export const SEMAINE_PARFAITE_BADGE: Badge = {
+    code: "semaine_parfaite",
+    label: "Semaine parfaite",
+    emoji: "💯",
+    de: "#ddd6fe",
+    a: "#7c3aed",
+    description: "7 jours travaillés d'affilée avec tous les objectifs du jour atteints",
+};
+
 export type EtatBadges = {
     debloques: Record<string, string>;
     volumeParProduit: Record<string, number>;
@@ -75,6 +123,9 @@ export type EtatBadges = {
     nbBoxRaccordees: number;
     defisGagnes: number;
     equipeGagnes: number;
+    streakParProduit: Record<string, number>;
+    nbJoursParfaits: number;
+    streakJoursParfaits: number;
 };
 
 async function getVolumeCumulProduit(conseillerId: string): Promise<Record<string, number>> {
@@ -139,6 +190,83 @@ async function getDefis1v1(conseillerId: string): Promise<{ gagnes: number; parM
     return { gagnes, parMois };
 }
 
+async function getPlanningMap(conseillerId: string, debut: Date, fin: Date): Promise<Record<string, StatutJour>> {
+    const { data } = await supabase
+        .from("planning_conseillers")
+        .select("jour, statut")
+        .eq("conseiller_id", conseillerId)
+        .gte("jour", jourStr(debut))
+        .lte("jour", jourStr(fin));
+    const map: Record<string, StatutJour> = {};
+    (data ?? []).forEach((r: any) => { map[r.jour] = r.statut as StatutJour; });
+    return map;
+}
+
+function jourTravailleAvec(planningMap: Record<string, StatutJour>, d: Date): boolean {
+    const statut = planningMap[jourStr(d)];
+    return statut !== undefined ? STATUTS_VENDEUR.includes(statut) : !estWeekend(d);
+}
+
+/** Jours travaillés consécutifs (aujourd'hui inclus si déjà acquis) présents dans `set` — sans gel. */
+function calculerStreakDepuisSet(set: Set<string>, planningMap: Record<string, StatutJour>): number {
+    const aujourdhui = new Date();
+    aujourdhui.setHours(0, 0, 0, 0);
+    const cursor = new Date(aujourdhui);
+    if (!set.has(jourStr(aujourdhui))) cursor.setDate(cursor.getDate() - 1);
+
+    let streak = 0;
+    for (let i = 0; i < PROFONDEUR_JOURS; i++) {
+        if (!jourTravailleAvec(planningMap, cursor)) {
+            cursor.setDate(cursor.getDate() - 1);
+            continue;
+        }
+        if (!set.has(jourStr(cursor))) break;
+        streak++;
+        cursor.setDate(cursor.getDate() - 1);
+    }
+    return streak;
+}
+
+async function getVentesParJourParProduit(conseillerId: string, debut: Date): Promise<Record<string, Set<string>>> {
+    const rows = await fetchToutesLesLignes((from, to) =>
+        supabase
+            .from("ventes")
+            .select("created_at, produits(code)")
+            .eq("conseiller_id", conseillerId)
+            .gte("created_at", debut.toISOString())
+            .order("created_at", { ascending: true })
+            .range(from, to)
+    );
+    const map: Record<string, Set<string>> = {};
+    rows.forEach((v: any) => {
+        const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code;
+        if (!code) return;
+        if (!map[code]) map[code] = new Set();
+        map[code].add(jourStr(new Date(v.created_at)));
+    });
+    return map;
+}
+
+/** Vérifie si TOUS les objectifs du jour (hors Spiderhome) sont atteints maintenant, et
+ *  enregistre "jour parfait" pour aujourd'hui si c'est le cas (idempotent, upsert). */
+async function verifierJourParfaitAujourdhui(conseillerId: string): Promise<void> {
+    const missions = await getMissionsReelles(conseillerId).catch(() => []);
+    const commerciales = missions.filter((m: any) => m.produit.toLowerCase() !== "spiderhome");
+    const totalObjectif = commerciales.reduce((t: number, m: any) => t + m.objectif, 0);
+    if (totalObjectif <= 0) return;
+    const parfait = commerciales.every((m: any) => m.objectif === 0 || m.realise >= m.objectif);
+    if (!parfait) return;
+
+    await supabase
+        .from("conseiller_jours_parfaits")
+        .upsert({ conseiller_id: conseillerId, jour: jourStr(new Date()) }, { onConflict: "conseiller_id,jour" });
+}
+
+async function getJoursParfaitsTous(conseillerId: string): Promise<Set<string>> {
+    const { data } = await supabase.from("conseiller_jours_parfaits").select("jour").eq("conseiller_id", conseillerId);
+    return new Set((data ?? []).map((r: any) => r.jour as string));
+}
+
 async function getVictoiresEquipe(conseillerId: string): Promise<number> {
     const defis = await getDefisEquipe();
     const termines = defis.filter((d) => d.statut === "termine" && d.membres.some((m) => m.conseillerId === conseillerId));
@@ -163,13 +291,28 @@ export async function calculerBadgesConseiller(conseillerId: string): Promise<Et
     const debloques: Record<string, string> = {};
     (badgeRows ?? []).forEach((r: any) => { debloques[r.badge_code] = r.obtenu_le; });
 
-    const [volumeParProduit, fiches, nbForfait4P, defisInfo, equipeGagnes] = await Promise.all([
+    const debutFenetre = new Date();
+    debutFenetre.setDate(debutFenetre.getDate() - PROFONDEUR_JOURS);
+
+    await verifierJourParfaitAujourdhui(conseillerId).catch(() => {});
+
+    const [volumeParProduit, fiches, nbForfait4P, defisInfo, equipeGagnes, planningMap, ventesParJourParProduit, joursParfaitsSet] = await Promise.all([
         getVolumeCumulProduit(conseillerId),
         getFichesBoxRaccordement(conseillerId),
         getNbForfait4PDifferesConseiller(conseillerId),
         getDefis1v1(conseillerId),
         getVictoiresEquipe(conseillerId),
+        getPlanningMap(conseillerId, debutFenetre, new Date()),
+        getVentesParJourParProduit(conseillerId, debutFenetre),
+        getJoursParfaitsTous(conseillerId),
     ]);
+
+    const streakParProduit: Record<string, number> = {};
+    PRODUITS_STREAK.forEach((code) => {
+        streakParProduit[code] = calculerStreakDepuisSet(ventesParJourParProduit[code] ?? new Set(), planningMap);
+    });
+    const nbJoursParfaits = joursParfaitsSet.size;
+    const streakJoursParfaits = calculerStreakDepuisSet(joursParfaitsSet, planningMap);
 
     const raccordees = fiches.filter((f) => f.raccordee);
     const nb4PCumule = raccordees.filter((f) => f.quatreP).length + nbForfait4P;
@@ -197,6 +340,18 @@ export async function calculerBadgesConseiller(conseillerId: string): Promise<Et
     }
     if (equipeGagnes >= 3 && !debloques["defi_esprit_equipe"]) aDebloquer.push("defi_esprit_equipe");
 
+    PRODUITS_STREAK.forEach((code) => {
+        const badgeCode = `streak_${code}_semaine`;
+        if (streakParProduit[code] >= 7 && !debloques[badgeCode]) aDebloquer.push(badgeCode);
+    });
+
+    PALIERS_JOURS_PARFAITS.forEach((seuil) => {
+        const badgeCode = `jour_parfait_${seuil}`;
+        if (nbJoursParfaits >= seuil && !debloques[badgeCode]) aDebloquer.push(badgeCode);
+    });
+
+    if (streakJoursParfaits >= 7 && !debloques["semaine_parfaite"]) aDebloquer.push("semaine_parfaite");
+
     if (aDebloquer.length > 0) {
         const aujourdhui = new Date().toISOString().slice(0, 10);
         await supabase.from("conseiller_badges").insert(
@@ -212,5 +367,8 @@ export async function calculerBadgesConseiller(conseillerId: string): Promise<Et
         nbBoxRaccordees: raccordees.length,
         defisGagnes: defisInfo.gagnes,
         equipeGagnes,
+        streakParProduit,
+        nbJoursParfaits,
+        streakJoursParfaits,
     };
 }
