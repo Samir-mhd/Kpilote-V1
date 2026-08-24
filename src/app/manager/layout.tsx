@@ -85,7 +85,7 @@ export default function ManagerLayout({
                     </span>
                 </Link>
 
-                <nav className="flex flex-1 flex-col gap-2">
+                <nav className="flex flex-1 flex-col gap-2 overflow-y-auto">
                     {menu.map((item) => {
 
                         const active =

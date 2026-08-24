@@ -10,7 +10,6 @@ import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 type Conseiller = {
     id: string;
     nom: string;
-    prenom: string | null;
     avatar: string | null;
     ordre: number;
     genre: "H" | "F" | null;
@@ -133,11 +132,10 @@ export default function GestionEquipePage() {
     async function saveEdit(id: string) {
         const nom = editNom.trim();
         if (!nom) { setEditId(null); return; }
-        const prenom = nom.split(" ")[0];
-        const { error } = await supabase.from("conseillers").update({ nom, prenom }).eq("id", id);
+        const { error } = await supabase.from("conseillers").update({ nom }).eq("id", id);
         if (error) { afficherToast("Erreur lors du renommage.", false); }
         else {
-            setConseillers(prev => prev.map(c => c.id === id ? { ...c, nom, prenom } : c));
+            setConseillers(prev => prev.map(c => c.id === id ? { ...c, nom } : c));
             afficherToast("Nom mis à jour !");
         }
         setEditId(null);
@@ -154,7 +152,7 @@ export default function GestionEquipePage() {
         const prenom   = nom.split(" ")[0];
         const { data, error } = await supabase
             .from("conseillers")
-            .insert({ nom, prenom, ordre: maxOrdre + 1, avatar: null })
+            .insert({ nom, ordre: maxOrdre + 1, avatar: null })
             .select()
             .single();
         if (error) {
