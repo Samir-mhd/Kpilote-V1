@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { uploadPhoto } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
+import CartoonAvatar from "@/components/avatar/CartoonAvatar";
+import {
+    ETATS_AVATAR, getCartoonAvatarsConseiller, uploadCartoonAvatar, supprimerCartoonAvatarEtat,
+} from "@/services/cartoonAvatarService";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
@@ -38,6 +42,14 @@ export default function GestionEquipePage() {
     const [uploadingId, setUploadingId] = useState<string | null>(null);
     const fileInputRef                  = useRef<HTMLInputElement>(null);
     const uploadTargetRef               = useRef<string | null>(null);
+
+    // Panel avatars (6 expressions)
+    const [panelOuvertId, setPanelOuvertId]   = useState<string | null>(null);
+    const [avatarsCourants, setAvatarsCourants] = useState<Record<string, string | null>>({});
+    const [chargementAvatars, setChargementAvatars] = useState(false);
+    const [uploadingEtat, setUploadingEtat]   = useState<string | null>(null);
+    const cartoonFileInputRef                 = useRef<HTMLInputElement>(null);
+    const cartoonTargetRef                    = useRef<{ conseillerId: string; nom: string; etat: string } | null>(null);
 
     // Ajout
     const [nomAjout, setNomAjout] = useState("");
@@ -90,6 +102,57 @@ export default function GestionEquipePage() {
             afficherToast("Échec de l'upload.", false);
         } finally {
             setUploadingId(null);
+        }
+    }
+
+    /* ── Panel avatars ────────────────────────────────────────────── */
+
+    async function toggleAvatarsPanel(c: Conseiller) {
+        if (panelOuvertId === c.id) { setPanelOuvertId(null); return; }
+        setPanelOuvertId(c.id);
+        setChargementAvatars(true);
+        try {
+            setAvatarsCourants(await getCartoonAvatarsConseiller(c.id));
+        } catch {
+            afficherToast("Erreur lors du chargement des avatars.", false);
+        } finally {
+            setChargementAvatars(false);
+        }
+    }
+
+    function ouvrirUploadCartoon(conseillerId: string, nom: string, etat: string) {
+        cartoonTargetRef.current = { conseillerId, nom, etat };
+        cartoonFileInputRef.current?.click();
+    }
+
+    async function handleCartoonFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file  = e.target.files?.[0];
+        const cible = cartoonTargetRef.current;
+        if (!file || !cible) return;
+        e.target.value = "";
+
+        if (file.size > 5 * 1024 * 1024) { afficherToast("Fichier trop lourd — max 5 Mo.", false); return; }
+        if (!file.type.startsWith("image/")) { afficherToast("Fichier invalide — image uniquement.", false); return; }
+
+        setUploadingEtat(cible.etat);
+        try {
+            const base64 = await uploadCartoonAvatar(cible.conseillerId, cible.nom, cible.etat, file);
+            setAvatarsCourants(prev => ({ ...prev, [cible.etat]: base64 }));
+            afficherToast("Avatar mis à jour !");
+        } catch {
+            afficherToast("Échec de l'upload.", false);
+        } finally {
+            setUploadingEtat(null);
+        }
+    }
+
+    async function supprimerCartoon(conseillerId: string, etat: string) {
+        try {
+            await supprimerCartoonAvatarEtat(conseillerId, etat);
+            setAvatarsCourants(prev => ({ ...prev, [etat]: null }));
+            afficherToast("Avatar supprimé — retour au visuel par défaut.");
+        } catch {
+            afficherToast("Erreur lors de la suppression.", false);
         }
     }
 
@@ -215,6 +278,13 @@ export default function GestionEquipePage() {
                 className="hidden"
                 onChange={handleFileChange}
             />
+            <input
+                ref={cartoonFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleCartoonFileChange}
+            />
 
             {/* ── Hero ──────────────────────────────────────────────────── */}
             <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-10 py-9 shadow-[0_20px_60px_rgba(15,23,42,.30)]">
@@ -243,12 +313,13 @@ export default function GestionEquipePage() {
                         const isEditing   = editId === c.id;
                         const isUploading = uploadingId === c.id;
                         const isDeleting  = deleteConfirm?.conseiller.id === c.id;
+                        const panelOuvert = panelOuvertId === c.id;
                         return (
+                            <div key={c.id}>
                             <div
-                                key={c.id}
                                 className={`flex items-center gap-5 rounded-[20px] bg-white px-6 py-5 shadow-[0_2px_16px_rgba(15,23,42,.06)] transition-all ${
                                     isDeleting ? "ring-2 ring-red-300" : ""
-                                } ${c.profil_actif === false ? "opacity-60" : ""}`}
+                                } ${c.profil_actif === false ? "opacity-60" : ""} ${panelOuvert ? "rounded-b-none" : ""}`}
                             >
                                 {/* Photo */}
                                 <div className="relative flex-shrink-0">
@@ -323,6 +394,19 @@ export default function GestionEquipePage() {
                                             </button>
                                         )}
 
+                                        {/* Avatars (6 expressions) */}
+                                        <button
+                                            onClick={() => toggleAvatarsPanel(c)}
+                                            className={`flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-all ${
+                                                panelOuvertId === c.id
+                                                    ? "bg-violet-600 text-white"
+                                                    : "bg-slate-100 text-slate-500 hover:bg-violet-100 hover:text-violet-600"
+                                            }`}
+                                            title="Gérer les avatars (6 expressions)"
+                                        >
+                                            🎭 Avatars
+                                        </button>
+
                                         {/* Genre H/F */}
                                         <button
                                             onClick={() => toggleGenre(c.id, c.genre)}
@@ -389,6 +473,68 @@ export default function GestionEquipePage() {
                                         </button>
                                     </div>
                                 )}
+                            </div>
+
+                            {/* ── Panel avatars ─────────────────────────── */}
+                            {panelOuvert && (
+                                <div className="rounded-b-[20px] border-t border-slate-100 bg-slate-50 px-6 py-5">
+                                    {chargementAvatars ? (
+                                        <div className="flex h-16 items-center justify-center">
+                                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-violet-600 border-t-transparent" />
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
+                                                Avatars — {c.nom.split(" ")[0]}
+                                            </p>
+                                            <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+                                                {ETATS_AVATAR.map((etatDef) => {
+                                                    const custom = avatarsCourants[etatDef.code];
+                                                    const busy = uploadingEtat === etatDef.code;
+                                                    return (
+                                                        <div key={etatDef.code} className="flex flex-col items-center gap-2 rounded-2xl bg-white p-3 text-center shadow-sm">
+                                                            <div className="relative">
+                                                                <div className={`flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl bg-slate-100 transition-opacity ${busy ? "opacity-40" : ""}`}>
+                                                                    {custom ? (
+                                                                        <img src={custom} alt={etatDef.label} className="h-full w-full object-contain" />
+                                                                    ) : (
+                                                                        <CartoonAvatar prenom={c.nom} etat={etatDef.code as any} size={56} />
+                                                                    )}
+                                                                </div>
+                                                                {busy && (
+                                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-violet-600 border-t-transparent" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-[10px] font-bold leading-tight text-slate-500">{etatDef.emoji} {etatDef.label}</p>
+                                                            <div className="flex gap-1.5">
+                                                                <button
+                                                                    onClick={() => ouvrirUploadCartoon(c.id, c.nom, etatDef.code)}
+                                                                    className="rounded-lg bg-violet-100 px-2 py-1 text-[10px] font-bold text-violet-600 transition-all hover:bg-violet-200"
+                                                                >
+                                                                    {custom ? "Changer" : "Upload"}
+                                                                </button>
+                                                                {custom && (
+                                                                    <button
+                                                                        onClick={() => supprimerCartoon(c.id, etatDef.code)}
+                                                                        className="rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-400 transition-all hover:bg-red-100 hover:text-red-500"
+                                                                    >
+                                                                        ×
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            <p className="mt-4 text-[11px] text-slate-400">
+                                                PNG avec fond transparent recommandé · Max 5 Mo · Sans image, l'expression garde son visuel par défaut (fichier existant ou initiales).
+                                            </p>
+                                        </>
+                                    )}
+                                </div>
+                            )}
                             </div>
                         );
                     })}

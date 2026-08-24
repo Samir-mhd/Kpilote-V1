@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import InitialesAvatar from "./InitialesAvatar";
+import { getTousLesCartoonAvatarsParPrenom } from "@/services/cartoonAvatarService";
 
 export type AvatarEtat =
     | "souriant_main"
@@ -42,21 +43,33 @@ interface Props {
 
 export default function CartoonAvatar({ prenom, etat = "souriant_main", className = "", size }: Props) {
     const [error, setError] = useState(false);
+    const [perso, setPerso] = useState<Record<string, string> | null>(null);
     const dossier   = prenomDossier(prenom);
     const prefix    = normPrenom(prenom);
     const imageEtat = etat === "souriant_actif" ? "souriant_main" : etat;
+
+    useEffect(() => {
+        let annule = false;
+        getTousLesCartoonAvatarsParPrenom()
+            .then((map) => { if (!annule) setPerso(map[prefix] ?? null); })
+            .catch(() => { if (!annule) setPerso(null); });
+        return () => { annule = true; };
+    }, [prefix]);
 
     if (error) {
         return <InitialesAvatar nom={prenom} size={size ?? 64} />;
     }
 
+    // Priorité à l'avatar uploadé depuis KPILOTE ; fallback sur le fichier statique historique.
+    const src = perso?.[imageEtat] || `/avatar/${dossier}/${prefix}_${imageEtat}.png`;
+
     return (
         <img
-            src={`/avatar/${dossier}/${prefix}_${imageEtat}.png`}
+            src={src}
             alt={prenom}
             className={className}
             style={size ? { width: size, height: size, objectFit: "contain" } : undefined}
-            onError={() => { console.warn(`[CartoonAvatar] 404 → /avatar/${dossier}/${prefix}_${imageEtat}.png`); setError(true); }}
+            onError={() => { console.warn(`[CartoonAvatar] échec chargement → ${src.slice(0, 60)}`); setError(true); }}
         />
     );
 }
