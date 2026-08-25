@@ -43,6 +43,8 @@ export type ObjectifManagerRow = {
   produits: { nom: string; code: string } | null;
 };
 
+/** Profil désactivé (espace restreint conseiller) : invisible des outils de gestion manager
+ *  (objectifs, planning, reset ventes) — même convention que classement/badges/feed. */
 export async function getObjectifsManager(): Promise<ObjectifManagerRow[]> {
   const { data, error } = await supabase
     .from("objectifs_mensuels")
@@ -51,7 +53,8 @@ export async function getObjectifsManager(): Promise<ObjectifManagerRow[]> {
       conseiller_id,
       objectif,
       conseillers (
-        nom
+        nom,
+        profil_actif
       ),
       produits (
         nom,
@@ -61,7 +64,8 @@ export async function getObjectifsManager(): Promise<ObjectifManagerRow[]> {
 
   if (error) throw error;
 
-  return (data ?? []) as unknown as ObjectifManagerRow[];
+  return ((data ?? []) as unknown as (ObjectifManagerRow & { conseillers: { nom: string; profil_actif: boolean | null } | null })[])
+    .filter((row) => row.conseillers?.profil_actif !== false);
 }
 
 export async function updateObjectifMensuel(id: string, objectif: number) {
