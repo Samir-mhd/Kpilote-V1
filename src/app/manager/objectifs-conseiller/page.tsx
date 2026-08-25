@@ -15,7 +15,7 @@ import {
 import { getJoursTravailTous, getJoursTravailSemaineTous } from "@/services/planningService";
 import { exporterObjectifsPDF, exporterObjectifsSemainePDF } from "@/utils/exportObjectifsPDF";
 import { periodeSemaineEffective } from "@/utils/periodes";
-import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
+import { getObjectifsSemaineFiges, invaliderObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import type { ProduitCode } from "@/utils/produits";
 import Link from "next/link";
 
@@ -116,6 +116,14 @@ export default function ObjectifsConseillerPage() {
             await Promise.all(
                 Object.entries(edits).map(([id, objectif]) => updateObjectifMensuel(id, objectif))
             );
+            // Sans ça, un objectif semaine déjà figé (potentiellement à 0) resterait bloqué
+            // jusqu'au lundi suivant malgré la mise à jour du mensuel.
+            const conseillerIdsModifies = [...new Set(
+                Object.keys(edits)
+                    .map((rowId) => rows.find((r) => r.id === rowId)?.conseiller_id)
+                    .filter((id): id is string => !!id)
+            )];
+            await invaliderObjectifsSemaineFiges(conseillerIdsModifies);
             setConfirmation("Objectifs mis à jour avec succès.");
             await charger();
         } finally {

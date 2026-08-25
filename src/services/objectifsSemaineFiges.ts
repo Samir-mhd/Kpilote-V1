@@ -8,12 +8,29 @@ import { supabase } from "@/lib/supabase";
 import { PRODUITS_ORDRE, ProduitCode } from "@/utils/produits";
 import { getJoursTravailPlageTous, getJoursTravailSemaineTous } from "@/services/planningService";
 import { fetchToutesLesLignes } from "@/utils/supabasePaging";
+import { periodeSemaineEffective } from "@/utils/periodes";
 
 function dateStr(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 const CODES_MANUELS = PRODUITS_ORDRE.filter((p) => p.code !== "spiderhome").map((p) => p.code) as ProduitCode[];
+
+/**
+ * Invalide l'objectif semaine figé EN COURS pour les conseillers donnés — à appeler après une
+ * modification manuelle de leurs objectifs mensuels, sinon le figé déjà calculé (potentiellement
+ * à 0, ex. conseiller tout juste créé) resterait bloqué jusqu'au lundi suivant malgré la mise à
+ * jour. Se recalcule automatiquement au prochain accès (getObjectifsSemaineFiges).
+ */
+export async function invaliderObjectifsSemaineFiges(conseillerIds: string[]): Promise<void> {
+    if (conseillerIds.length === 0) return;
+    const { debut } = periodeSemaineEffective(new Date());
+    await supabase
+        .from("objectifs_semaine_figes")
+        .delete()
+        .eq("semaine_debut", dateStr(debut))
+        .in("conseiller_id", conseillerIds);
+}
 
 export async function getObjectifsSemaineFiges(
     conseillerIds: string[],
