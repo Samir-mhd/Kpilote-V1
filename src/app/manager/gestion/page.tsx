@@ -8,6 +8,7 @@ import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 import {
     ETATS_AVATAR, getCartoonAvatarsConseiller, uploadCartoonAvatar, supprimerCartoonAvatarEtat,
 } from "@/services/cartoonAvatarService";
+import { initialiserObjectifsMensuels } from "@/services/objectifs";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
@@ -223,7 +224,12 @@ export default function GestionEquipePage() {
         } else {
             setConseillers(prev => [...prev, data as Conseiller]);
             setNomAjout("");
-            afficherToast(`${prenom} ajouté·e à l'équipe !`);
+            try {
+                await initialiserObjectifsMensuels(data.id);
+                afficherToast(`${prenom} ajouté·e à l'équipe !`);
+            } catch {
+                afficherToast(`${prenom} ajouté·e, mais l'initialisation des objectifs a échoué — réessayez depuis "Objectifs conseiller".`, false);
+            }
         }
         setAjoutEnCours(false);
     }
