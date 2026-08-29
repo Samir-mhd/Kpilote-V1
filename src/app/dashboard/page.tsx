@@ -51,6 +51,7 @@ type MissionDashboard = {
     realise: number;
     couleur: string;
     message: string;
+    dernierJourSemaine?: boolean;
 };
 
 /** Date locale au format YYYY-MM-DD (pas UTC — important pour les fuseaux horaires). */
@@ -975,6 +976,7 @@ export default function Dashboard() {
                                 }
                             } : undefined}
                             onBoostReady={afficherBoostToast}
+                            dernierJourSemaine={mission.dernierJourSemaine}
                         />
                     ))}
                 </div>

@@ -20,6 +20,10 @@ type Props = {
     onCrossSell4P?: () => void | Promise<void>;
     /** Affiche le bandeau boost — appelé après la question 4P si elle est posée, sinon immédiatement. */
     onBoostReady?: (info?: BoostInfo) => void;
+    /** true si c'est le dernier jour travaillé de la semaine figée — le reste de la semaine
+     *  se concentre alors entièrement sur aujourd'hui (pas de lissage avec le jour suivant,
+     *  qui appartient à une semaine figée différente). */
+    dernierJourSemaine?: boolean;
 };
 
 // Mapping couleur Tailwind → hex (pour le SVG arc) + gradient (pour la barre/bouton)
@@ -97,7 +101,7 @@ function genParticles(): Particle[] {
 
 export default function MissionCard({
     titre, realise, objectif, couleur, onSale, sousChoix, acteDirect, onChoixVariable,
-    demanderCrossSell4P, montantCrossSell4P, onCrossSell4P, onBoostReady,
+    demanderCrossSell4P, montantCrossSell4P, onCrossSell4P, onBoostReady, dernierJourSemaine,
 }: Props) {
     const [celebrating, setCelebrating] = useState(false);
     const [celebEmoji, setCelebEmoji] = useState("🎉");
@@ -222,6 +226,11 @@ export default function MissionCard({
                         <h2 className="mt-2 truncate text-2xl font-black text-white">
                             {displayTitre}
                         </h2>
+                        {dernierJourSemaine && (
+                            <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2.5 py-1 text-[10px] font-black text-amber-300">
+                                📅 Dernier jour de la semaine
+                            </span>
+                        )}
                     </div>
 
                     <div className="relative flex-shrink-0">

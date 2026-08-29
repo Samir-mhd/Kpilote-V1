@@ -135,6 +135,7 @@ export async function getMissionsReelles(conseillerId: string) {
                 realise:  realiseAujourdhui,
                 couleur:  couleurProduit(m.produit),
                 message:  m.message,
+                dernierJourSemaine: false,
             };
         }
 
@@ -149,6 +150,9 @@ export async function getMissionsReelles(conseillerId: string) {
             realise:  realiseAujourdhui, // ventes d'aujourd'hui = 0 au début de chaque journée
             couleur:  couleurProduit(m.produit),
             message:  m.message,
+            // Reste de la semaine figée entièrement compressé sur aujourd'hui — le jour suivant
+            // appartient à une autre semaine figée (recalcul indépendant), pas de lissage possible.
+            dernierJourSemaine: joursRestantsSemaine === 1,
         };
     });
 }
