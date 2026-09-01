@@ -26,6 +26,7 @@ import { useAvatarEtat } from "@/hooks/useAvatarEtat";
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 import TeamFeed from "@/components/dashboard/TeamFeed";
 import CagnotteJourCard from "@/components/dashboard/CagnotteJourCard";
+import AutresActesCard from "@/components/dashboard/AutresActesCard";
 import { ChoixActe } from "@/components/dashboard/ChoixActeModal";
 import {
     BaremeVariable,
@@ -622,9 +623,6 @@ export default function Dashboard() {
     // "Autres actes") : assurance essentielle après un forfait, boost constructeur après un
     // téléphone, Canal+ uniquement après une box Ultra (pas les autres modèles de box).
     function calculerQuestionsCrossSell(titre: string, choix?: ChoixActe): QuestionCrossSell[] {
-        // Bascule manager "Autres actes" (/manager/variable) — désactivée par défaut.
-        if (champMasque("autres_actes")) return [];
-
         const n = normaliser(titre);
         const questions: QuestionCrossSell[] = [];
 
@@ -1043,6 +1041,13 @@ export default function Dashboard() {
                     ))}
                 </div>
             </section>
+
+            {variableActivee && !champMasque("autres_actes") && (
+                <AutresActesCard
+                    bonusManuels={bonusManuels}
+                    onChoisir={ajouterActeVariable}
+                />
+            )}
 
         </div>
     );

@@ -280,21 +280,14 @@ export default function VariableSimulationPage() {
                         );
                     })}
 
-                    <BonusManuelsCard
-                        items={bonusManuels.filter((b) => !b.categorie || b.categorie === "destockage")}
-                        mode="gestion"
-                        onAdd={(label, montant) => handleAjouterBonus(label, montant, "destockage")}
-                        onRemove={handleSupprimerBonus}
-                    />
-
-                    {/* ── Autres actes (questions de rebond post-vente) ────────────── */}
+                    {/* ── Autres actes (carte conseiller "Complète ta cagnotte") ────── */}
                     <CardShell>
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-300">Autres actes</p>
                                 <p className="max-w-md text-sm text-white/50">
-                                    Questions posées juste après une vente : boost constructeur/déstockage après un téléphone,
-                                    assurance essentielle après un forfait, Canal+ après une box Ultra uniquement.
+                                    Carte "Autres actes" sur l'Accueil conseiller — pour des actes ponctuels ajoutés au coup par coup,
+                                    mois par mois. N'active que si tu as des actes à proposer ce mois-ci.
                                 </p>
                             </div>
                             <button
@@ -307,6 +300,14 @@ export default function VariableSimulationPage() {
                             >
                                 {(bareme.champsMasques ?? []).includes("autres_actes") ? "🚫 Désactivé" : "✅ Actif"}
                             </button>
+                        </div>
+                        <div className="mt-4 border-t border-white/10 pt-4">
+                            <BonusManuelsInline
+                                items={bonusManuels.filter((b) => !b.categorie || b.categorie === "destockage")}
+                                mode="gestion"
+                                onAdd={(label, montant) => handleAjouterBonus(label, montant, "destockage")}
+                                onRemove={handleSupprimerBonus}
+                            />
                         </div>
                     </CardShell>
                 </div>

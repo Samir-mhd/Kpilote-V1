@@ -295,8 +295,9 @@ export const BAREME_DEFAUT: BaremeVariable = {
     lead_coms_pro: 10,
 
     // "autres_actes" est un sentinel (pas un champ numérique du barème) : quand présent,
-    // désactive les questions de rebond post-vente (boost constructeur, assurance essentielle,
-    // Canal+) côté conseiller — bascule "Autres actes" sur /manager/variable.
+    // masque la carte Accueil "Autres actes" (actes ponctuels ajoutés par le manager) côté
+    // conseiller — bascule sur /manager/variable. N'affecte jamais les questions de rebond
+    // post-vente (boost constructeur, assurance essentielle, Canal+), toujours actives.
     champsMasques: ["autres_actes"],
 };
 
