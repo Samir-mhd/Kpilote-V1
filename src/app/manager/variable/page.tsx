@@ -139,7 +139,9 @@ export default function VariableSimulationPage() {
 
     // Retire/remet en vente un champ fixe du barème (Box Ultra, Forfait Free Max...) : masqué
     // du barème ET de la carte Accueil (sous-choix) tant qu'il n'est pas remis en vente.
-    function toggleChampMasque(key: keyof BaremeVariable) {
+    // Accepte aussi des sentinels hors-barème (ex. "autres_actes") pour des bascules on/off
+    // qui ne correspondent à aucun champ numérique — même mécanisme de stockage/lecture.
+    function toggleChampMasque(key: keyof BaremeVariable | string) {
         setBareme((prev) => {
             const masques = new Set(prev.champsMasques ?? []);
             if (masques.has(key)) masques.delete(key); else masques.add(key);
@@ -284,6 +286,29 @@ export default function VariableSimulationPage() {
                         onAdd={(label, montant) => handleAjouterBonus(label, montant, "destockage")}
                         onRemove={handleSupprimerBonus}
                     />
+
+                    {/* ── Autres actes (questions de rebond post-vente) ────────────── */}
+                    <CardShell>
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div>
+                                <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-300">Autres actes</p>
+                                <p className="max-w-md text-sm text-white/50">
+                                    Questions posées juste après une vente : boost constructeur/déstockage après un téléphone,
+                                    assurance essentielle après un forfait, Canal+ après une box Ultra uniquement.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => toggleChampMasque("autres_actes")}
+                                className={`flex-shrink-0 rounded-2xl px-5 py-3 text-sm font-black transition-all ${
+                                    (bareme.champsMasques ?? []).includes("autres_actes")
+                                        ? "bg-white/10 text-white/40 hover:bg-white/15"
+                                        : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
+                                }`}
+                            >
+                                {(bareme.champsMasques ?? []).includes("autres_actes") ? "🚫 Désactivé" : "✅ Actif"}
+                            </button>
+                        </div>
+                    </CardShell>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-7 lg:grid-cols-[1.3fr_1fr]">

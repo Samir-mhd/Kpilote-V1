@@ -294,7 +294,10 @@ export const BAREME_DEFAUT: BaremeVariable = {
     lead_forfait: 5,
     lead_coms_pro: 10,
 
-    champsMasques: [],
+    // "autres_actes" est un sentinel (pas un champ numérique du barème) : quand présent,
+    // désactive les questions de rebond post-vente (boost constructeur, assurance essentielle,
+    // Canal+) côté conseiller — bascule "Autres actes" sur /manager/variable.
+    champsMasques: ["autres_actes"],
 };
 
 export const VENTES_VIDES: VenteConseiller = {

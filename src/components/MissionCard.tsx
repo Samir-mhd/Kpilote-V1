@@ -5,6 +5,16 @@ import ChoixActeModal, { ChoixActe } from "@/components/dashboard/ChoixActeModal
 
 type BoostInfo = { label: string; montant: number };
 
+/** Question de rebond posée juste après une vente/un choix. Une seule option → "Oui" applique
+ *  directement ce montant. Plusieurs options → "Oui" ouvre un petit choix (ex. quelle option
+ *  Canal+, quel boost constructeur) avant d'appliquer l'acte choisi. */
+export type QuestionCrossSell = {
+    id: string;
+    emoji: string;
+    question: string;
+    options: ChoixActe[];
+};
+
 type Props = {
     titre: string;
     realise: number;
@@ -18,7 +28,11 @@ type Props = {
     demanderCrossSell4P?: boolean;
     montantCrossSell4P?: number;
     onCrossSell4P?: () => void | Promise<void>;
-    /** Affiche le bandeau boost — appelé après la question 4P si elle est posée, sinon immédiatement. */
+    /** Questions de rebond supplémentaires selon l'acte réalisé (ex. assurance essentielle après
+     *  un forfait, Canal+ après une box Ultra, boost constructeur après un téléphone). Recalculées
+     *  à chaque vente à partir du choix réellement fait. */
+    questionsCrossSellPour?: (choix?: ChoixActe) => QuestionCrossSell[];
+    /** Affiche le bandeau boost — appelé après toutes les questions de rebond, sinon immédiatement. */
     onBoostReady?: (info?: BoostInfo) => void;
     /** true si c'est le dernier jour travaillé de la semaine figée — le reste de la semaine
      *  se concentre alors entièrement sur aujourd'hui (pas de lissage avec le jour suivant,
@@ -103,7 +117,7 @@ function genParticles(): Particle[] {
 
 export default function MissionCard({
     titre, realise, objectif, couleur, onSale, sousChoix, acteDirect, onChoixVariable,
-    demanderCrossSell4P, montantCrossSell4P, onCrossSell4P, onBoostReady, dernierJourSemaine,
+    demanderCrossSell4P, montantCrossSell4P, onCrossSell4P, questionsCrossSellPour, onBoostReady, dernierJourSemaine,
 }: Props) {
     const [celebrating, setCelebrating] = useState(false);
     const [celebEmoji, setCelebEmoji] = useState("🎉");
@@ -111,6 +125,10 @@ export default function MissionCard({
     const [modalOuverte, setModalOuverte] = useState(false);
     const [question4POuverte, setQuestion4POuverte] = useState(false);
     const [envoi4PEnCours, setEnvoi4PEnCours] = useState(false);
+    const [queueQuestions, setQueueQuestions] = useState<QuestionCrossSell[]>([]);
+    const [questionActive, setQuestionActive] = useState<QuestionCrossSell | null>(null);
+    const [pickerOuvert, setPickerOuvert] = useState(false);
+    const [envoiCrossSellEnCours, setEnvoiCrossSellEnCours] = useState(false);
     const boostEnAttenteRef = useRef<BoostInfo | undefined>(undefined);
 
     const pal   = PALETTE[couleur] ?? DEFAULT_PAL;
@@ -132,14 +150,31 @@ export default function MissionCard({
         if (choix) boostInfo = (await onChoixVariable?.(choix)) || undefined;
         setTimeout(() => setParticles([]), 750);
         setTimeout(() => setCelebrating(false), 1600);
-        // Uniquement après un choix de modèle (Box/Forfait) — pas sur les cartes à acte direct.
-        // Le bandeau boost est différé après la question 4P pour ne pas se superposer.
+        boostEnAttenteRef.current = boostInfo;
+
+        // Questions de rebond (assurance essentielle, Canal+, boost constructeur...) calculées
+        // à partir du choix réellement fait — uniquement après un choix de modèle/acte, pas sur
+        // les cartes sans choix (ex. historisation Spiderhome).
+        const questions = choix ? (questionsCrossSellPour?.(choix) ?? []) : [];
+
+        // Le bandeau boost est différé après toutes les questions pour ne pas se superposer.
         if (choix && demanderCrossSell4P) {
-            boostEnAttenteRef.current = boostInfo;
+            setQueueQuestions(questions);
             setQuestion4POuverte(true);
         } else {
-            onBoostReady?.(boostInfo);
+            avancerQuestions(questions);
         }
+    }
+
+    function avancerQuestions(queue: QuestionCrossSell[]) {
+        if (queue.length === 0) {
+            onBoostReady?.(boostEnAttenteRef.current);
+            boostEnAttenteRef.current = undefined;
+            return;
+        }
+        const [prochaine, ...reste] = queue;
+        setQueueQuestions(reste);
+        setQuestionActive(prochaine);
     }
 
     function handleSale() {
@@ -166,8 +201,46 @@ export default function MissionCard({
             }
         }
         setQuestion4POuverte(false);
-        onBoostReady?.(boostEnAttenteRef.current);
-        boostEnAttenteRef.current = undefined;
+        avancerQuestions(queueQuestions);
+    }
+
+    async function handleReponseCrossSell(oui: boolean) {
+        if (!questionActive) return;
+        if (!oui) {
+            setQuestionActive(null);
+            avancerQuestions(queueQuestions);
+            return;
+        }
+        if (questionActive.options.length === 1) {
+            setEnvoiCrossSellEnCours(true);
+            try {
+                await onChoixVariable?.(questionActive.options[0]);
+            } finally {
+                setEnvoiCrossSellEnCours(false);
+            }
+            setQuestionActive(null);
+            avancerQuestions(queueQuestions);
+        } else {
+            setPickerOuvert(true);
+        }
+    }
+
+    async function handlePickerCrossSell(choix: ChoixActe) {
+        setPickerOuvert(false);
+        setEnvoiCrossSellEnCours(true);
+        try {
+            await onChoixVariable?.(choix);
+        } finally {
+            setEnvoiCrossSellEnCours(false);
+        }
+        setQuestionActive(null);
+        avancerQuestions(queueQuestions);
+    }
+
+    function fermerPickerSansChoix() {
+        setPickerOuvert(false);
+        setQuestionActive(null);
+        avancerQuestions(queueQuestions);
     }
 
     return (
@@ -318,7 +391,7 @@ export default function MissionCard({
             {question4POuverte && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-                    onClick={() => !envoi4PEnCours && setQuestion4POuverte(false)}
+                    onClick={() => !envoi4PEnCours && handleReponse4P(false)}
                 >
                     <div
                         className="mx-4 w-full max-w-xs rounded-[28px] bg-slate-900 p-7 text-center shadow-[0_24px_64px_rgba(0,0,0,.5)]"
@@ -344,6 +417,51 @@ export default function MissionCard({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {questionActive && !pickerOuvert && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                    onClick={() => !envoiCrossSellEnCours && handleReponseCrossSell(false)}
+                >
+                    <div
+                        className="mx-4 w-full max-w-xs rounded-[28px] bg-slate-900 p-7 text-center shadow-[0_24px_64px_rgba(0,0,0,.5)]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <p className="text-4xl">{questionActive.emoji}</p>
+                        <p className="mt-3 text-lg font-black text-white">{questionActive.question}</p>
+                        <div className="mt-6 flex gap-3">
+                            <button
+                                onClick={() => handleReponseCrossSell(false)}
+                                disabled={envoiCrossSellEnCours}
+                                className="flex-1 rounded-2xl border-2 border-white/15 py-3 text-sm font-bold text-white/60 transition-all hover:bg-white/5 disabled:opacity-50"
+                            >
+                                Non
+                            </button>
+                            <button
+                                onClick={() => handleReponseCrossSell(true)}
+                                disabled={envoiCrossSellEnCours}
+                                className="flex-1 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 py-3 text-sm font-black text-white transition-all hover:opacity-90 disabled:opacity-60"
+                            >
+                                {envoiCrossSellEnCours
+                                    ? "…"
+                                    : questionActive.options.length === 1
+                                    ? `Oui +${(questionActive.options[0].montant ?? 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €`
+                                    : "Oui →"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {questionActive && pickerOuvert && (
+                <ChoixActeModal
+                    titre={questionActive.question}
+                    options={questionActive.options}
+                    onChoisir={handlePickerCrossSell}
+                    onClose={fermerPickerSansChoix}
+                    layout="tableau"
+                />
             )}
 
             <style>{`

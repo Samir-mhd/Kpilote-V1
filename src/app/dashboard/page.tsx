@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation";
 import HeroHeader from "@/components/dashboard/HeroHeader";
 import StatsBar from "@/components/dashboard/StatsBar";
 import MorningCheck from "@/components/dashboard/MorningCheck";
-import MissionCard from "@/components/MissionCard";
+import MissionCard, { QuestionCrossSell } from "@/components/MissionCard";
 import { detecterEvenement } from "@/engine/eventEngine";
 import { genererMessageCoach } from "@/engine/coachEngine";
 import { traiterVente } from "@/engine/venteEngine";
@@ -26,7 +26,6 @@ import { useAvatarEtat } from "@/hooks/useAvatarEtat";
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 import TeamFeed from "@/components/dashboard/TeamFeed";
 import CagnotteJourCard from "@/components/dashboard/CagnotteJourCard";
-import AutresActesCard from "@/components/dashboard/AutresActesCard";
 import { ChoixActe } from "@/components/dashboard/ChoixActeModal";
 import {
     BaremeVariable,
@@ -619,6 +618,54 @@ export default function Dashboard() {
         return n === "box" || n === "forfaits";
     }
 
+    // Questions de rebond supplémentaires (remplacent les entrées correspondantes de l'ancien
+    // "Autres actes") : assurance essentielle après un forfait, boost constructeur après un
+    // téléphone, Canal+ uniquement après une box Ultra (pas les autres modèles de box).
+    function calculerQuestionsCrossSell(titre: string, choix?: ChoixActe): QuestionCrossSell[] {
+        // Bascule manager "Autres actes" (/manager/variable) — désactivée par défaut.
+        if (champMasque("autres_actes")) return [];
+
+        const n = normaliser(titre);
+        const questions: QuestionCrossSell[] = [];
+
+        if (n === "forfaits" && !champMasque("assurance_essentielle")) {
+            questions.push({
+                id: "assurance_essentielle",
+                emoji: "🛡️",
+                question: "As-tu vendu une assurance essentielle ?",
+                options: [{ label: "Assurance essentielle", montant: bareme.assurance_essentielle, champ: "assurance_essentielle" }],
+            });
+        }
+
+        if (n === "telephones" && bonusManuels.length > 0) {
+            questions.push({
+                id: "boost_constructeur",
+                emoji: "🏭",
+                question: "As-tu un boost constructeur / déstockage ?",
+                options: bonusManuels.map((b) => ({ label: b.label, montant: b.montant, bonusManuelId: b.id })),
+            });
+        }
+
+        if (n === "box" && choix?.champ === "box_ultra") {
+            const masques = bareme.champsMasques ?? [];
+            const optionsCanal = [
+                !masques.includes("canal_option1") && { label: "Canal+ Option 1", montant: bareme.canal_option1 },
+                !masques.includes("canal_option2") && { label: "Canal+ Option 2", montant: bareme.canal_option2 },
+                !masques.includes("canal_option3") && { label: "Canal+ Option 3", montant: bareme.canal_option3 },
+            ].filter(Boolean) as ChoixActe[];
+            if (optionsCanal.length > 0) {
+                questions.push({
+                    id: "canal_plus",
+                    emoji: "📺",
+                    question: "As-tu vendu une option Canal+ ?",
+                    options: optionsCanal,
+                });
+            }
+        }
+
+        return questions;
+    }
+
     return (
         <div className="space-y-8">
 
@@ -989,20 +1036,13 @@ export default function Dashboard() {
                                     creerForfait4PDiffere(conseillerId, bareme.cross_sell_4p).catch(() => {});
                                 }
                             } : undefined}
+                            questionsCrossSellPour={variableActivee ? (choix) => calculerQuestionsCrossSell(mission.produit, choix) : undefined}
                             onBoostReady={afficherBoostToast}
                             dernierJourSemaine={mission.dernierJourSemaine}
                         />
                     ))}
                 </div>
             </section>
-
-            {variableActivee && (
-                <AutresActesCard
-                    bareme={bareme}
-                    bonusManuels={bonusManuels}
-                    onChoisir={ajouterActeVariable}
-                />
-            )}
 
         </div>
     );
