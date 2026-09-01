@@ -9,9 +9,6 @@ import { construireRecommandationsManager } from "./recommandationsManager";
 import { couleursProduits } from "@/utils/colors";
 import { KPI } from "@/types/dashboard";
 
-import { MetricEngine } from "@/intelligence/metrics";
-import { BrainService } from "./brain/BrainService";
-
 export async function construireDashboardManager() {
 
   const { data: conseillers } = await supabase
@@ -128,22 +125,6 @@ export async function construireDashboardManager() {
     Math.max(objectifGlobal - realiseGlobal, 0);
 
   // ====================================================
-  // KPILOTE BRAIN
-  // ====================================================
-
-  const metrics = kpis.map((kpi) =>
-    MetricEngine.create(
-      kpi.nom.toLowerCase(),
-      kpi.nom,
-      kpi.realise,
-      kpi.objectif
-    )
-  );
-
-  const intelligence =
-    BrainService.analyze(metrics);
-
-  // ====================================================
   // SERVICES
   // ====================================================
 
@@ -162,8 +143,6 @@ export async function construireDashboardManager() {
     tauxGlobal,
 
     ventesRestantes,
-
-    intelligence,
 
   });
 
@@ -184,8 +163,6 @@ export async function construireDashboardManager() {
 
     recommandations,
 
-    intelligence,
-
     realiseGlobal,
 
     objectifGlobal,
@@ -193,18 +170,6 @@ export async function construireDashboardManager() {
     tauxGlobal,
 
     ventesRestantes,
-
-    // ==========================
-    // KPILOTE
-    // ==========================
-
-    scoreIA: intelligence.score,
-
-    confianceIA: intelligence.confidence,
-
-    etatIA: intelligence.health,
-
-    resumeIA: intelligence.summary,
 
   };
 

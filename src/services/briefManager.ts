@@ -8,12 +8,6 @@ export type BriefManager = {
   niveau: "success" | "warning" | "danger";
 };
 
-type Intelligence = {
-  observations?: any[];
-  deductions?: any[];
-  recommendations?: any[];
-};
-
 type BriefManagerInput = {
   kpis: KPI[];
   classement: ConseillerClassement[];
@@ -22,7 +16,6 @@ type BriefManagerInput = {
   objectifGlobal: number;
   tauxGlobal: number;
   ventesRestantes: number;
-  intelligence?: Intelligence;
 };
 
 export function construireBriefManager(
@@ -103,29 +96,6 @@ export function construireBriefManager(
     });
 
   }
-
-  // ===============================
-  // Intelligence KPILOTE
-  // ===============================
-
-  dashboard.intelligence?.recommendations?.forEach((rec: any) => {
-
-    briefs.push({
-
-      titre: "🧠 " + rec.title,
-
-      message: rec.description,
-
-      niveau:
-        rec.priority === "high"
-          ? "danger"
-          : rec.priority === "medium"
-          ? "warning"
-          : "success",
-
-    });
-
-  });
 
   // ===============================
   // Produits
