@@ -9,7 +9,8 @@ function normaliserProduit(produit: string) {
   return produit
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/ /g, "_");
 }
 
 export async function traiterVente({

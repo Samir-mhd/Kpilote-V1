@@ -164,7 +164,7 @@ export default function MorningCheck({ nom, conseillerId, isReset = false, onVal
                             setPressing(true);
                             if (conseillerId) {
                                 const toCode = (produit: string) =>
-                                    produit.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+                                    produit.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ /g, "_");
 
                                 // Toujours un ajustement par écart (jamais de suppression/réécriture) :
                                 // ne redéfinit que ce qui a changé par rapport aux vrais totaux actuels.

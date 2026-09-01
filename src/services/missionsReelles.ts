@@ -126,8 +126,8 @@ export async function getMissionsReelles(conseillerId: string) {
     const objSemaine = objSemaineParConseiller[conseillerId] ?? {};
 
     return resultats.map((m) => {
-        // Normalise le nom produit en code : "Téléphones" → "telephones"
-        const code = m.produit.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+        // Normalise le nom produit en code : "Téléphones" → "telephones", "Avis Google" → "avis_google"
+        const code = m.produit.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ /g, "_");
         const realiseAujourdhui = realiseJour[code] ?? 0;
 
         if (code === "spiderhome") {
