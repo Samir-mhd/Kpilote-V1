@@ -42,6 +42,8 @@ import {
 } from "@/services/variableConseiller";
 import { creerFicheBoxRaccordement } from "@/services/boxRaccordement";
 import { creerForfait4PDiffere } from "@/services/forfait4P";
+import { getOrdreMissions } from "@/services/ordreMissionsService";
+import { PRODUITS_ORDRE } from "@/utils/produits";
 
 const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
 
@@ -194,6 +196,12 @@ export default function Dashboard() {
     // "+X€" discret de la cagnotte).
     const [boostToast, setBoostToast] = useState<{ key: number; label: string; montant: number } | null>(null);
     const boostTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const [ordrePersonnalise, setOrdrePersonnalise] = useState<string[] | null>(null);
+    useEffect(() => {
+        if (!conseillerId) return;
+        getOrdreMissions(conseillerId).then(setOrdrePersonnalise).catch(() => {});
+    }, [conseillerId]);
 
     async function chargerMissions() {
         if (!conseillerId) return;
@@ -569,12 +577,18 @@ export default function Dashboard() {
         return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
     }
 
-    // Ordre d'affichage des cartes Accueil : Box - McAfee / Téléphones - Assurance / Forfaits - Spiderhome
-    const ORDRE_ACCUEIL = ["box", "mcafee", "telephones", "assurance", "forfaits", "avis google", "spiderhome"];
+    function produitCode(nom: string): string {
+        return PRODUITS_ORDRE.find((p) => p.label === nom)?.code ?? normaliser(nom).replace(/ /g, "_");
+    }
+
+    // Ordre par défaut des cartes Accueil : Box - McAfee / Téléphones - Assurance / Forfaits - Avis Google - Spiderhome
+    // Chaque conseiller peut le personnaliser depuis Profil (ordrePersonnalise, sinon ce défaut).
+    const ORDRE_ACCUEIL_DEFAUT = ["box", "mcafee", "telephones", "assurance", "forfaits", "avis_google", "spiderhome"];
     function ordonnerAccueil(liste: MissionDashboard[]): MissionDashboard[] {
+        const ordre = ordrePersonnalise ?? ORDRE_ACCUEIL_DEFAUT;
         return [...liste].sort((a, b) => {
-            const ia = ORDRE_ACCUEIL.indexOf(normaliser(a.produit));
-            const ib = ORDRE_ACCUEIL.indexOf(normaliser(b.produit));
+            const ia = ordre.indexOf(produitCode(a.produit));
+            const ib = ordre.indexOf(produitCode(b.produit));
             return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
         });
     }

@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { uploadPhoto, getPhotoUrl } from "@/services/photoService";
 import ThemePicker from "@/components/dashboard/ThemePicker";
+import OrdreMissionsCard from "@/components/dashboard/OrdreMissionsCard";
 import { getMoisDisponibles, getRecapMensuel, RecapMensuel } from "@/services/recapMensuelService";
 
 function ProfilInner() {
@@ -200,6 +201,9 @@ function ProfilInner() {
 
             {/* Palette de couleurs */}
             <ThemePicker conseillerId={conseillerId} />
+
+            {/* Ordre des cartes objectifs */}
+            <OrdreMissionsCard conseillerId={conseillerId} />
 
             {/* Mes récaps */}
             <div className="rounded-[24px] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
