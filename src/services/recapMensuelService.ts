@@ -17,7 +17,9 @@ export type RecapMensuel = {
     mois: string;
     label: string;
     totalVentes: number;
-    parProduit: { code: string; label: string; emoji: string; nombre: number }[];
+    totalObjectif: number;
+    tauxGlobal: number;
+    parProduit: { code: string; label: string; emoji: string; nombre: number; objectif: number; taux: number }[];
     meilleurJour: { date: string; nombre: number } | null;
     joursActifs: number;
 };
@@ -43,16 +45,29 @@ export async function getRecapMensuel(conseillerId: string, mois: string): Promi
     const debut = new Date(annee, m - 1, 1);
     const fin = new Date(annee, m, 0, 23, 59, 59);
 
-    const rows = await fetchToutesLesLignes((from, to) =>
-        supabase
-            .from("ventes")
-            .select("created_at, quantite, produits(code)")
-            .eq("conseiller_id", conseillerId)
-            .gte("created_at", debut.toISOString())
-            .lte("created_at", fin.toISOString())
-            .order("created_at", { ascending: true })
-            .range(from, to)
-    );
+    const [rows, objectifsRows] = await Promise.all([
+        fetchToutesLesLignes((from, to) =>
+            supabase
+                .from("ventes")
+                .select("created_at, quantite, produits(code)")
+                .eq("conseiller_id", conseillerId)
+                .gte("created_at", debut.toISOString())
+                .lte("created_at", fin.toISOString())
+                .order("created_at", { ascending: true })
+                .range(from, to)
+        ),
+        supabase.from("objectifs_mensuels").select("objectif, produits(code)").eq("conseiller_id", conseillerId),
+    ]);
+
+    // Note : objectifs_mensuels n'est pas historisé par mois dans KPILOTE — une seule ligne
+    // évolutive par conseiller/produit, mise à jour directement par le manager. Pour un mois
+    // révolu, l'objectif affiché est donc le dernier fixé, pas nécessairement celui en vigueur
+    // à l'époque.
+    const objectifParCode: Record<string, number> = {};
+    (objectifsRows.data ?? []).forEach((o: any) => {
+        const code = (Array.isArray(o.produits) ? o.produits[0] : o.produits)?.code;
+        if (code) objectifParCode[code] = o.objectif ?? 0;
+    });
 
     const parJour: Record<string, number> = {};
     const parProduitCount: Record<string, number> = {};
@@ -75,12 +90,22 @@ export async function getRecapMensuel(conseillerId: string, mois: string): Promi
 
     const parProduit = PRODUITS_ORDRE
         .filter((p) => p.code !== "spiderhome")
-        .map((p) => ({ code: p.code, label: p.label, emoji: p.emoji, nombre: parProduitCount[p.code] ?? 0 }));
+        .map((p) => {
+            const nombre = parProduitCount[p.code] ?? 0;
+            const objectif = objectifParCode[p.code] ?? 0;
+            const taux = objectif > 0 ? Math.round((nombre / objectif) * 100) : 0;
+            return { code: p.code, label: p.label, emoji: p.emoji, nombre, objectif, taux };
+        });
+
+    const totalObjectif = parProduit.reduce((t, p) => t + p.objectif, 0);
+    const tauxGlobal = totalObjectif > 0 ? Math.round((total / totalObjectif) * 100) : 0;
 
     return {
         mois,
         label: `${MOIS_FR[m - 1]} ${annee}`,
         totalVentes: total,
+        totalObjectif,
+        tauxGlobal,
         parProduit,
         meilleurJour,
         joursActifs: Object.keys(parJour).length,

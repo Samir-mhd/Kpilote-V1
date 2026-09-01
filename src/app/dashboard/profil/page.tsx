@@ -239,7 +239,11 @@ function ProfilInner() {
                             <div className="mt-5 flex items-end gap-3">
                                 <p className="text-6xl font-black tabular-nums leading-none">{recap.totalVentes}</p>
                                 <p className="pb-2 text-sm font-semibold text-white/70">
-                                    vente{recap.totalVentes > 1 ? "s" : ""} au total
+                                    {recap.totalObjectif > 0 ? (
+                                        <>/ {recap.totalObjectif} vente{recap.totalObjectif > 1 ? "s" : ""} · R/O {recap.tauxGlobal}%</>
+                                    ) : (
+                                        <>vente{recap.totalVentes > 1 ? "s" : ""} au total</>
+                                    )}
                                 </p>
                             </div>
 
@@ -247,8 +251,14 @@ function ProfilInner() {
                                 {recap.parProduit.map((p) => (
                                     <div key={p.code} className="rounded-2xl bg-white/10 p-3 text-center backdrop-blur">
                                         <div className="text-xl">{p.emoji}</div>
-                                        <p className="mt-1 text-lg font-black">{p.nombre}</p>
+                                        <p className="mt-1 text-lg font-black">
+                                            {p.nombre}
+                                            {p.objectif > 0 && <span className="text-xs font-normal text-white/50">/{p.objectif}</span>}
+                                        </p>
                                         <p className="text-[10px] font-semibold text-white/60">{p.label}</p>
+                                        {p.objectif > 0 && (
+                                            <p className="mt-0.5 text-[10px] font-black text-white/70">R/O {p.taux}%</p>
+                                        )}
                                     </div>
                                 ))}
                             </div>

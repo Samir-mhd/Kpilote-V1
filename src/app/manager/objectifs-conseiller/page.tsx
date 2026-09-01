@@ -25,6 +25,7 @@ const PRODUITS_MANUELS = [
     { label: "Téléphones", code: "telephones", emoji: "📲", text: "text-violet-600",  bg: "bg-violet-50/70",  border: "border-violet-100",  focus: "focus:border-violet-400 focus:ring-violet-100" },
     { label: "McAfee",     code: "mcafee",     emoji: "🔒", text: "text-orange-600",  bg: "bg-orange-50/70",  border: "border-orange-100",  focus: "focus:border-orange-400 focus:ring-orange-100" },
     { label: "Assurance",  code: "assurance",  emoji: "🛡️", text: "text-red-600",     bg: "bg-red-50/70",     border: "border-red-100",     focus: "focus:border-red-400 focus:ring-red-100" },
+    { label: "Avis Google", code: "avis_google", emoji: "⭐", text: "text-amber-600",  bg: "bg-amber-50/70",   border: "border-amber-100",   focus: "focus:border-amber-400 focus:ring-amber-100" },
 ];
 
 const colonnesProduits = [
@@ -287,7 +288,7 @@ export default function ObjectifsConseillerPage() {
                                             </div>
 
                                             {/* Grille produits */}
-                                            <div className="grid grid-cols-3 gap-1.5 p-2 sm:grid-cols-6">
+                                            <div className="grid grid-cols-3 gap-1.5 p-2 sm:grid-cols-7">
                                                 {PRODUITS_MANUELS.map((prod) => {
                                                     const cellule = ligne.cellules[prod.code];
                                                     return (

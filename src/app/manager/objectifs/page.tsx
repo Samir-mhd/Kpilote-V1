@@ -16,6 +16,7 @@ const PRODUITS_SUIVIS: { label: string; code: ProduitCode; emoji: string }[] = [
     { label: "Téléphones", code: "telephones", emoji: "📲" },
     { label: "McAfee",     code: "mcafee",     emoji: "🔒" },
     { label: "Assurance",  code: "assurance",  emoji: "🛡️" },
+    { label: "Avis Google", code: "avis_google", emoji: "⭐" },
 ];
 
 function sommeParProduit(stats: ConseillerStats[], code: ProduitCode): number {

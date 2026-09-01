@@ -33,6 +33,7 @@ const PALETTE: Record<string, { hex: string; arcStroke: string; gradient: string
     "bg-purple-500": { hex: "#8b5cf6", arcStroke: "#a78bfa", gradient: "from-purple-500 to-violet-400",  glow: "rgba(139,92,246,.35)" },
     "bg-orange-500": { hex: "#f97316", arcStroke: "#fb923c", gradient: "from-orange-500 to-amber-400",   glow: "rgba(249,115,22,.35)" },
     "bg-sky-500":    { hex: "#0ea5e9", arcStroke: "#38bdf8", gradient: "from-sky-500 to-cyan-400",       glow: "rgba(14,165,233,.35)" },
+    "bg-yellow-500": { hex: "#eab308", arcStroke: "#facc15", gradient: "from-yellow-500 to-amber-400",   glow: "rgba(234,179,8,.35)"  },
     "bg-red-500":    { hex: "#ef4444", arcStroke: "#f87171", gradient: "from-red-500 to-rose-400",       glow: "rgba(239,68,68,.35)"  },
 };
 const DEFAULT_PAL = { hex: "#8b5cf6", arcStroke: "#a78bfa", gradient: "from-violet-500 to-purple-400", glow: "rgba(139,92,246,.35)" };
@@ -52,8 +53,9 @@ const CELEBRATIONS = ["🎉", "🔥", "⚡", "🚀", "💪", "🏆"];
 
 // Uniquement des messages neutres/encourageants — le retard est déjà géré par le hero/coach au-dessus.
 type StatusCfg = { icon: string; label: string; color: string };
-function getStatus(pct: number, realise: number, objectif: number, isHistorisation: boolean): StatusCfg {
+function getStatus(pct: number, realise: number, objectif: number, isHistorisation: boolean, isAvisGoogle: boolean): StatusCfg {
     if (realise === 0 && isHistorisation) return { icon: "🌱", label: "N'oublie pas d'historiser !", color: "#94a3b8" };
+    if (realise === 0 && isAvisGoogle) return { icon: "🌱", label: "Pas encore d'avis Google aujourd'hui", color: "#94a3b8" };
     if (realise === 0) return { icon: "🌱", label: "En attente de ta première vente", color: "#94a3b8" };
     // Pas d'objectif fixé : chaque vente est une avance pure, pas un "démarrage"
     if (objectif === 0) return { icon: "🚀", label: `+${realise} d'avance sur l'objectif`, color: "#34d399" };
@@ -116,7 +118,8 @@ export default function MissionCard({
     const article = getArticle(titre);
     const displayTitre = getDisplayTitre(titre);
     const isHistorisation = titre.toLowerCase() === "spiderhome";
-    const status = getStatus(pct, realise, objectif, isHistorisation);
+    const isAvisGoogle = titre.toLowerCase() === "avis google";
+    const status = getStatus(pct, realise, objectif, isHistorisation, isAvisGoogle);
 
     // La vente doit être committée avant le choix variable : le boost auto compte le volume
     // réel du mois, il a donc besoin que CETTE vente soit déjà en base au moment du comptage.
@@ -279,7 +282,7 @@ export default function MissionCard({
                         className="rounded-xl px-4 py-2.5 text-sm font-black text-white"
                         style={{ background: `${pal.hex}22`, border: `1px solid ${pal.hex}40` }}
                     >
-                        ✅ {isHistorisation ? "Une historisation" : `${article.charAt(0).toUpperCase() + article.slice(1)} ${displayTitre}`} de plus — excellent !
+                        ✅ {isHistorisation ? "Une historisation" : isAvisGoogle ? "Un avis Google" : `${article.charAt(0).toUpperCase() + article.slice(1)} ${displayTitre}`} de plus — excellent !
                     </div>
                 </div>
 
@@ -290,7 +293,7 @@ export default function MissionCard({
                     className={`group mt-6 flex w-full items-center justify-between rounded-2xl bg-gradient-to-r ${pal.gradient} px-6 py-4 text-sm font-black text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50`}
                     style={{ boxShadow: `0 4px 20px ${pal.glow}` }}
                 >
-                    <span>{isHistorisation ? "J'ai fait une historisation" : `J'ai vendu ${article} ${displayTitre}`}</span>
+                    <span>{isHistorisation ? "J'ai fait une historisation" : isAvisGoogle ? "J'ai eu un avis Google" : `J'ai vendu ${article} ${displayTitre}`}</span>
                     <svg
                         width="16" height="16"
                         viewBox="0 0 24 24" fill="none" stroke="currentColor"

@@ -570,7 +570,7 @@ export default function Dashboard() {
     }
 
     // Ordre d'affichage des cartes Accueil : Box - McAfee / Téléphones - Assurance / Forfaits - Spiderhome
-    const ORDRE_ACCUEIL = ["box", "mcafee", "telephones", "assurance", "forfaits", "spiderhome"];
+    const ORDRE_ACCUEIL = ["box", "mcafee", "telephones", "assurance", "forfaits", "avis google", "spiderhome"];
     function ordonnerAccueil(liste: MissionDashboard[]): MissionDashboard[] {
         return [...liste].sort((a, b) => {
             const ia = ORDRE_ACCUEIL.indexOf(normaliser(a.produit));

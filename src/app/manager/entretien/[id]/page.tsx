@@ -10,13 +10,29 @@ import { exporterBilanPDF, getMoisLabel, type BilanExport, type Tendance } from 
 
 // ── Helpers date ──────────────────────────────────────────────────────────────
 
-function debutMois() {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
+function debutMois(ref: Date) {
+    return new Date(ref.getFullYear(), ref.getMonth(), 1).toISOString();
 }
-function finMois() {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59).toISOString();
+function finMois(ref: Date) {
+    return new Date(ref.getFullYear(), ref.getMonth() + 1, 0, 23, 59, 59).toISOString();
+}
+
+type MoisOption = { valeur: string; label: string; ref: Date };
+
+/** Mois courant + les `nbMois` précédents, du plus récent au plus ancien — pas de plancher
+ *  (contrairement au récap conseiller) : un entretien peut vouloir remonter plus loin. */
+function genererMoisOptions(nbMois = 18): MoisOption[] {
+    const now = new Date();
+    const options: MoisOption[] = [];
+    for (let i = 0; i <= nbMois; i++) {
+        const ref = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        options.push({
+            valeur: `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}`,
+            label: getMoisLabel(ref),
+            ref,
+        });
+    }
+    return options;
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -58,19 +74,24 @@ function couleurTaux(taux: number) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+const MOIS_OPTIONS = genererMoisOptions();
+
 export default function BilanConseiller() {
     const { id } = useParams<{ id: string }>();
     const router  = useRouter();
     const [bilan,   setBilan]   = useState<Bilan | null>(null);
     const [loading, setLoading] = useState(true);
     const [erreur,  setErreur]  = useState(false);
+    const [moisValeur, setMoisValeur] = useState(MOIS_OPTIONS[0].valeur);
+    const moisRef = MOIS_OPTIONS.find((o) => o.valeur === moisValeur)?.ref ?? MOIS_OPTIONS[0].ref;
 
     useEffect(() => {
         if (!id) return;
+        setLoading(true);
         (async () => {
             try {
-                const debut = debutMois();
-                const fin   = finMois();
+                const debut = debutMois(moisRef);
+                const fin   = finMois(moisRef);
 
                 const [conseillerRes, objectifsData, ventesRes, classementData] = await Promise.all([
                     supabase.from("conseillers").select("id, nom, avatar").eq("id", id).single(),
@@ -172,7 +193,7 @@ export default function BilanConseiller() {
                 setLoading(false);
             }
         })();
-    }, [id]);
+    }, [id, moisValeur]);
 
     if (loading) return (
         <div className="flex min-h-[60vh] items-center justify-center">
@@ -186,7 +207,7 @@ export default function BilanConseiller() {
         </div>
     );
 
-    const moisLabel = getMoisLabel();
+    const moisLabel = getMoisLabel(moisRef);
 
     function handleExport() {
         const bilanExport: BilanExport = {
@@ -245,18 +266,30 @@ export default function BilanConseiller() {
                     </div>
                 </div>
 
-                <button
-                    onClick={handleExport}
-                    className="group flex items-center gap-2.5 self-start rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-5 py-3 text-sm font-black text-violet-700 shadow-sm transition-all hover:border-violet-400 hover:shadow-md active:scale-[0.97] sm:self-auto"
-                >
-                    <svg className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                        <line x1="12" y1="18" x2="12" y2="12"/>
-                        <polyline points="9 15 12 18 15 15"/>
-                    </svg>
-                    Exporter PDF
-                </button>
+                <div className="flex flex-shrink-0 items-center gap-2.5 self-start sm:self-auto">
+                    <select
+                        value={moisValeur}
+                        onChange={(e) => setMoisValeur(e.target.value)}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 outline-none transition-all hover:border-violet-300 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                    >
+                        {MOIS_OPTIONS.map((o) => (
+                            <option key={o.valeur} value={o.valeur}>{o.label}</option>
+                        ))}
+                    </select>
+
+                    <button
+                        onClick={handleExport}
+                        className="group flex items-center gap-2.5 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-5 py-3 text-sm font-black text-violet-700 shadow-sm transition-all hover:border-violet-400 hover:shadow-md active:scale-[0.97]"
+                    >
+                        <svg className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="12" y1="18" x2="12" y2="12"/>
+                            <polyline points="9 15 12 18 15 15"/>
+                        </svg>
+                        Exporter PDF
+                    </button>
+                </div>
             </div>
 
             {/* ── KPIs globaux ── */}

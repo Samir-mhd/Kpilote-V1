@@ -274,7 +274,6 @@ export function exporterBilanPDF(bilan: BilanExport): void {
     win.document.close();
 }
 
-export function getMoisLabel(): string {
-    const now = new Date();
-    return `${MOIS_FR[now.getMonth()]} ${now.getFullYear()}`;
+export function getMoisLabel(reference: Date = new Date()): string {
+    return `${MOIS_FR[reference.getMonth()]} ${reference.getFullYear()}`;
 }

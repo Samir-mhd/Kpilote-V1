@@ -15,7 +15,7 @@ import { couleursProgression } from "@/utils/colors";
 
 const MANAGER_ID = "manager";
 
-type CleProduit = "box" | "forfaits" | "telephones" | "mcafee" | "assurance";
+type CleProduit = "box" | "forfaits" | "telephones" | "mcafee" | "assurance" | "avis_google";
 
 const colonnesProduits: { label: string; cle: CleProduit; couleur: string }[] = [
     { label: "Box", cle: "box", couleur: couleursProgression.Box },
@@ -23,6 +23,7 @@ const colonnesProduits: { label: string; cle: CleProduit; couleur: string }[] = 
     { label: "Téléphones", cle: "telephones", couleur: couleursProgression.Téléphones },
     { label: "McAfee", cle: "mcafee", couleur: couleursProgression.McAfee },
     { label: "Assurance", cle: "assurance", couleur: couleursProgression.Assurance },
+    { label: "Avis Google", cle: "avis_google", couleur: couleursProgression["Avis Google"] },
 ];
 
 const sizeMap = { sm: 36, md: 48, lg: 72 };

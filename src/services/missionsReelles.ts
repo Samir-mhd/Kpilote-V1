@@ -17,20 +17,22 @@ function getProduit(produits: ProduitLie | ProduitLie[] | null) {
 }
 
 export function couleurProduit(produit: string): string {
-    if (produit === "Box")        return "bg-green-500";
-    if (produit === "Forfaits")   return "bg-blue-500";
-    if (produit === "Téléphones") return "bg-purple-500";
-    if (produit === "McAfee")     return "bg-orange-500";
-    if (produit === "Spiderhome") return "bg-sky-500";
+    if (produit === "Box")         return "bg-green-500";
+    if (produit === "Forfaits")    return "bg-blue-500";
+    if (produit === "Téléphones")  return "bg-purple-500";
+    if (produit === "McAfee")      return "bg-orange-500";
+    if (produit === "Avis Google") return "bg-yellow-500";
+    if (produit === "Spiderhome")  return "bg-sky-500";
     return "bg-red-500";
 }
 
 export function couleurGradientProduit(produit: string): string {
-    if (produit === "Box")        return "from-green-500 to-emerald-400";
-    if (produit === "Forfaits")   return "from-blue-500 to-cyan-400";
-    if (produit === "Téléphones") return "from-purple-500 to-violet-400";
-    if (produit === "McAfee")     return "from-orange-500 to-amber-400";
-    if (produit === "Spiderhome") return "from-sky-500 to-cyan-400";
+    if (produit === "Box")         return "from-green-500 to-emerald-400";
+    if (produit === "Forfaits")    return "from-blue-500 to-cyan-400";
+    if (produit === "Téléphones")  return "from-purple-500 to-violet-400";
+    if (produit === "McAfee")      return "from-orange-500 to-amber-400";
+    if (produit === "Avis Google") return "from-yellow-500 to-amber-400";
+    if (produit === "Spiderhome")  return "from-sky-500 to-cyan-400";
     return "from-red-500 to-rose-400";
 }
 

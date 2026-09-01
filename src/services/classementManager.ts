@@ -7,6 +7,7 @@ export type ObjectifsProduits = {
   telephones: number;
   mcafee: number;
   assurance: number;
+  avis_google: number;
 };
 
 export type ConseillerClassement = {
@@ -18,6 +19,7 @@ export type ConseillerClassement = {
   telephones: number;
   mcafee: number;
   assurance: number;
+  avis_google: number;
   objectifs: ObjectifsProduits;
 };
 
@@ -32,12 +34,14 @@ function classementVide(conseillers: { id: string; nom: string; profil_actif?: b
     telephones: 0,
     mcafee: 0,
     assurance: 0,
+    avis_google: 0,
     objectifs: {
       box: 0,
       forfaits: 0,
       telephones: 0,
       mcafee: 0,
       assurance: 0,
+      avis_google: 0,
     },
   }));
 }
@@ -79,6 +83,10 @@ function appliquerVentes(classement: ConseillerClassement[], ventes: any[]) {
       case "assurance":
         conseiller.assurance += vente.quantite;
         break;
+
+      case "avis_google":
+        conseiller.avis_google += vente.quantite;
+        break;
     }
   });
 }
@@ -114,6 +122,10 @@ function appliquerObjectifs(classement: ConseillerClassement[], objectifs: any[]
 
       case "assurance":
         conseiller.objectifs.assurance += objectif.objectif;
+        break;
+
+      case "avis_google":
+        conseiller.objectifs.avis_google += objectif.objectif;
         break;
     }
   });
