@@ -635,12 +635,25 @@ export default function Dashboard() {
             });
         }
 
-        if (n === "telephones" && bonusManuels.length > 0) {
+        const bonusMcafeeMobile = bonusManuels.filter(
+            (b) => b.categorie === "autres_primes" && normaliser(b.label).includes("mcafee")
+        );
+        if (n === "forfaits" && bonusMcafeeMobile.length > 0) {
+            questions.push({
+                id: "mcafee_mobile",
+                emoji: "🛡️",
+                question: "As-tu vendu du McAfee Mobile ?",
+                options: bonusMcafeeMobile.map((b) => ({ label: b.label, montant: b.montant, bonusManuelId: b.id })),
+            });
+        }
+
+        const bonusConstructeur = bonusManuels.filter((b) => !b.categorie || b.categorie === "destockage");
+        if (n === "telephones" && bonusConstructeur.length > 0) {
             questions.push({
                 id: "boost_constructeur",
                 emoji: "🏭",
                 question: "As-tu un boost constructeur / déstockage ?",
-                options: bonusManuels.map((b) => ({ label: b.label, montant: b.montant, bonusManuelId: b.id })),
+                options: bonusConstructeur.map((b) => ({ label: b.label, montant: b.montant, bonusManuelId: b.id })),
             });
         }
 
