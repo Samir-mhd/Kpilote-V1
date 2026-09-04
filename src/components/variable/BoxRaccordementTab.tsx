@@ -15,6 +15,7 @@ import {
     estPerdue,
     dateLimite,
     nomMois,
+    dateDuJour,
 } from "@/services/boxRaccordement";
 
 const CANAUX: { cle: CanalOption; label: string; champMontant: "montantCanal1" | "montantCanal2" | "montantCanal3" }[] = [
@@ -26,8 +27,10 @@ const CANAUX: { cle: CanalOption; label: string; champMontant: "montantCanal1" |
 function fmtEuro(n: number) {
     return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
-function fmtDateHeure(iso: string) {
-    return new Date(iso).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+// "YYYY-MM-DD" -> "JJ/MM/AAAA", sans passer par Date() pour éviter tout décalage de fuseau horaire.
+function fmtDateVente(dateIso: string) {
+    const [y, m, d] = dateIso.split("-");
+    return `${d}/${m}/${y}`;
 }
 
 const MODELES: ModeleBox[] = ["box_ultra", "box_pop", "box_pop_s_revolution_5g"];
@@ -37,6 +40,7 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
     const [loading, setLoading] = useState(true);
     const [enCoursId, setEnCoursId] = useState<string | null>(null);
     const [ajoutOuvert, setAjoutOuvert] = useState(false);
+    const [dateAjout, setDateAjout] = useState(dateDuJour());
     const [commentaires, setCommentaires] = useState<Record<string, string>>({});
     const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -95,7 +99,8 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
 
     async function ajouter(modele: ModeleBox) {
         setAjoutOuvert(false);
-        await creerFicheBoxRaccordement(conseillerId, modele, bareme);
+        await creerFicheBoxRaccordement(conseillerId, modele, bareme, dateAjout);
+        setDateAjout(dateDuJour());
         await charger();
     }
 
@@ -130,7 +135,7 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
                             <span className="text-xs font-bold text-slate-400">{fmtEuro(f.montantBox)} figé</span>
                         </div>
                         <p className="mt-0.5 text-xs text-slate-400">
-                            Vendue le {fmtDateHeure(f.createdAt)}
+                            Vendue le {fmtDateVente(f.dateVente)}
                             {variante === "attente" && ` · à raccorder avant le ${dateLimite(f.moisPaiement).toLocaleDateString("fr-FR")}`}
                             {variante === "raccordee" && ` · payée en ${nomMois(f.moisPaiement)}`}
                             {variante === "perdue" && ` · non raccordée avant le paiement de ${nomMois(f.moisPaiement)} · non payée`}
@@ -217,6 +222,16 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
                         </button>
                         {ajoutOuvert && (
                             <div className="absolute right-0 top-full z-20 mt-2 w-64 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_8px_32px_rgba(15,23,42,.15)]">
+                                <div className="border-b border-slate-100 p-3">
+                                    <label className="mb-1 block text-[11px] font-bold text-slate-400">Date de la vente</label>
+                                    <input
+                                        type="date"
+                                        value={dateAjout}
+                                        max={dateDuJour()}
+                                        onChange={(e) => setDateAjout(e.target.value)}
+                                        className="h-8 w-full rounded-lg border border-slate-200 px-2 text-xs font-semibold text-slate-700 outline-none focus:border-violet-400"
+                                    />
+                                </div>
                                 {MODELES.map((m) => (
                                     <button
                                         key={m}

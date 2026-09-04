@@ -33,6 +33,7 @@ export const CANAL_LABELS: Record<CanalOption, string> = {
 export type FicheBoxRaccordement = {
     id: string;
     conseillerId: string;
+    dateVente: string; // "YYYY-MM-DD" — date réelle de la vente, choisie par le conseiller (peut être antérieure à aujourd'hui pour un rattrapage)
     moisVente: string;
     moisPaiement: string;
     modele: ModeleBox;
@@ -55,9 +56,15 @@ export type FicheBoxRaccordement = {
     createdAt: string;
 };
 
-function moisCourantLocal(): string {
+/** Date du jour au format "YYYY-MM-DD" (locale, pas UTC) — valeur par défaut du sélecteur de date de vente. */
+export function dateDuJour(): string {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** "YYYY-MM-DD" -> "YYYY-MM-01" : mois de vente à partir de la date choisie (simple découpage, pas de fuseau horaire en jeu). */
+function moisDe(dateIso: string): string {
+    return `${dateIso.slice(0, 7)}-01`;
 }
 
 function moisPlus(mois: string, delta: number): string {
@@ -73,12 +80,13 @@ export function nomMois(mois: string): string {
 }
 
 const SELECT_FICHE =
-    "id, conseiller_id, mois_vente, mois_paiement, modele, montant_box, quatre_p, montant_4p, mcafee, montant_mcafee, canal1, montant_canal1, canal2, montant_canal2, canal3, montant_canal3, seuil_box, boost_individuel_box, raccordee, raccordee_le, commentaire, created_at";
+    "id, conseiller_id, date_vente, mois_vente, mois_paiement, modele, montant_box, quatre_p, montant_4p, mcafee, montant_mcafee, canal1, montant_canal1, canal2, montant_canal2, canal3, montant_canal3, seuil_box, boost_individuel_box, raccordee, raccordee_le, commentaire, created_at";
 
 function mapFiche(r: any): FicheBoxRaccordement {
     return {
         id: r.id,
         conseillerId: r.conseiller_id,
+        dateVente: r.date_vente,
         moisVente: r.mois_vente,
         moisPaiement: r.mois_paiement,
         modele: r.modele,
@@ -102,15 +110,25 @@ function mapFiche(r: any): FicheBoxRaccordement {
     };
 }
 
-/** Crée la fiche de suivi au moment de la vente — fige tout le barème pertinent tout de suite. */
+/**
+ * Crée la fiche de suivi au moment de la vente — fige tout le barème pertinent tout de suite.
+ * `dateVente` (optionnel, "YYYY-MM-DD") permet un rattrapage : mois de vente et mois de paiement
+ * (M+2) suivent la date choisie, pas la date de saisie. Le barème figé, lui, reste toujours celui
+ * en vigueur au moment du clic (aucun historique de barème par mois passé n'est conservé) — pour
+ * un rattrapage sur un mois où le barème a changé depuis, les montants figés peuvent différer de
+ * ceux réellement en vigueur ce mois-là.
+ */
 export async function creerFicheBoxRaccordement(
     conseillerId: string,
     modele: ModeleBox,
-    bareme: BaremeVariable
+    bareme: BaremeVariable,
+    dateVente?: string
 ): Promise<void> {
-    const moisVente = moisCourantLocal();
+    const dateVenteFinale = dateVente ?? dateDuJour();
+    const moisVente = moisDe(dateVenteFinale);
     await supabase.from("box_raccordements").insert({
         conseiller_id: conseillerId,
+        date_vente: dateVenteFinale,
         mois_vente: moisVente,
         mois_paiement: moisPlus(moisVente, 2),
         modele,
@@ -130,6 +148,7 @@ export async function getFichesBoxRaccordement(conseillerId: string): Promise<Fi
         .from("box_raccordements")
         .select(SELECT_FICHE)
         .eq("conseiller_id", conseillerId)
+        .order("date_vente", { ascending: false })
         .order("created_at", { ascending: false });
     return (data ?? []).map(mapFiche);
 }
