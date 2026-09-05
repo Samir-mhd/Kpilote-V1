@@ -21,6 +21,7 @@ import {
 } from "@/services/variableConseiller";
 import { CATEGORIES_VENTES, NumberField, CardShell, BonusManuelsCard, BonusManuelsInline, DetailResultatsCard } from "@/components/variable/variableUi";
 import BoxRaccordementTab from "@/components/variable/BoxRaccordementTab";
+import HistoriqueVariableTab from "@/components/variable/HistoriqueVariableTab";
 import { getContributionBoxMoisPaiement, nomMois, ContributionBoxMoisPaiement } from "@/services/boxRaccordement";
 import { getContributionForfait4PMoisPaiement, ContributionForfait4P } from "@/services/forfait4P";
 
@@ -31,6 +32,7 @@ const VERROUILLAGE_BOX = new Date(2026, 8, 1); // 01/09/2026
 function VariableInner() {
     const searchParams = useSearchParams();
     const conseillerId = searchParams.get("id") ?? "";
+    const nomConseiller = searchParams.get("nom") ?? "";
 
     const [ventes, setVentes] = useState<VenteConseiller>(VENTES_VIDES);
     const [boost, setBoost] = useState<BoostData>(BOOST_VIDE);
@@ -41,7 +43,7 @@ function VariableInner() {
     const [loading, setLoading] = useState(true);
     const [enregistre, setEnregistre] = useState(true);
     const [variableActivee, setVariableActivee] = useState(true);
-    const [ongletBox, setOngletBox] = useState(false);
+    const [onglet, setOnglet] = useState<"simulation" | "box" | "historique">("simulation");
     const [contributionBox, setContributionBox] = useState<ContributionBoxMoisPaiement | null>(null);
     const [contributionForfait4P, setContributionForfait4P] = useState<ContributionForfait4P | null>(null);
 
@@ -88,7 +90,7 @@ function VariableInner() {
         if (!conseillerId) return;
         getContributionBoxMoisPaiement(conseillerId, mois).then(setContributionBox).catch(() => {});
         getContributionForfait4PMoisPaiement(conseillerId, mois).then(setContributionForfait4P).catch(() => {});
-    }, [conseillerId, mois, ongletBox]);
+    }, [conseillerId, mois, onglet]);
 
     // Live : les boosts constructeur/déstockage ajoutés par le manager apparaissent sans recharger la page
     useEffect(() => {
@@ -174,24 +176,32 @@ function VariableInner() {
                         </span>
                         <div className="flex gap-2">
                             <button
-                                onClick={() => setOngletBox(false)}
-                                className={`rounded-2xl px-4 py-2.5 text-sm font-bold transition-all ${!ongletBox ? "bg-white text-slate-900" : "bg-white/8 text-white/60 hover:bg-white/15"}`}
+                                onClick={() => setOnglet("simulation")}
+                                className={`rounded-2xl px-4 py-2.5 text-sm font-bold transition-all ${onglet === "simulation" ? "bg-white text-slate-900" : "bg-white/8 text-white/60 hover:bg-white/15"}`}
                             >
                                 Simulation
                             </button>
                             <button
-                                onClick={() => setOngletBox(true)}
-                                className={`rounded-2xl px-4 py-2.5 text-sm font-bold transition-all ${ongletBox ? "bg-white text-slate-900" : "bg-white/8 text-white/60 hover:bg-white/15"}`}
+                                onClick={() => setOnglet("box")}
+                                className={`rounded-2xl px-4 py-2.5 text-sm font-bold transition-all ${onglet === "box" ? "bg-white text-slate-900" : "bg-white/8 text-white/60 hover:bg-white/15"}`}
                             >
                                 📦 Mes box
+                            </button>
+                            <button
+                                onClick={() => setOnglet("historique")}
+                                className={`rounded-2xl px-4 py-2.5 text-sm font-bold transition-all ${onglet === "historique" ? "bg-white text-slate-900" : "bg-white/8 text-white/60 hover:bg-white/15"}`}
+                            >
+                                🗂️ Historique
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {ongletBox ? (
+            {onglet === "box" ? (
                 <BoxRaccordementTab conseillerId={conseillerId} bareme={bareme} />
+            ) : onglet === "historique" ? (
+                <HistoriqueVariableTab conseillerId={conseillerId} nomConseiller={nomConseiller} />
             ) : (
             <div className="grid grid-cols-1 gap-7 lg:grid-cols-[1.3fr_1fr]">
                 {/* ── Formulaire ─────────────────────────────────────────────── */}

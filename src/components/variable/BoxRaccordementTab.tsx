@@ -99,7 +99,7 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
 
     async function ajouter(modele: ModeleBox) {
         setAjoutOuvert(false);
-        await creerFicheBoxRaccordement(conseillerId, modele, bareme, dateAjout);
+        await creerFicheBoxRaccordement(conseillerId, modele, dateAjout);
         setDateAjout(dateDuJour());
         await charger();
     }

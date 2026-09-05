@@ -532,7 +532,7 @@ export default function Dashboard() {
             // avec le barème du mois figé — indépendant du barème qui sera en vigueur au
             // moment où le conseiller validera le raccordement.
             if (option.champ === "box_ultra" || option.champ === "box_pop" || option.champ === "box_pop_s_revolution_5g") {
-                creerFicheBoxRaccordement(conseillerId, option.champ, bareme).catch(() => {});
+                creerFicheBoxRaccordement(conseillerId, option.champ).catch(() => {});
             }
 
             const famille = familleBoostPour(option.produitCode);

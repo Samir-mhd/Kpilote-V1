@@ -343,8 +343,41 @@ export async function getBareme(): Promise<BaremeVariable> {
     return data ? { ...BAREME_DEFAUT, ...(data.data as Partial<BaremeVariable>) } : BAREME_DEFAUT;
 }
 
+// "YYYY-MM-DD" du jour, en local — clé de l'instantané quotidien du barème (variable_bareme_historique).
+function dateDuJourLocale(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Sauvegarde le barème courant ET son instantané du jour (un seul par jour, écrasé si modifié
+ * plusieurs fois le même jour) — permet de reconstituer le barème réellement en vigueur à une
+ * date passée via getBaremeAuMois, sans historique visible ni utile ailleurs dans l'appli.
+ */
 export async function sauvegarderBareme(bareme: BaremeVariable): Promise<void> {
-    await supabase.from("variable_bareme").upsert({ id: "default", data: bareme, updated_at: new Date().toISOString() });
+    const maintenant = new Date().toISOString();
+    await Promise.all([
+        supabase.from("variable_bareme").upsert({ id: "default", data: bareme, updated_at: maintenant }),
+        supabase
+            .from("variable_bareme_historique")
+            .upsert({ snapshot_date: dateDuJourLocale(), data: bareme }, { onConflict: "snapshot_date" }),
+    ]);
+}
+
+/** Barème réellement en vigueur à la fin du mois donné ("YYYY-MM-01") — dernier instantané connu
+ *  à cette date (variable_bareme_historique), sinon barème par défaut. Sert à figer un mois passé
+ *  (historique variable, box raccordées) avec le bon barème plutôt que le barème actuel. */
+export async function getBaremeAuMois(mois: string): Promise<BaremeVariable> {
+    const [y, m] = mois.split("-").map(Number);
+    const finMois = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+    const { data } = await supabase
+        .from("variable_bareme_historique")
+        .select("data")
+        .lte("snapshot_date", finMois)
+        .order("snapshot_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    return data ? { ...BAREME_DEFAUT, ...(data.data as Partial<BaremeVariable>) } : BAREME_DEFAUT;
 }
 
 export async function getBonusManuels(): Promise<BonusManuel[]> {

@@ -2,14 +2,16 @@
  * Suivi des box vendues en attendant leur raccordement — paiement M+2.
  * Chaque vente box fige immédiatement les montants (box, 4P, McAfee) et le seuil/boost
  * individuel en vigueur au moment de la vente : le barème du mois de paiement (M+2) ne doit
- * jamais influencer une vente déjà faite, même s'il change entre-temps.
+ * jamais influencer une vente déjà faite, même s'il change entre-temps. Le barème figé est
+ * celui réellement en vigueur fin du mois de la vente (getBaremeAuMois), pas forcément celui
+ * du jour où la fiche est créée — important pour un rattrapage sur une date passée.
  * Le conseiller valide ensuite le raccordement (+ confirme 4P / McAfee) quand c'est fait,
  * ce qui alimente automatiquement sa variable du mois M+2. Passé la date limite (fin du
  * mois M+2), une box non raccordée est définitivement perdue (non payée).
  */
 
 import { supabase } from "@/lib/supabase";
-import { BaremeVariable } from "./variableConseiller";
+import { getBaremeAuMois } from "./variableConseiller";
 
 export type ModeleBox = "box_ultra" | "box_pop" | "box_pop_s_revolution_5g";
 
@@ -113,19 +115,17 @@ function mapFiche(r: any): FicheBoxRaccordement {
 /**
  * Crée la fiche de suivi au moment de la vente — fige tout le barème pertinent tout de suite.
  * `dateVente` (optionnel, "YYYY-MM-DD") permet un rattrapage : mois de vente et mois de paiement
- * (M+2) suivent la date choisie, pas la date de saisie. Le barème figé, lui, reste toujours celui
- * en vigueur au moment du clic (aucun historique de barème par mois passé n'est conservé) — pour
- * un rattrapage sur un mois où le barème a changé depuis, les montants figés peuvent différer de
- * ceux réellement en vigueur ce mois-là.
+ * (M+2) suivent la date choisie, pas la date de saisie, et le barème figé est celui réellement en
+ * vigueur fin de ce mois-là (getBaremeAuMois) — pas celui du jour où la fiche est créée.
  */
 export async function creerFicheBoxRaccordement(
     conseillerId: string,
     modele: ModeleBox,
-    bareme: BaremeVariable,
     dateVente?: string
 ): Promise<void> {
     const dateVenteFinale = dateVente ?? dateDuJour();
     const moisVente = moisDe(dateVenteFinale);
+    const bareme = await getBaremeAuMois(moisVente);
     await supabase.from("box_raccordements").insert({
         conseiller_id: conseillerId,
         date_vente: dateVenteFinale,
