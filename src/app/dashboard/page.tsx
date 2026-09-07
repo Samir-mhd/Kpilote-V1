@@ -583,7 +583,7 @@ export default function Dashboard() {
 
     // Ordre par défaut des cartes Accueil : Box - McAfee / Téléphones - Assurance / Forfaits - Avis Google - Spiderhome
     // Chaque conseiller peut le personnaliser depuis Profil (ordrePersonnalise, sinon ce défaut).
-    const ORDRE_ACCUEIL_DEFAUT = ["box", "mcafee", "telephones", "assurance", "forfaits", "avis_google", "spiderhome"];
+    const ORDRE_ACCUEIL_DEFAUT = ["box", "mcafee", "telephones", "assurance", "forfaits", "avis_google", "recap_commercial", "spiderhome"];
     function ordonnerAccueil(liste: MissionDashboard[]): MissionDashboard[] {
         const ordre = ordrePersonnalise ?? ORDRE_ACCUEIL_DEFAUT;
         return [...liste].sort((a, b) => {

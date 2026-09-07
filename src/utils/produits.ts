@@ -6,10 +6,14 @@ export const PRODUITS_ORDRE = [
     { code: "mcafee",      label: "McAfee",      emoji: "🛡️", key: "mcafee"      as const },
     { code: "assurance",   label: "Assurance",   emoji: "✅", key: "assurance"   as const },
     { code: "avis_google", label: "Avis Google", emoji: "⭐", key: "avis_google" as const },
+    { code: "recap_commercial", label: "Récap commercial", emoji: "📋", key: "recap_commercial" as const },
     { code: "spiderhome",  label: "Spiderhome",  emoji: "🏠", key: "spiderhome"  as const },
 ] as const;
 
 export type ProduitCode = typeof PRODUITS_ORDRE[number]["code"];
 
-/** Spiderhome = historisation, pas un acte commercial → absent de tous les classements/rankings. */
-export const PRODUITS_CLASSEMENT = PRODUITS_ORDRE.filter((p) => p.code !== "spiderhome");
+/** Spiderhome = historisation ; Récap commercial = suivi sans prime ni classement → absents de
+ *  tous les classements/rankings, mais suivent les mêmes règles d'objectif que les autres. */
+export const PRODUITS_CLASSEMENT = PRODUITS_ORDRE.filter(
+    (p) => p.code !== "spiderhome" && p.code !== "recap_commercial"
+);

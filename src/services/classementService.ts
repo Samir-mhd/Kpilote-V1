@@ -78,7 +78,7 @@ export async function construireClassementPeriode(
         const row = map.get(v.conseiller_id);
         if (!row) return;
         const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code as ProduitCode;
-        if (code === "spiderhome") return;
+        if (code === "spiderhome" || code === "recap_commercial") return;
         if (code && row.produits[code] !== undefined) {
             row.produits[code] += v.quantite ?? 1;
             row.total += v.quantite ?? 1;

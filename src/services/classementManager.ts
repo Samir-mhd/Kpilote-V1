@@ -58,8 +58,8 @@ function appliquerVentes(classement: ConseillerClassement[], ventes: any[]) {
       ? vente.produits[0]
       : vente.produits;
 
-    // Spiderhome = historisation → exclu du classement commercial
-    if (produit?.code === "spiderhome") return;
+    // Spiderhome = historisation, Récap commercial = suivi sans prime → exclus du classement commercial
+    if (produit?.code === "spiderhome" || produit?.code === "recap_commercial") return;
 
     conseiller.ventes += vente.quantite;
 
