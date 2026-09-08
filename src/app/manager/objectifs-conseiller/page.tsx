@@ -26,12 +26,14 @@ const PRODUITS_MANUELS = [
     { label: "McAfee",     code: "mcafee",     emoji: "🔒", text: "text-orange-600",  bg: "bg-orange-50/70",  border: "border-orange-100",  focus: "focus:border-orange-400 focus:ring-orange-100" },
     { label: "Assurance",  code: "assurance",  emoji: "🛡️", text: "text-red-600",     bg: "bg-red-50/70",     border: "border-red-100",     focus: "focus:border-red-400 focus:ring-red-100" },
     { label: "Avis Google", code: "avis_google", emoji: "⭐", text: "text-amber-600",  bg: "bg-amber-50/70",   border: "border-amber-100",   focus: "focus:border-amber-400 focus:ring-amber-100" },
-    { label: "Récap commercial", code: "recap_commercial", emoji: "📋", text: "text-teal-600", bg: "bg-teal-50/70", border: "border-teal-100", focus: "focus:border-teal-400 focus:ring-teal-100" },
 ];
 
+// Spiderhome (auto) et Récap commercial (manuel mais pas un acte commercial) : encarts à part,
+// affichés côte à côte hors de la grille des actes, mais toujours présents dans les exports PDF.
 const colonnesProduits = [
     ...PRODUITS_MANUELS.map((p) => ({ label: p.label, code: p.code })),
     { label: "Spiderhome", code: "spiderhome", auto: true },
+    { label: "Récap commercial", code: "recap_commercial" },
 ];
 
 type LigneConseiller = {
@@ -172,6 +174,13 @@ export default function ObjectifsConseillerPage() {
                 id: l.cellules["spiderhome"]?.id ?? "",
                 objectif: coeff * (joursSemaine[l.conseillerId] ?? 0),
             };
+            const celluleRecap = l.cellules["recap_commercial"];
+            if (celluleRecap) {
+                cellules["recap_commercial"] = {
+                    id: celluleRecap.id,
+                    objectif: objSemaine[l.conseillerId]?.["recap_commercial" as ProduitCode] ?? 0,
+                };
+            }
             return { ...l, cellules, photoUrl: photos[l.conseillerId] ?? null };
         });
 
@@ -332,6 +341,31 @@ export default function ObjectifsConseillerPage() {
                                                         </span>
                                                         <span className="text-[9px] text-sky-500">auto</span>
                                                     </div>
+                                                </div>
+
+                                                {/* Récap commercial : encart à part, comme Spiderhome — pas un acte commercial,
+                                                    mais objectif manuel (pas auto-calculé) */}
+                                                <div className="flex flex-col gap-1 rounded-xl border border-teal-100 bg-teal-50/70 p-2">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-xs">📋</span>
+                                                        <span className="text-[9px] font-black uppercase tracking-wide text-teal-600">Récap commercial</span>
+                                                    </div>
+                                                    {ligne.cellules["recap_commercial"] ? (
+                                                        <input
+                                                            type="number"
+                                                            min={0}
+                                                            defaultValue={ligne.cellules["recap_commercial"]!.objectif}
+                                                            onChange={(e) =>
+                                                                setEdits((prev) => ({
+                                                                    ...prev,
+                                                                    [ligne.cellules["recap_commercial"]!.id]: Number(e.target.value),
+                                                                }))
+                                                            }
+                                                            className="w-full rounded-lg border border-teal-100 bg-white/70 px-1 py-1 text-center text-base font-black text-slate-800 outline-none transition-all focus:bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
+                                                        />
+                                                    ) : (
+                                                        <div className="text-center text-base font-black text-slate-300">—</div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

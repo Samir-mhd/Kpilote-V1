@@ -425,8 +425,10 @@ export default function Dashboard() {
         );
     }
 
-    // Spiderhome = historisation, pas un acte commercial → exclu des totaux
-    const missionsCommerciales = missions.filter((m) => m.produit.toLowerCase() !== "spiderhome");
+    // Spiderhome (historisation) et Récap commercial (suivi, pas une vente) → exclus des actes commerciaux
+    const PRODUITS_HISTORISATION = ["spiderhome", "récap commercial"];
+    const estHistorisation = (produit: string) => PRODUITS_HISTORISATION.includes(produit.toLowerCase());
+    const missionsCommerciales = missions.filter((m) => !estHistorisation(m.produit));
     const realiseGlobal = missionsCommerciales.reduce((t, m) => t + m.realise, 0);
     const objectifGlobal = missionsCommerciales.reduce((t, m) => t + m.objectif, 0);
     const tauxGlobal = objectifGlobal > 0 ? Math.round((realiseGlobal / objectifGlobal) * 100) : 0;
@@ -434,14 +436,14 @@ export default function Dashboard() {
     async function handleSale(produit: string) {
         const mission = missions.find((m) => m.produit === produit);
         if (!mission) return;
-        const isHistorisation = produit.toLowerCase() === "spiderhome";
+        const isHistorisation = estHistorisation(produit);
         if (conseillerId) {
             await traiterVente({ conseillerId, produit });
             await chargerMissions();
             await chargerRang();
             refreshAvatar();
         }
-        // Spiderhome = historisation : ne compte pas dans les actes commerciaux
+        // Historisation : ne compte pas dans les actes commerciaux
         if (isHistorisation) {
             setCoachMessage("📋 Historisation enregistrée. Continue !");
             return;

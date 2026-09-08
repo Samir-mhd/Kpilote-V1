@@ -12,8 +12,7 @@ export const PRODUITS_ORDRE = [
 
 export type ProduitCode = typeof PRODUITS_ORDRE[number]["code"];
 
-/** Spiderhome = historisation ; Récap commercial = suivi sans prime ni classement → absents de
- *  tous les classements/rankings, mais suivent les mêmes règles d'objectif que les autres. */
-export const PRODUITS_CLASSEMENT = PRODUITS_ORDRE.filter(
-    (p) => p.code !== "spiderhome" && p.code !== "recap_commercial"
-);
+/** Spiderhome = historisation, pas un acte commercial → absent de tous les classements/rankings.
+ *  Récap commercial n'est pas non plus un acte commercial (exclu des totaux "ventes"), mais
+ *  reste visible dans le classement comme Avis Google pour que le manager voie les résultats. */
+export const PRODUITS_CLASSEMENT = PRODUITS_ORDRE.filter((p) => p.code !== "spiderhome");

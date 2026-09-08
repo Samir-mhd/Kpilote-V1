@@ -78,7 +78,8 @@ export async function construireClassementPeriode(
         const row = map.get(v.conseiller_id);
         if (!row) return;
         const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code as ProduitCode;
-        if (code === "spiderhome" || code === "recap_commercial") return;
+        // Spiderhome = historisation → exclu. Récap commercial reste visible ici (comme Avis Google).
+        if (code === "spiderhome") return;
         if (code && row.produits[code] !== undefined) {
             row.produits[code] += v.quantite ?? 1;
             row.total += v.quantite ?? 1;
