@@ -16,6 +16,7 @@ import { getJoursTravailTous, getJoursTravailSemaineTous } from "@/services/plan
 import { exporterObjectifsPDF, exporterObjectifsSemainePDF } from "@/utils/exportObjectifsPDF";
 import { periodeSemaineEffective } from "@/utils/periodes";
 import { getObjectifsSemaineFiges, invaliderObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
+import { getCoeffRecapCommercial, sauvegarderCoeffRecapCommercial } from "@/services/recapCommercialConfig";
 import type { ProduitCode } from "@/utils/produits";
 import Link from "next/link";
 
@@ -28,12 +29,12 @@ const PRODUITS_MANUELS = [
     { label: "Avis Google", code: "avis_google", emoji: "⭐", text: "text-amber-600",  bg: "bg-amber-50/70",   border: "border-amber-100",   focus: "focus:border-amber-400 focus:ring-amber-100" },
 ];
 
-// Spiderhome (auto) et Récap commercial (manuel mais pas un acte commercial) : encarts à part,
-// affichés côte à côte hors de la grille des actes, mais toujours présents dans les exports PDF.
+// Spiderhome et Récap commercial : objectif auto (coeff × jours), pas un acte commercial →
+// encarts à part, affichés côte à côte hors de la grille des actes, toujours présents en PDF.
 const colonnesProduits = [
     ...PRODUITS_MANUELS.map((p) => ({ label: p.label, code: p.code })),
     { label: "Spiderhome", code: "spiderhome", auto: true },
-    { label: "Récap commercial", code: "recap_commercial" },
+    { label: "Récap commercial", code: "recap_commercial", auto: true },
 ];
 
 type LigneConseiller = {
@@ -70,11 +71,13 @@ export default function ObjectifsConseillerPage() {
     const [confirmation, setConfirmation]         = useState<string | null>(null);
     const [joursPlanifies, setJoursPlanifies]     = useState<Record<string, number>>({});
     const [coeff, setCoeff]                       = useState(25);
+    const [coeffRecap, setCoeffRecap]             = useState(1);
     const [photos, setPhotos]                     = useState<Record<string, string | null>>({});
 
     useEffect(() => {
         const stored = localStorage.getItem("spiderhome_coeff");
         if (stored) setCoeff(Math.max(1, Number(stored) || 25));
+        getCoeffRecapCommercial().then((c) => setCoeffRecap(Math.max(1, c || 1)));
     }, []);
 
     async function charger() {
@@ -101,6 +104,12 @@ export default function ObjectifsConseillerPage() {
         const v = Math.max(1, Math.min(999, isNaN(val) ? 25 : val));
         setCoeff(v);
         localStorage.setItem("spiderhome_coeff", String(v));
+    }
+
+    function handleCoeffRecap(val: number) {
+        const v = Math.max(1, Math.min(999, isNaN(val) ? 1 : val));
+        setCoeffRecap(v);
+        sauvegarderCoeffRecapCommercial(v);
     }
 
     if (loading) {
@@ -145,6 +154,10 @@ export default function ObjectifsConseillerPage() {
                     id: l.cellules["spiderhome"]?.id ?? "",
                     objectif: coeff * (joursPlanifies[l.conseillerId] ?? 0),
                 },
+                recap_commercial: {
+                    id: l.cellules["recap_commercial"]?.id ?? "",
+                    objectif: coeffRecap * (joursPlanifies[l.conseillerId] ?? 0),
+                },
             },
         }));
         exporterObjectifsPDF(lignesAvecSpider, colonnesProduits);
@@ -174,13 +187,10 @@ export default function ObjectifsConseillerPage() {
                 id: l.cellules["spiderhome"]?.id ?? "",
                 objectif: coeff * (joursSemaine[l.conseillerId] ?? 0),
             };
-            const celluleRecap = l.cellules["recap_commercial"];
-            if (celluleRecap) {
-                cellules["recap_commercial"] = {
-                    id: celluleRecap.id,
-                    objectif: objSemaine[l.conseillerId]?.["recap_commercial" as ProduitCode] ?? 0,
-                };
-            }
+            cellules["recap_commercial"] = {
+                id: l.cellules["recap_commercial"]?.id ?? "",
+                objectif: coeffRecap * (joursSemaine[l.conseillerId] ?? 0),
+            };
             return { ...l, cellules, photoUrl: photos[l.conseillerId] ?? null };
         });
 
@@ -250,19 +260,36 @@ export default function ObjectifsConseillerPage() {
                                 <h2 className="mt-0.5 text-base font-black text-white">Par conseiller et par produit</h2>
                             </div>
 
-                            {/* Coefficient journalier Spiderhome */}
-                            <div className="flex items-center gap-2 rounded-xl bg-white/8 px-3 py-1.5">
-                                <span className="text-sm">🏠</span>
-                                <span className="text-[10px] font-bold uppercase tracking-wide text-sky-300">Spiderhome/j</span>
-                                <input
-                                    type="number"
-                                    min={1}
-                                    max={999}
-                                    value={coeff}
-                                    onChange={(e) => handleCoeff(Number(e.target.value))}
-                                    className="w-12 rounded-lg border border-white/15 bg-slate-950 px-1 py-1 text-center text-sm font-black text-sky-300 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
-                                />
-                                <span className="text-[10px] font-semibold text-white/40">× jours</span>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {/* Coefficient journalier Spiderhome */}
+                                <div className="flex items-center gap-2 rounded-xl bg-white/8 px-3 py-1.5">
+                                    <span className="text-sm">🏠</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-wide text-sky-300">Spiderhome/j</span>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={999}
+                                        value={coeff}
+                                        onChange={(e) => handleCoeff(Number(e.target.value))}
+                                        className="w-12 rounded-lg border border-white/15 bg-slate-950 px-1 py-1 text-center text-sm font-black text-sky-300 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                                    />
+                                    <span className="text-[10px] font-semibold text-white/40">× jours</span>
+                                </div>
+
+                                {/* Coefficient journalier Récap commercial */}
+                                <div className="flex items-center gap-2 rounded-xl bg-white/8 px-3 py-1.5">
+                                    <span className="text-sm">📋</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-wide text-teal-300">Récap/j</span>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={999}
+                                        value={coeffRecap}
+                                        onChange={(e) => handleCoeffRecap(Number(e.target.value))}
+                                        className="w-12 rounded-lg border border-white/15 bg-slate-950 px-1 py-1 text-center text-sm font-black text-teal-300 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20"
+                                    />
+                                    <span className="text-[10px] font-semibold text-white/40">× jours</span>
+                                </div>
                             </div>
                         </div>
 
@@ -343,29 +370,18 @@ export default function ObjectifsConseillerPage() {
                                                     </div>
                                                 </div>
 
-                                                {/* Récap commercial : encart à part, comme Spiderhome — pas un acte commercial,
-                                                    mais objectif manuel (pas auto-calculé) */}
+                                                {/* Récap commercial auto — comme Spiderhome : pas un acte commercial, objectif = coeff × jours */}
                                                 <div className="flex flex-col gap-1 rounded-xl border border-teal-100 bg-teal-50/70 p-2">
                                                     <div className="flex items-center gap-1">
                                                         <span className="text-xs">📋</span>
                                                         <span className="text-[9px] font-black uppercase tracking-wide text-teal-600">Récap commercial</span>
                                                     </div>
-                                                    {ligne.cellules["recap_commercial"] ? (
-                                                        <input
-                                                            type="number"
-                                                            min={0}
-                                                            defaultValue={ligne.cellules["recap_commercial"]!.objectif}
-                                                            onChange={(e) =>
-                                                                setEdits((prev) => ({
-                                                                    ...prev,
-                                                                    [ligne.cellules["recap_commercial"]!.id]: Number(e.target.value),
-                                                                }))
-                                                            }
-                                                            className="w-full rounded-lg border border-teal-100 bg-white/70 px-1 py-1 text-center text-base font-black text-slate-800 outline-none transition-all focus:bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
-                                                        />
-                                                    ) : (
-                                                        <div className="text-center text-base font-black text-slate-300">—</div>
-                                                    )}
+                                                    <div className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-teal-200 bg-white/70 py-1">
+                                                        <span className="text-base font-black text-teal-700 tabular-nums">
+                                                            {coeffRecap * jours}
+                                                        </span>
+                                                        <span className="text-[9px] text-teal-500">auto</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

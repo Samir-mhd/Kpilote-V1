@@ -2,6 +2,7 @@ import { getObjectifsMensuels } from "@/services/objectifs";
 import { getVentesDuJour, getVentesDuMois, getVentesDepuisLundi } from "@/services/stats";
 import { getJoursTravail, getJoursTravailPlage } from "@/services/planningService";
 import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
+import { getCoeffRecapCommercial } from "@/services/recapCommercialConfig";
 import { calculerObjectifs, EtatObjectif } from "@/engine/objectifEngine";
 import { periodeSemaineEffective } from "@/utils/periodes";
 import type { ProduitCode } from "@/utils/produits";
@@ -59,10 +60,11 @@ export type MissionComplete = {
 type VentesGetter = (id: string) => Promise<VenteSupabase[]>;
 
 async function calcul(conseillerId: string, annee: number, mois: number, ventesGetter: VentesGetter = getVentesDuMois) {
-    const [objectifs, ventes, joursTravail] = await Promise.all([
+    const [objectifs, ventes, joursTravail, coeffRecap] = await Promise.all([
         getObjectifsMensuels(conseillerId) as Promise<ObjectifSupabase[]>,
         ventesGetter(conseillerId) as Promise<VenteSupabase[]>,
         getJoursTravail(conseillerId, annee, mois),
+        getCoeffRecapCommercial(),
     ]);
 
     const { travailles: joursTravailles, restants: joursRestants } = joursTravail;
@@ -76,9 +78,10 @@ async function calcul(conseillerId: string, annee: number, mois: number, ventesG
             .filter((v) => getProduit(v.produits)?.code === produitCode)
             .reduce((t, v) => t + v.quantite, 0);
 
-        // Spiderhome : objectif mensuel auto = 25 × total jours planifiés du mois
-        const objectifMensuel = produitCode === "spiderhome"
-            ? 25 * (joursTravailles + joursRestants)
+        // Spiderhome et Récap commercial : objectif mensuel auto = coeff × total jours planifiés du mois
+        const objectifMensuel =
+            produitCode === "spiderhome" ? 25 * (joursTravailles + joursRestants)
+            : produitCode === "recap_commercial" ? coeffRecap * (joursTravailles + joursRestants)
             : objectif.objectif;
 
         return { produit: produitNom, objectifMensuel, realise, joursTravailles, joursRestants };
@@ -132,10 +135,10 @@ export async function getMissionsReelles(conseillerId: string) {
         const code = m.produit.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ /g, "_");
         const realiseAujourdhui = realiseJour[code] ?? 0;
 
-        if (code === "spiderhome") {
+        if (code === "spiderhome" || code === "recap_commercial") {
             return {
                 produit:  m.produit,
-                objectif: m.objectifJour, // Spiderhome : hors cascade semaine, calcul auto mensuel inchangé
+                objectif: m.objectifJour, // Hors cascade semaine, calcul auto mensuel (coeff × jours) inchangé
                 realise:  realiseAujourdhui,
                 couleur:  couleurProduit(m.produit),
                 message:  m.message,

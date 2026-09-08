@@ -14,7 +14,10 @@ function dateStr(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const CODES_MANUELS = PRODUITS_ORDRE.filter((p) => p.code !== "spiderhome").map((p) => p.code) as ProduitCode[];
+// Spiderhome et Récap commercial ont un objectif auto (coeff × jours), hors cascade semaine figée.
+const CODES_MANUELS = PRODUITS_ORDRE
+    .filter((p) => p.code !== "spiderhome" && p.code !== "recap_commercial")
+    .map((p) => p.code) as ProduitCode[];
 
 /**
  * Invalide l'objectif semaine figé EN COURS pour les conseillers donnés — à appeler après une
