@@ -3,7 +3,7 @@
  * Utilisé par manager/classement et dashboard/classement.
  */
 import { supabase } from "@/lib/supabase";
-import { PRODUITS_ORDRE, ProduitCode } from "@/utils/produits";
+import { PRODUITS_ORDRE, PRODUITS_HORS_TOTAL_CLASSEMENT, ProduitCode } from "@/utils/produits";
 import { Periode, dateDebutPeriode } from "@/utils/periodes";
 import { fetchToutesLesLignes } from "@/utils/supabasePaging";
 
@@ -78,11 +78,12 @@ export async function construireClassementPeriode(
         const row = map.get(v.conseiller_id);
         if (!row) return;
         const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code as ProduitCode;
-        // Spiderhome = historisation → exclu. Récap commercial reste visible ici (comme Avis Google).
+        // Spiderhome = historisation → exclu totalement. Avis Google reste affiché mais ne
+        // compte pas dans le total qui sert à classer (voir PRODUITS_HORS_TOTAL_CLASSEMENT).
         if (code === "spiderhome") return;
         if (code && row.produits[code] !== undefined) {
             row.produits[code] += v.quantite ?? 1;
-            row.total += v.quantite ?? 1;
+            if (!PRODUITS_HORS_TOTAL_CLASSEMENT.includes(code)) row.total += v.quantite ?? 1;
         }
     });
 

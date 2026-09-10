@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { PRODUITS_CLASSEMENT } from "@/utils/produits";
+import { PRODUITS_CLASSEMENT, PRODUITS_HORS_TOTAL_CLASSEMENT } from "@/utils/produits";
 import { Periode, PERIODE_LABELS, couleurTaux, periodeSemaineEffective } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
@@ -213,7 +213,10 @@ function ClassementInner() {
                                 <tbody>
                                     {classement.map((c, idx) => {
                                         const isMoi   = c.id === conseillerId;
-                                        const totalObj = PRODUITS_CLASSEMENT.reduce((t, p) => t + getObjDynamic(c, p.key), 0);
+                                        // Même périmètre que c.total (classementService) : exclut Avis Google du calcul de taux.
+                                        const totalObj = PRODUITS_CLASSEMENT
+                                            .filter((p) => !PRODUITS_HORS_TOTAL_CLASSEMENT.includes(p.code))
+                                            .reduce((t, p) => t + getObjDynamic(c, p.key), 0);
                                         const taux    = totalObj > 0 ? Math.round((c.total / totalObj) * 100) : 0;
                                         const ct      = couleurTaux(c.total, totalObj);
                                         return (

@@ -13,6 +13,10 @@ export const PRODUITS_ORDRE = [
 export type ProduitCode = typeof PRODUITS_ORDRE[number]["code"];
 
 /** Spiderhome = historisation, pas un acte commercial → absent de tous les classements/rankings.
- *  Récap commercial n'est pas non plus un acte commercial (exclu des totaux "ventes"), mais
- *  reste visible dans le classement comme Avis Google pour que le manager voie les résultats. */
+ *  Avis Google et Récap commercial restent visibles ici (colonne + résultats par conseiller),
+ *  mais sont exclus du total qui sert à classer (voir PRODUITS_HORS_TOTAL_CLASSEMENT). */
 export const PRODUITS_CLASSEMENT = PRODUITS_ORDRE.filter((p) => p.code !== "spiderhome");
+
+/** Produits comptés/affichés dans le classement mais exclus du total utilisé pour classer/trier
+ *  (pas des actes commerciaux au même titre que Box/Forfaits/etc.). */
+export const PRODUITS_HORS_TOTAL_CLASSEMENT: ProduitCode[] = ["avis_google"];
