@@ -129,6 +129,8 @@ export type EtatBadges = {
     streakParProduit: Record<string, number>;
     nbJoursParfaits: number;
     streakJoursParfaits: number;
+    /** Codes tout juste débloqués PAR CET APPEL (pour déclencher une célébration côté page). */
+    nouveaux: string[];
 };
 
 async function getVolumeCumulProduit(conseillerId: string): Promise<Record<string, number>> {
@@ -373,5 +375,57 @@ export async function calculerBadgesConseiller(conseillerId: string): Promise<Et
         streakParProduit,
         nbJoursParfaits,
         streakJoursParfaits,
+        nouveaux: aDebloquer,
     };
+}
+
+// ─── Prochain badge à débloquer (le plus proche, tous types confondus) ────────
+
+export type ProchainBadge = { badge: Badge; restant: number };
+
+/** Parmi tous les badges non encore débloqués à progression numérique claire (hors conditions
+ *  binaires comme "sans faute" ou "invincible"), celui qui demande le moins d'efforts restants. */
+export function prochainBadgeADebloquer(etat: EtatBadges): ProchainBadge | null {
+    const candidats: ProchainBadge[] = [];
+
+    Object.entries(PALIERS_PRODUIT).forEach(([code, seuils]) => {
+        const volume = etat.volumeParProduit[code] ?? 0;
+        const badges = PRODUIT_BADGES.filter((b) => b.code.startsWith(`produit_${code}_`));
+        seuils.forEach((seuil, i) => {
+            const badgeCode = `produit_${code}_${i}`;
+            if (!etat.debloques[badgeCode] && volume < seuil) {
+                candidats.push({ badge: badges[i], restant: seuil - volume });
+            }
+        });
+    });
+
+    if (!etat.debloques["box_premier"]) candidats.push({ badge: BOX_BADGES[0], restant: Math.max(1 - etat.nbBoxRaccordees, 1) });
+    if (!etat.debloques["box_closer"] && etat.nbBoxRaccordees < 10) candidats.push({ badge: BOX_BADGES[1], restant: 10 - etat.nbBoxRaccordees });
+    if (!etat.debloques["box_roi_4p"] && etat.nb4PCumule < 25) candidats.push({ badge: BOX_BADGES[3], restant: 25 - etat.nb4PCumule });
+
+    const defisGagnesTotal = etat.defisGagnes + etat.equipeGagnes;
+    if (!etat.debloques["defi_premier_sang"]) candidats.push({ badge: DEFI_BADGES[0], restant: Math.max(1 - defisGagnesTotal, 1) });
+    if (!etat.debloques["defi_guerrier"] && defisGagnesTotal < 5) candidats.push({ badge: DEFI_BADGES[1], restant: 5 - defisGagnesTotal });
+    if (!etat.debloques["defi_esprit_equipe"] && etat.equipeGagnes < 3) candidats.push({ badge: DEFI_BADGES[3], restant: 3 - etat.equipeGagnes });
+
+    PRODUITS_STREAK.forEach((code, i) => {
+        const badgeCode = `streak_${code}_semaine`;
+        const streak = etat.streakParProduit[code] ?? 0;
+        if (!etat.debloques[badgeCode] && streak < SEUIL_SEMAINE) {
+            candidats.push({ badge: PRODUIT_STREAK_BADGES[i], restant: SEUIL_SEMAINE - streak });
+        }
+    });
+
+    const prochainPalierJour = PALIERS_JOURS_PARFAITS.find((seuil, i) => !etat.debloques[`jour_parfait_${seuil}`] && etat.nbJoursParfaits < seuil);
+    if (prochainPalierJour !== undefined) {
+        const i = PALIERS_JOURS_PARFAITS.indexOf(prochainPalierJour);
+        candidats.push({ badge: JOUR_PARFAIT_BADGES[i], restant: prochainPalierJour - etat.nbJoursParfaits });
+    }
+
+    if (!etat.debloques["semaine_parfaite"] && etat.streakJoursParfaits < SEUIL_SEMAINE) {
+        candidats.push({ badge: SEMAINE_PARFAITE_BADGE, restant: SEUIL_SEMAINE - etat.streakJoursParfaits });
+    }
+
+    if (candidats.length === 0) return null;
+    return candidats.reduce((min, c) => (c.restant < min.restant ? c : min));
 }

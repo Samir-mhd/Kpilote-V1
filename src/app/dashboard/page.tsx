@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import Link from "next/link";
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -43,6 +44,7 @@ import {
 import { creerFicheBoxRaccordement } from "@/services/boxRaccordement";
 import { creerForfait4PDiffere } from "@/services/forfait4P";
 import { getOrdreMissions } from "@/services/ordreMissionsService";
+import { calculerBadgesConseiller, prochainBadgeADebloquer, ProchainBadge } from "@/services/badgesService";
 import { PRODUITS_ORDRE } from "@/utils/produits";
 
 const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
@@ -198,6 +200,7 @@ export default function Dashboard() {
     const boostTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [ordrePersonnalise, setOrdrePersonnalise] = useState<string[] | null>(null);
+    const [prochainBadge, setProchainBadge] = useState<ProchainBadge | null>(null);
     useEffect(() => {
         if (!conseillerId) return;
         getOrdreMissions(conseillerId).then(setOrdrePersonnalise).catch(() => {});
@@ -329,6 +332,13 @@ export default function Dashboard() {
                     setCagnotteActes(actes);
                 }
             );
+        }
+
+        // Prochain trophée à débloquer (widget Accueil) — non bloquant, best-effort.
+        if (conseillerId) {
+            calculerBadgesConseiller(conseillerId)
+                .then((etat) => setProchainBadge(prochainBadgeADebloquer(etat)))
+                .catch(() => setProchainBadge(null));
         }
     }, [conseillerId]);
 
@@ -1013,6 +1023,28 @@ export default function Dashboard() {
                     taux={tauxGlobal}
                     rang={rang}
                 />
+            )}
+
+            {prochainBadge && (
+                <Link
+                    href={`/dashboard/badges?id=${conseillerId}&nom=${encodeURIComponent(nom)}`}
+                    className="flex items-center gap-4 rounded-[24px] border border-amber-100 bg-gradient-to-r from-amber-50 to-orange-50 p-4 transition-all hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_8px_24px_rgba(217,119,6,.14)]"
+                >
+                    <div
+                        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-3xl"
+                        style={{ background: `linear-gradient(135deg, ${prochainBadge.badge.de}, ${prochainBadge.badge.a})` }}
+                    >
+                        {prochainBadge.badge.emoji}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600">🏆 Prochain trophée</p>
+                        <p className="truncate font-black text-slate-800">{prochainBadge.badge.label}</p>
+                        <p className="text-xs font-semibold text-slate-400">
+                            Encore {prochainBadge.restant} pour le débloquer
+                        </p>
+                    </div>
+                    <span className="shrink-0 text-lg text-slate-300">›</span>
+                </Link>
             )}
 
             <TeamFeed conseillerId={conseillerId} />
