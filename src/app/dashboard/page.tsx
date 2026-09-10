@@ -426,7 +426,7 @@ export default function Dashboard() {
     }
 
     // Spiderhome (historisation) et Récap commercial (suivi, pas une vente) → exclus des actes commerciaux
-    const PRODUITS_HISTORISATION = ["spiderhome", "récap commercial"];
+    const PRODUITS_HISTORISATION = ["spiderhome", "récap commercial", "avis google"];
     const estHistorisation = (produit: string) => PRODUITS_HISTORISATION.includes(produit.toLowerCase());
     const missionsCommerciales = missions.filter((m) => !estHistorisation(m.produit));
     const realiseGlobal = missionsCommerciales.reduce((t, m) => t + m.realise, 0);
