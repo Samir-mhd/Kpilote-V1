@@ -54,6 +54,8 @@ export type FicheBoxRaccordement = {
     boostIndividuelBox: number;
     raccordee: boolean;
     raccordeeLe: string | null;
+    /** Marquée perdue manuellement par le conseiller (sans attendre la date limite M+2). */
+    boxKo: boolean;
     commentaire: string | null;
     createdAt: string;
 };
@@ -69,7 +71,7 @@ function moisDe(dateIso: string): string {
     return `${dateIso.slice(0, 7)}-01`;
 }
 
-function moisPlus(mois: string, delta: number): string {
+export function moisPlus(mois: string, delta: number): string {
     const [y, m] = mois.split("-").map(Number);
     const d = new Date(y, m - 1 + delta, 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
@@ -82,7 +84,7 @@ export function nomMois(mois: string): string {
 }
 
 const SELECT_FICHE =
-    "id, conseiller_id, date_vente, mois_vente, mois_paiement, modele, montant_box, quatre_p, montant_4p, mcafee, montant_mcafee, canal1, montant_canal1, canal2, montant_canal2, canal3, montant_canal3, seuil_box, boost_individuel_box, raccordee, raccordee_le, commentaire, created_at";
+    "id, conseiller_id, date_vente, mois_vente, mois_paiement, modele, montant_box, quatre_p, montant_4p, mcafee, montant_mcafee, canal1, montant_canal1, canal2, montant_canal2, canal3, montant_canal3, seuil_box, boost_individuel_box, raccordee, raccordee_le, box_ko, commentaire, created_at";
 
 function mapFiche(r: any): FicheBoxRaccordement {
     return {
@@ -107,6 +109,7 @@ function mapFiche(r: any): FicheBoxRaccordement {
         boostIndividuelBox: r.boost_individuel_box,
         raccordee: r.raccordee,
         raccordeeLe: r.raccordee_le,
+        boxKo: r.box_ko ?? false,
         commentaire: r.commentaire ?? null,
         createdAt: r.created_at,
     };
@@ -159,16 +162,38 @@ export function dateLimite(moisPaiement: string): Date {
     return new Date(y, m, 0, 23, 59, 59);
 }
 
+/** Perdue si marquée "Box KO" manuellement, ou si la date limite M+2 est dépassée sans raccordement. */
 export function estPerdue(fiche: FicheBoxRaccordement): boolean {
+    return !fiche.raccordee && (fiche.boxKo || new Date() > dateLimite(fiche.moisPaiement));
+}
+
+/** Perdue uniquement par dépassement de la date limite (pour distinguer d'un "Box KO" manuel,
+ *  encore annulable tant que la date limite n'est pas elle-même dépassée). */
+export function estPerdueParDelai(fiche: FicheBoxRaccordement): boolean {
     return !fiche.raccordee && new Date() > dateLimite(fiche.moisPaiement);
 }
 
+/** À partir de M+3 (3 mois après la vente), la fiche disparaît de la liste de suivi — elle reste
+ *  en base (historique, badges "sans faute") mais n'est plus affichée sur /dashboard/variable. */
+export function estDisparu(fiche: FicheBoxRaccordement): boolean {
+    return new Date() > dateLimite(moisPlus(fiche.moisVente, 3));
+}
+
 /** Bascule le statut raccordée — recliquer une fiche déjà raccordée la remet en attente
- *  (pour corriger un 4P/McAfee oublié avant validation, sans perdre la fiche). */
+ *  (pour corriger un 4P/McAfee oublié avant validation, sans perdre la fiche). Marquer raccordée
+ *  annule un éventuel "Box KO" (les deux statuts sont mutuellement exclusifs). */
 export async function basculerRaccordement(ficheId: string, raccordee: boolean): Promise<void> {
     await supabase
         .from("box_raccordements")
-        .update({ raccordee, raccordee_le: raccordee ? new Date().toISOString() : null })
+        .update({ raccordee, raccordee_le: raccordee ? new Date().toISOString() : null, box_ko: raccordee ? false : undefined })
+        .eq("id", ficheId);
+}
+
+/** Bascule "Box KO" (perte manuelle, avant même la date limite) — recliquer annule le marquage. */
+export async function basculerBoxKo(ficheId: string, boxKo: boolean): Promise<void> {
+    await supabase
+        .from("box_raccordements")
+        .update({ box_ko: boxKo, raccordee: boxKo ? false : undefined, raccordee_le: boxKo ? null : undefined })
         .eq("id", ficheId);
 }
 

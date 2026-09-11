@@ -10,9 +10,12 @@ import {
     getFichesBoxRaccordement,
     creerFicheBoxRaccordement,
     basculerRaccordement,
+    basculerBoxKo,
     mettreAJourFiche,
     supprimerFicheBoxRaccordement,
     estPerdue,
+    estPerdueParDelai,
+    estDisparu,
     dateLimite,
     nomMois,
     dateDuJour,
@@ -91,7 +94,18 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
         const next = !f.raccordee;
         try {
             await basculerRaccordement(f.id, next);
-            patchLocal(f.id, { raccordee: next, raccordeeLe: next ? new Date().toISOString() : null });
+            patchLocal(f.id, { raccordee: next, raccordeeLe: next ? new Date().toISOString() : null, boxKo: next ? false : f.boxKo });
+        } finally {
+            setEnCoursId(null);
+        }
+    }
+
+    async function toggleBoxKo(f: FicheBoxRaccordement) {
+        setEnCoursId(f.id);
+        const next = !f.boxKo;
+        try {
+            await basculerBoxKo(f.id, next);
+            patchLocal(f.id, { boxKo: next, raccordee: next ? false : f.raccordee, raccordeeLe: next ? null : f.raccordeeLe });
         } finally {
             setEnCoursId(null);
         }
@@ -117,9 +131,11 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
         );
     }
 
-    const enAttente = fiches.filter((f) => !f.raccordee && !estPerdue(f));
-    const raccordees = fiches.filter((f) => f.raccordee);
-    const perdues = fiches.filter((f) => !f.raccordee && estPerdue(f));
+    // À M+3 (3 mois après la vente), la fiche sort de ce suivi — elle reste en base pour l'historique.
+    const fichesVisibles = fiches.filter((f) => !estDisparu(f));
+    const enAttente = fichesVisibles.filter((f) => !f.raccordee && !estPerdue(f));
+    const raccordees = fichesVisibles.filter((f) => f.raccordee);
+    const perdues = fichesVisibles.filter((f) => !f.raccordee && estPerdue(f));
 
     function ligneFiche(f: FicheBoxRaccordement, variante: "attente" | "raccordee" | "perdue") {
         const style =
@@ -138,7 +154,8 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
                             Vendue le {fmtDateVente(f.dateVente)}
                             {variante === "attente" && ` · à raccorder avant le ${dateLimite(f.moisPaiement).toLocaleDateString("fr-FR")}`}
                             {variante === "raccordee" && ` · payée en ${nomMois(f.moisPaiement)}`}
-                            {variante === "perdue" && ` · non raccordée avant le paiement de ${nomMois(f.moisPaiement)} · non payée`}
+                            {variante === "perdue" && f.boxKo && !estPerdueParDelai(f) && ` · marquée Box KO · non payée`}
+                            {variante === "perdue" && estPerdueParDelai(f) && ` · non raccordée avant le paiement de ${nomMois(f.moisPaiement)} · non payée`}
                         </p>
                         <input
                             value={commentaires[f.id] ?? ""}
@@ -188,7 +205,27 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
                                 >
                                     {enCoursId === f.id ? "…" : f.raccordee ? "Raccordée ✓" : "Raccordée ?"}
                                 </button>
+                                {!f.raccordee && (
+                                    <button
+                                        onClick={() => toggleBoxKo(f)}
+                                        disabled={enCoursId === f.id}
+                                        className="rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-500 transition-all hover:bg-red-100 disabled:opacity-60"
+                                        title="Marquer cette box comme perdue"
+                                    >
+                                        {enCoursId === f.id ? "…" : "Box KO"}
+                                    </button>
+                                )}
                             </>
+                        )}
+                        {variante === "perdue" && f.boxKo && !estPerdueParDelai(f) && (
+                            <button
+                                onClick={() => toggleBoxKo(f)}
+                                disabled={enCoursId === f.id}
+                                className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-500 transition-all hover:bg-slate-100 disabled:opacity-60"
+                                title="Annuler le marquage Box KO"
+                            >
+                                {enCoursId === f.id ? "…" : "Annuler Box KO"}
+                            </button>
                         )}
                         <button
                             onClick={() => supprimer(f.id)}
@@ -263,7 +300,7 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
 
             {perdues.length > 0 && (
                 <div className="rounded-[24px] bg-white p-6 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
-                    <p className="text-xs font-black uppercase tracking-[0.2em] text-red-500">✕ Perdues (délai dépassé)</p>
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-red-500">✕ Perdues (Box KO ou délai dépassé)</p>
                     <div className="mt-4 space-y-3">{perdues.map((f) => ligneFiche(f, "perdue"))}</div>
                 </div>
             )}
