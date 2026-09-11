@@ -45,7 +45,7 @@ import { creerFicheBoxRaccordement } from "@/services/boxRaccordement";
 import { creerForfait4PDiffere } from "@/services/forfait4P";
 import { getOrdreMissions } from "@/services/ordreMissionsService";
 import { calculerBadgesConseiller, prochainBadgeADebloquer, ProchainBadge } from "@/services/badgesService";
-import { PRODUITS_ORDRE } from "@/utils/produits";
+import { PRODUITS_ORDRE, PRODUITS_HORS_ACTES, ProduitCode } from "@/utils/produits";
 
 const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
 
@@ -436,8 +436,7 @@ export default function Dashboard() {
     }
 
     // Spiderhome (historisation) et Récap commercial (suivi, pas une vente) → exclus des actes commerciaux
-    const PRODUITS_HISTORISATION = ["spiderhome", "récap commercial", "avis google"];
-    const estHistorisation = (produit: string) => PRODUITS_HISTORISATION.includes(produit.toLowerCase());
+    const estHistorisation = (produit: string) => PRODUITS_HORS_ACTES.includes(produitCode(produit) as ProduitCode);
     const missionsCommerciales = missions.filter((m) => !estHistorisation(m.produit));
     const realiseGlobal = missionsCommerciales.reduce((t, m) => t + m.realise, 0);
     const objectifGlobal = missionsCommerciales.reduce((t, m) => t + m.objectif, 0);

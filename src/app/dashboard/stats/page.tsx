@@ -6,10 +6,18 @@ import { supabase } from "@/lib/supabase";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import MorningCheck from "@/components/dashboard/MorningCheck";
 import CorrigerVentesJourCard from "@/components/dashboard/CorrigerVentesJourCard";
+import { PRODUITS_HORS_ACTES, ProduitCode } from "@/utils/produits";
 
 // Exclut les ajustements techniques (cerebro check, correction du jour) de l'affichage —
 // ils restent comptés dans les totaux réels, mais ne doivent pas polluer heatmap/timeline.
 const EXCLURE_AJUSTEMENTS = "source.is.null,and(source.neq.cerebro_check,source.neq.reset_jour)";
+
+// Spiderhome (historisation), Avis Google et Récap commercial ne sont pas des actes commerciaux
+// → exclus de l'analyse (heatmap, meilleure heure/jour/produit, tendance semaine).
+function estActeCommercial(v: any): boolean {
+    const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code as ProduitCode | undefined;
+    return !code || !PRODUITS_HORS_ACTES.includes(code);
+}
 
 /* ─── Types ──────────────────────────────────────────────── */
 type Vente = { id: string; produits: any; created_at: string; };
@@ -135,24 +143,23 @@ function StatsInner() {
                 .or(EXCLURE_AJUSTEMENTS)
                 .gte("created_at", debut30j.toISOString()),
 
-            supabase.from("ventes").select("id", { count: "exact", head: true })
+            supabase.from("ventes").select("id,produits(code)")
                 .eq("conseiller_id", conseillerId)
                 .or(EXCLURE_AJUSTEMENTS)
                 .gte("created_at", lundi.toISOString()),
 
-            supabase.from("ventes").select("id", { count: "exact", head: true })
+            supabase.from("ventes").select("id,produits(code)")
                 .eq("conseiller_id", conseillerId)
                 .or(EXCLURE_AJUSTEMENTS)
                 .gte("created_at", lundiPrec.toISOString())
                 .lt("created_at", lundi.toISOString()),
         ]);
 
-        // Spiderhome = historisation, pas un acte commercial → exclu de "Mes ventes aujourd'hui"
-        const estSpiderhome = (v: any) => (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code === "spiderhome";
-        const auj   = (resAujourd.data ?? []).filter((v) => !estSpiderhome(v));
-        const j30   = res30j.data ?? [];
-        const semC  = resSemCour.count ?? 0;
-        const semP  = resSemPrec.count ?? 0;
+        // Spiderhome, Avis Google, Récap commercial : pas des actes commerciaux → exclus partout ici.
+        const auj   = (resAujourd.data ?? []).filter(estActeCommercial);
+        const j30   = (res30j.data ?? []).filter(estActeCommercial);
+        const semC  = (resSemCour.data ?? []).filter(estActeCommercial).length;
+        const semP  = (resSemPrec.data ?? []).filter(estActeCommercial).length;
 
         setVentesAujourdhui(auj);
         setHeatmap(buildHeatmap(j30));

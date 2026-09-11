@@ -20,3 +20,7 @@ export const PRODUITS_CLASSEMENT = PRODUITS_ORDRE.filter((p) => p.code !== "spid
 /** Produits comptés/affichés dans le classement mais exclus du total utilisé pour classer/trier
  *  (pas des actes commerciaux au même titre que Box/Forfaits/etc.). */
 export const PRODUITS_HORS_TOTAL_CLASSEMENT: ProduitCode[] = ["avis_google", "recap_commercial"];
+
+/** Pas des actes commerciaux : à exclure de tout comptage "ventes/actes du jour" (Accueil, Mes
+ *  stats...). Spiderhome (historisation), Avis Google et Récap commercial (suivis sans prime). */
+export const PRODUITS_HORS_ACTES: ProduitCode[] = ["spiderhome", "avis_google", "recap_commercial"];
