@@ -28,6 +28,7 @@ import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 import TeamFeed from "@/components/dashboard/TeamFeed";
 import CagnotteJourCard from "@/components/dashboard/CagnotteJourCard";
 import AutresActesCard from "@/components/dashboard/AutresActesCard";
+import ComboVenteModal, { ComboSelection } from "@/components/dashboard/ComboVenteModal";
 import { ChoixActe } from "@/components/dashboard/ChoixActeModal";
 import {
     BaremeVariable,
@@ -201,6 +202,7 @@ export default function Dashboard() {
 
     const [ordrePersonnalise, setOrdrePersonnalise] = useState<string[] | null>(null);
     const [prochainBadge, setProchainBadge] = useState<ProchainBadge | null>(null);
+    const [comboOuvert, setComboOuvert] = useState(false);
     useEffect(() => {
         if (!conseillerId) return;
         getOrdreMissions(conseillerId).then(setOrdrePersonnalise).catch(() => {});
@@ -688,6 +690,69 @@ export default function Dashboard() {
         return questions;
     }
 
+    const CANAL_LABELS_COMBO: Record<string, string> = {
+        canal_option1: "Canal+ Option 1",
+        canal_option2: "Canal+ Option 2",
+        canal_option3: "Canal+ Option 3",
+    };
+
+    // Vente combo (Accueil) : enchaîne les mêmes fonctions que chaque carte individuelle,
+    // dans l'ordre, pour rester cohérent avec le reste de l'app (une seule écriture à la fois,
+    // ajouterActeVariable fait un read-modify-write sur le mois courant — jamais en parallèle).
+    async function soumettreCombo(s: ComboSelection) {
+        if (s.box) {
+            const acte = BOX_CHOIX.find((c) => c.champ === s.box);
+            if (acte) {
+                await handleSale("Box");
+                await ajouterActeVariable(acte);
+            }
+            if (s.box === "box_ultra" && s.canal) {
+                await ajouterActeVariable({ label: CANAL_LABELS_COMBO[s.canal], montant: bareme[s.canal] });
+            }
+        }
+
+        if (s.forfait) {
+            const acte = FORFAIT_CHOIX.find((c) => c.champ === s.forfait);
+            if (acte) {
+                await handleSale("Forfaits");
+                await ajouterActeVariable(acte);
+            }
+        }
+
+        if (s.quatreP) {
+            await ajouterActeVariable(VENTE_4P_ACTE);
+            if (s.forfait && conseillerId) {
+                creerForfait4PDiffere(conseillerId, bareme.cross_sell_4p).catch(() => {});
+            }
+        }
+
+        if (s.telephone) {
+            await handleSale("Téléphones");
+            await ajouterActeVariable(TELEPHONE_ACTE);
+            if (s.boostConstructeurId) {
+                const b = bonusManuels.find((x) => x.id === s.boostConstructeurId);
+                if (b) await ajouterActeVariable({ label: b.label, montant: b.montant, bonusManuelId: b.id });
+            }
+        }
+
+        if (s.mcafee) {
+            const acte = MCAFEE_CHOIX.find((c) => c.champ === s.mcafee);
+            if (acte) {
+                await handleSale("McAfee");
+                await ajouterActeVariable(acte);
+            }
+        }
+
+        if (s.assurance === "nouveau_mobile") {
+            await handleSale("Assurance");
+            await ajouterActeVariable(ASSURANCE_ACTE);
+        } else if (s.assurance === "essentielle") {
+            await ajouterActeVariable({ label: "Assurance essentielle", montant: bareme.assurance_essentielle, champ: "assurance_essentielle" });
+        }
+
+        setCoachMessage("🎁 Vente combo enregistrée — bien joué !");
+    }
+
     return (
         <div className="space-y-8">
 
@@ -1085,8 +1150,28 @@ export default function Dashboard() {
                             dernierJourSemaine={mission.dernierJourSemaine}
                         />
                     ))}
+
+                    {variableActivee && (
+                        <button
+                            onClick={() => setComboOuvert(true)}
+                            className="flex flex-col items-center justify-center gap-2 rounded-[28px] border-2 border-dashed border-violet-200 bg-violet-50/50 p-7 text-center transition-all hover:border-violet-400 hover:bg-violet-50"
+                        >
+                            <span className="text-4xl">🎁</span>
+                            <span className="font-black text-violet-700">Vente combo</span>
+                            <span className="text-xs font-semibold text-violet-400">Box + forfait + assurance + tout d'un coup</span>
+                        </button>
+                    )}
                 </div>
             </section>
+
+            {comboOuvert && (
+                <ComboVenteModal
+                    bareme={bareme}
+                    bonusManuels={bonusManuels}
+                    onClose={() => setComboOuvert(false)}
+                    onValider={soumettreCombo}
+                />
+            )}
 
             {variableActivee && !champMasque("autres_actes") && (
                 <AutresActesCard
