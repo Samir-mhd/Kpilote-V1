@@ -1154,11 +1154,12 @@ export default function Dashboard() {
                     {variableActivee && (
                         <button
                             onClick={() => setComboOuvert(true)}
-                            className="flex flex-col items-center justify-center gap-2 rounded-[28px] border-2 border-dashed border-violet-200 bg-violet-50/50 p-7 text-center transition-all hover:border-violet-400 hover:bg-violet-50"
+                            className="relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-[28px] border-2 border-amber-300 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-7 text-center shadow-[0_8px_24px_rgba(217,119,6,.12)] transition-all hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-[0_12px_32px_rgba(217,119,6,.22)]"
                         >
-                            <span className="text-4xl">🎁</span>
-                            <span className="font-black text-violet-700">Vente combo</span>
-                            <span className="text-xs font-semibold text-violet-400">Box + forfait + assurance + tout d'un coup</span>
+                            <div className="pointer-events-none absolute -top-8 -right-8 h-28 w-28 rounded-full bg-amber-300/25 blur-2xl" />
+                            <span className="relative text-3xl leading-none">📱💻🛡️✅💪🎉</span>
+                            <span className="relative font-black text-amber-700">Vente combo</span>
+                            <span className="relative text-xs font-semibold text-amber-500">Box + forfait + assurance + tout d'un coup</span>
                         </button>
                     )}
                 </div>
