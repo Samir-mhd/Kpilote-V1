@@ -7,6 +7,8 @@ import { getObjectifsMensuels } from "@/services/objectifs";
 import { chargerClassementDefisEtChallenges } from "@/services/defisService";
 import { PRODUITS_ORDRE } from "@/utils/produits";
 import { exporterBilanPDF, getMoisLabel, type BilanExport, type Tendance } from "@/utils/exportBilanPDF";
+import { getStatsTransactionsMois, StatsTransactionsMois } from "@/services/ventesTransactions";
+import ArticlesParVenteCard from "@/components/dashboard/ArticlesParVenteCard";
 
 // ── Helpers date ──────────────────────────────────────────────────────────────
 
@@ -83,7 +85,16 @@ export default function BilanConseiller() {
     const [loading, setLoading] = useState(true);
     const [erreur,  setErreur]  = useState(false);
     const [moisValeur, setMoisValeur] = useState(MOIS_OPTIONS[0].valeur);
+    const [statsArticles, setStatsArticles] = useState<StatsTransactionsMois | null>(null);
     const moisRef = MOIS_OPTIONS.find((o) => o.valeur === moisValeur)?.ref ?? MOIS_OPTIONS[0].ref;
+
+    useEffect(() => {
+        if (!id) return;
+        getStatsTransactionsMois(id, moisRef.getFullYear(), moisRef.getMonth() + 1)
+            .then(setStatsArticles)
+            .catch(() => setStatsArticles(null));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id, moisValeur]);
 
     useEffect(() => {
         if (!id) return;
@@ -493,6 +504,12 @@ export default function BilanConseiller() {
                     </div>
                 </div>
             </div>
+
+            {statsArticles && (
+                <div className="mt-6">
+                    <ArticlesParVenteCard stats={statsArticles} />
+                </div>
+            )}
         </main>
     );
 }

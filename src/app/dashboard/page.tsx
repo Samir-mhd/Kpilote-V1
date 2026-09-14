@@ -29,6 +29,8 @@ import TeamFeed from "@/components/dashboard/TeamFeed";
 import CagnotteJourCard from "@/components/dashboard/CagnotteJourCard";
 import AutresActesCard from "@/components/dashboard/AutresActesCard";
 import ComboVenteModal, { ComboSelection } from "@/components/dashboard/ComboVenteModal";
+import ComboSansVarianteModal, { ComboSansVarianteSelection } from "@/components/dashboard/ComboSansVarianteModal";
+import { enregistrerTransaction } from "@/services/ventesTransactions";
 import { ChoixActe } from "@/components/dashboard/ChoixActeModal";
 import {
     BaremeVariable,
@@ -203,6 +205,11 @@ export default function Dashboard() {
     const [ordrePersonnalise, setOrdrePersonnalise] = useState<string[] | null>(null);
     const [prochainBadge, setProchainBadge] = useState<ProchainBadge | null>(null);
     const [comboOuvert, setComboOuvert] = useState(false);
+    const [comboSansVarianteOuvert, setComboSansVarianteOuvert] = useState(false);
+    // Compteur d'articles de la vente en cours (carte + questions de rebond qui suivent, ou
+    // combo) — flushé en une transaction "ventes_transactions" à la fin du flux (onBoostReady
+    // pour le parcours normal, explicitement en fin de soumission pour les cartes combo).
+    const transactionArticlesRef = useRef(0);
     useEffect(() => {
         if (!conseillerId) return;
         getOrdreMissions(conseillerId).then(setOrdrePersonnalise).catch(() => {});
@@ -439,6 +446,22 @@ export default function Dashboard() {
 
     // Spiderhome (historisation) et Récap commercial (suivi, pas une vente) → exclus des actes commerciaux
     const estHistorisation = (produit: string) => PRODUITS_HORS_ACTES.includes(produitCode(produit) as ProduitCode);
+
+    // "Nombre d'articles par vente" : uniquement ces types comptent comme un article (jamais le
+    // boost constructeur, Canal+, 4P, Avis Google, Spiderhome ou Récap commercial).
+    const ARTICLE_PRODUITS_DIRECTS = new Set(["box", "forfaits", "telephones", "mcafee", "assurance"]);
+    const CHAMPS_ARTICLE_QUALIFIANT = new Set([
+        "box_ultra", "box_pop", "box_pop_s_revolution_5g",
+        "forfait_free_serie", "forfait_free_max",
+        "smartphones",
+        "mcafee_499", "mcafee_699",
+        "assurance_nouveau_mobile", "assurance_essentielle",
+    ]);
+    const idsMcafeeMobile = new Set(
+        bonusManuels
+            .filter((b) => b.categorie === "autres_primes" && normaliser(b.label).includes("mcafee"))
+            .map((b) => b.id)
+    );
     const missionsCommerciales = missions.filter((m) => !estHistorisation(m.produit));
     const realiseGlobal = missionsCommerciales.reduce((t, m) => t + m.realise, 0);
     const objectifGlobal = missionsCommerciales.reduce((t, m) => t + m.objectif, 0);
@@ -458,6 +481,12 @@ export default function Dashboard() {
         if (isHistorisation) {
             setCoachMessage("📋 Historisation enregistrée. Continue !");
             return;
+        }
+        // Sans variable, ce clic est le seul signal disponible pour compter un article (pas de
+        // sous-choix/ajouterActeVariable) — avec variable, c'est déjà compté via ajouterActeVariable,
+        // ne pas compter deux fois ici.
+        if (!variableActivee && ARTICLE_PRODUITS_DIRECTS.has(produitCode(produit))) {
+            transactionArticlesRef.current += 1;
         }
         const nouveauTotal = totalVentesJour + 1;
         setTotalVentesJour(nouveauTotal);
@@ -521,9 +550,19 @@ export default function Dashboard() {
         return undefined;
     }
 
+    // Appelé une fois à la fin de CHAQUE flux de vente (carte + questions de rebond qui suivent),
+    // avec ou sans boost — signal fiable pour clore la transaction "articles par vente" en cours.
+    function flushTransactionArticles() {
+        if (transactionArticlesRef.current > 0 && conseillerId) {
+            enregistrerTransaction(conseillerId, transactionArticlesRef.current).catch(() => {});
+        }
+        transactionArticlesRef.current = 0;
+    }
+
     // Affiche le bandeau boost — appelé immédiatement, ou différé après la question "4P ?"
     // sur Box/Forfait pour ne pas se superposer à la question.
     function afficherBoostToast(info?: { label: string; montant: number }) {
+        flushTransactionArticles();
         if (!info) return;
         setCagnotteTotal((prev) => prev + info.montant);
         setCagnotteFlash({ key: Date.now(), montant: info.montant, label: "de boost !" });
@@ -540,6 +579,11 @@ export default function Dashboard() {
             setCagnotteTotal((prev) => prev + montant);
             setCagnotteFlash({ key: Date.now(), montant });
             setCagnotteActes((prev) => [...prev, acte]);
+
+            const estArticleQualifiant =
+                (option.champ && CHAMPS_ARTICLE_QUALIFIANT.has(option.champ)) ||
+                (option.bonusManuelId && idsMcafeeMobile.has(option.bonusManuelId));
+            if (estArticleQualifiant) transactionArticlesRef.current += 1;
 
             // Box payée au raccordement (M+2) : une fiche de suivi est créée immédiatement,
             // avec le barème du mois figé — indépendant du barème qui sera en vigueur au
@@ -750,6 +794,22 @@ export default function Dashboard() {
             await ajouterActeVariable({ label: "Assurance essentielle", montant: bareme.assurance_essentielle, champ: "assurance_essentielle" });
         }
 
+        // La carte combo ne passe jamais par le flux normal de MissionCard (onBoostReady) :
+        // il faut clore la transaction "articles par vente" explicitement ici.
+        flushTransactionArticles();
+        setCoachMessage("🎁 Vente combo enregistrée — bien joué !");
+    }
+
+    // Combo simplifié (sans variable) : coche des produits, aucun montant/sous-choix — le seul
+    // signal disponible reste le clic sur chaque produit (handleSale incrémente déjà le compteur
+    // d'articles quand !variableActivee).
+    async function soumettreComboSansVariante(s: ComboSansVarianteSelection) {
+        if (s.box) await handleSale("Box");
+        if (s.forfait) await handleSale("Forfaits");
+        if (s.telephone) await handleSale("Téléphones");
+        if (s.mcafee) await handleSale("McAfee");
+        if (s.assurance) await handleSale("Assurance");
+        flushTransactionArticles();
         setCoachMessage("🎁 Vente combo enregistrée — bien joué !");
     }
 
@@ -1151,17 +1211,15 @@ export default function Dashboard() {
                         />
                     ))}
 
-                    {variableActivee && (
-                        <button
-                            onClick={() => setComboOuvert(true)}
-                            className="relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-[28px] border-2 border-amber-300 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-7 text-center shadow-[0_8px_24px_rgba(217,119,6,.12)] transition-all hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-[0_12px_32px_rgba(217,119,6,.22)]"
-                        >
-                            <div className="pointer-events-none absolute -top-8 -right-8 h-28 w-28 rounded-full bg-amber-300/25 blur-2xl" />
-                            <span className="relative text-3xl leading-none">📱💻🛡️✅💪🎉</span>
-                            <span className="relative font-black text-amber-700">Vente combo</span>
-                            <span className="relative text-xs font-semibold text-amber-500">Box + forfait + assurance + tout d'un coup</span>
-                        </button>
-                    )}
+                    <button
+                        onClick={() => (variableActivee ? setComboOuvert(true) : setComboSansVarianteOuvert(true))}
+                        className="relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-[28px] border-2 border-amber-300 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-7 text-center shadow-[0_8px_24px_rgba(217,119,6,.12)] transition-all hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-[0_12px_32px_rgba(217,119,6,.22)]"
+                    >
+                        <div className="pointer-events-none absolute -top-8 -right-8 h-28 w-28 rounded-full bg-amber-300/25 blur-2xl" />
+                        <span className="relative text-3xl leading-none">📱💻🛡️✅💪🎉</span>
+                        <span className="relative font-black text-amber-700">Vente combo</span>
+                        <span className="relative text-xs font-semibold text-amber-500">Box + forfait + assurance + tout d'un coup</span>
+                    </button>
                 </div>
             </section>
 
@@ -1171,6 +1229,13 @@ export default function Dashboard() {
                     bonusManuels={bonusManuels}
                     onClose={() => setComboOuvert(false)}
                     onValider={soumettreCombo}
+                />
+            )}
+
+            {comboSansVarianteOuvert && (
+                <ComboSansVarianteModal
+                    onClose={() => setComboSansVarianteOuvert(false)}
+                    onValider={soumettreComboSansVariante}
                 />
             )}
 

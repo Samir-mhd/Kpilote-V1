@@ -238,6 +238,7 @@ export default function ClassementPage() {
                                                 {p.emoji} {p.label}
                                             </th>
                                         ))}
+                                        <th className="px-3 pb-2 text-center">🛒 Art./vente</th>
                                         <th className="px-3 pb-2 text-right">Total</th>
                                         <th className="px-3 pb-2" />
                                     </tr>
@@ -298,6 +299,11 @@ export default function ClassementPage() {
                                                         );
                                                     })}
 
+                                                    {/* Articles / vente */}
+                                                    <td className="px-3 py-3 text-center">
+                                                        <span className="text-sm font-black text-teal-600">{c.moyenneArticles.toFixed(2)}</span>
+                                                    </td>
+
                                                     {/* Total */}
                                                     <td className="px-3 py-3 text-right">
                                                         <p className="text-lg font-black text-slate-800">{c.total}</p>
@@ -317,7 +323,7 @@ export default function ClassementPage() {
                                                 {/* Félicitation inline */}
                                                 {ouvert && (
                                                     <tr>
-                                                        <td colSpan={PRODUITS_CLASSEMENT.length + 4} className="px-3 pb-3">
+                                                        <td colSpan={PRODUITS_CLASSEMENT.length + 5} className="px-3 pb-3">
                                                             <FelicitationCard
                                                                 conseillerId={c.id}
                                                                 conseiller={prenom}

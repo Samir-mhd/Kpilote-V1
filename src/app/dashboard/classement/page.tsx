@@ -206,6 +206,7 @@ function ClassementInner() {
                                         {PRODUITS_CLASSEMENT.map(p => (
                                             <th key={p.code} className="px-3 pb-2 text-center">{p.emoji} {p.label}</th>
                                         ))}
+                                        <th className="px-3 pb-2 text-center">🛒 Art./vente</th>
                                         <th className="px-4 pb-2 text-right">Total</th>
                                         <th className="px-5 pb-2 text-right">Taux</th>
                                     </tr>
@@ -256,6 +257,9 @@ function ClassementInner() {
                                                         </td>
                                                     );
                                                 })}
+                                                <td className="px-3 py-3 text-center">
+                                                    <span className="text-sm font-black text-teal-600">{c.moyenneArticles.toFixed(2)}</span>
+                                                </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <p className={`text-lg font-black ${isMoi ? "text-green-700" : "text-slate-800"}`}>{c.total}</p>
                                                 </td>

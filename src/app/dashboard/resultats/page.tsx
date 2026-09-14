@@ -4,6 +4,8 @@ import { Suspense } from "react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getMissionsCompletes, getVentesParMois, MissionComplete } from "@/services/missionsReelles";
+import { getStatsTransactionsMois, StatsTransactionsMois } from "@/services/ventesTransactions";
+import ArticlesParVenteCard from "@/components/dashboard/ArticlesParVenteCard";
 
 const MOIS_LABELS = ["", "Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
 const MOIS_NOMS  = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
@@ -54,6 +56,7 @@ function ResultatsInner() {
     const [missions,   setMissions]   = useState<MissionComplete[]>([]);
     const [vue,        setVue]        = useState<"globale" | "produit">("globale");
     const [historique, setHistorique] = useState<{ mois: number; annee: number; label: string; ventes: Record<string, number> }[]>([]);
+    const [statsArticles, setStatsArticles] = useState<StatsTransactionsMois | null>(null);
     const [loading,    setLoading]    = useState(true);
 
     useEffect(() => {
@@ -62,14 +65,16 @@ function ResultatsInner() {
         const now = new Date();
         Promise.all([
             getMissionsCompletes(conseillerId),
+            getStatsTransactionsMois(conseillerId, now.getFullYear(), now.getMonth() + 1),
             ...[-3, -2, -1].map((delta) => {
                 let m = now.getMonth() + 1 + delta;
                 let a = now.getFullYear();
                 if (m < 1) { m += 12; a -= 1; }
                 return getVentesParMois(conseillerId, a, m).then(v => ({ mois: m, annee: a, label: `${MOIS_LABELS[m]} ${a}`, ventes: v }));
             }),
-        ]).then(([missionsData, ...histData]) => {
+        ]).then(([missionsData, statsData, ...histData]) => {
             setMissions(missionsData as MissionComplete[]);
+            setStatsArticles(statsData as StatsTransactionsMois);
             setHistorique(histData as any[]);
         }).finally(() => setLoading(false));
     }, [conseillerId]);
@@ -142,6 +147,9 @@ function ResultatsInner() {
                     </div>
                 </div>
             </div>
+
+            {/* ── Articles par vente ────────────────────────────────────── */}
+            {statsArticles && <ArticlesParVenteCard stats={statsArticles} />}
 
             {/* ── Toggle vue ─────────────────────────────────────────────── */}
             <div className="flex gap-2">

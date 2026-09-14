@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { PRODUITS_ORDRE, PRODUITS_HORS_TOTAL_CLASSEMENT, ProduitCode } from "@/utils/produits";
 import { Periode, dateDebutPeriode } from "@/utils/periodes";
 import { fetchToutesLesLignes } from "@/utils/supabasePaging";
+import { getMoyenneArticlesParConseiller } from "@/services/ventesTransactions";
 
 export type ConseillerStats = {
     id: string;
@@ -13,6 +14,7 @@ export type ConseillerStats = {
     total: number;
     produits: Record<ProduitCode, number>;
     objectifs: Record<ProduitCode, number>;
+    moyenneArticles: number;
 };
 
 export async function construireClassementPeriode(
@@ -70,6 +72,7 @@ export async function construireClassementPeriode(
             total: 0,
             produits: Object.fromEntries(codesProduits.map(k => [k, 0])) as Record<ProduitCode, number>,
             objectifs: Object.fromEntries(codesProduits.map(k => [k, 0])) as Record<ProduitCode, number>,
+            moyenneArticles: 0,
         });
     });
 
@@ -96,6 +99,10 @@ export async function construireClassementPeriode(
             row.objectifs[code] += o.objectif ?? 0;
         }
     });
+
+    // Moyenne d'articles par vente, sur la même période
+    const moyennes = await getMoyenneArticlesParConseiller([...map.keys()], debut).catch(() => ({} as Record<string, number>));
+    map.forEach((row) => { row.moyenneArticles = moyennes[row.id] ?? 0; });
 
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
