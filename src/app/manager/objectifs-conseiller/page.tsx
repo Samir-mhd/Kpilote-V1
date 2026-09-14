@@ -34,7 +34,7 @@ const PRODUITS_MANUELS = [
 const colonnesProduits = [
     ...PRODUITS_MANUELS.map((p) => ({ label: p.label, code: p.code })),
     { label: "Spiderhome", code: "spiderhome", auto: true },
-    { label: "Récap commercial", code: "recap_commercial", auto: true },
+    { label: "Récap Co", code: "recap_commercial", auto: true },
 ];
 
 type LigneConseiller = {
@@ -374,7 +374,7 @@ export default function ObjectifsConseillerPage() {
                                                 <div className="flex flex-col gap-1 rounded-xl border border-teal-100 bg-teal-50/70 p-2">
                                                     <div className="flex items-center gap-1">
                                                         <span className="text-xs">📋</span>
-                                                        <span className="text-[9px] font-black uppercase tracking-wide text-teal-600">Récap commercial</span>
+                                                        <span className="text-[9px] font-black uppercase tracking-wide text-teal-600">Récap Co</span>
                                                     </div>
                                                     <div className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-teal-200 bg-white/70 py-1">
                                                         <span className="text-base font-black text-teal-700 tabular-nums">

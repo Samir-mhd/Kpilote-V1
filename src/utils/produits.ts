@@ -6,7 +6,7 @@ export const PRODUITS_ORDRE = [
     { code: "mcafee",      label: "McAfee",      emoji: "🛡️", key: "mcafee"      as const },
     { code: "assurance",   label: "Assurance",   emoji: "✅", key: "assurance"   as const },
     { code: "avis_google", label: "Avis Google", emoji: "⭐", key: "avis_google" as const },
-    { code: "recap_commercial", label: "Récap commercial", emoji: "📋", key: "recap_commercial" as const },
+    { code: "recap_commercial", label: "Récap Co", emoji: "📋", key: "recap_commercial" as const },
     { code: "spiderhome",  label: "Spiderhome",  emoji: "🏠", key: "spiderhome"  as const },
 ] as const;
 

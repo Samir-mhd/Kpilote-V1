@@ -234,11 +234,11 @@ export default function ClassementPage() {
                                         <th className="w-8 px-3 pb-2">#</th>
                                         <th className="px-3 pb-2">Conseiller</th>
                                         {PRODUITS_CLASSEMENT.map((p) => (
-                                            <th key={p.key} className="px-3 pb-2 text-center">
+                                            <th key={p.key} className="px-2 pb-2 text-center">
                                                 {p.emoji} {p.label}
                                             </th>
                                         ))}
-                                        <th className="px-3 pb-2 text-center">🛒 Art./vente</th>
+                                        <th className="px-2 pb-2 text-center" title="Nombre d'articles par vente">NAP</th>
                                         <th className="px-3 pb-2 text-right">Total</th>
                                         <th className="px-3 pb-2" />
                                     </tr>
@@ -281,7 +281,7 @@ export default function ClassementPage() {
                                                             : taux >= 50 ? "bg-amber-400" : "bg-red-400";
 
                                                         return (
-                                                            <td key={p.key} className="px-3 py-3 text-center">
+                                                            <td key={p.key} className="px-2 py-3 text-center">
                                                                 <p className="text-sm font-black text-slate-800">
                                                                     {realise}
                                                                     {objectif > 0 && (
@@ -300,7 +300,7 @@ export default function ClassementPage() {
                                                     })}
 
                                                     {/* Articles / vente */}
-                                                    <td className="px-3 py-3 text-center">
+                                                    <td className="px-2 py-3 text-center">
                                                         <span className="text-sm font-black text-teal-600">{c.moyenneArticles.toFixed(2)}</span>
                                                     </td>
 

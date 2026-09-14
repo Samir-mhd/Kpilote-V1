@@ -23,7 +23,7 @@ export function couleurProduit(produit: string): string {
     if (produit === "Téléphones")       return "bg-purple-500";
     if (produit === "McAfee")           return "bg-orange-500";
     if (produit === "Avis Google")      return "bg-yellow-500";
-    if (produit === "Récap commercial") return "bg-teal-500";
+    if (produit === "Récap Co")         return "bg-teal-500";
     if (produit === "Spiderhome")       return "bg-sky-500";
     return "bg-red-500";
 }
@@ -34,7 +34,7 @@ export function couleurGradientProduit(produit: string): string {
     if (produit === "Téléphones")       return "from-purple-500 to-violet-400";
     if (produit === "McAfee")           return "from-orange-500 to-amber-400";
     if (produit === "Avis Google")      return "from-yellow-500 to-amber-400";
-    if (produit === "Récap commercial") return "from-teal-500 to-emerald-400";
+    if (produit === "Récap Co")         return "from-teal-500 to-emerald-400";
     if (produit === "Spiderhome")       return "from-sky-500 to-cyan-400";
     return "from-red-500 to-rose-400";
 }

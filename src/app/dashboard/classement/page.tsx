@@ -198,15 +198,15 @@ function ClassementInner() {
                             </div>
                         </div>
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[680px] border-separate border-spacing-y-1.5">
+                            <table className="w-full min-w-[560px] border-separate border-spacing-y-1.5">
                                 <thead>
                                     <tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-300">
                                         <th className="px-4 pb-2">#</th>
                                         <th className="px-4 pb-2">Conseiller</th>
                                         {PRODUITS_CLASSEMENT.map(p => (
-                                            <th key={p.code} className="px-3 pb-2 text-center">{p.emoji} {p.label}</th>
+                                            <th key={p.code} className="px-2 pb-2 text-center">{p.emoji} {p.label}</th>
                                         ))}
-                                        <th className="px-3 pb-2 text-center">🛒 Art./vente</th>
+                                        <th className="px-2 pb-2 text-center" title="Nombre d'articles par vente">NAP</th>
                                         <th className="px-4 pb-2 text-right">Total</th>
                                         <th className="px-5 pb-2 text-right">Taux</th>
                                     </tr>
@@ -240,7 +240,7 @@ function ClassementInner() {
                                                     const obj = getObjDynamic(c, p.key);
                                                     const col = couleurTaux(val, obj);
                                                     return (
-                                                        <td key={p.code} className="px-3 py-3 text-center">
+                                                        <td key={p.code} className="px-2 py-3 text-center">
                                                             <div>
                                                                 <div className={`mx-auto inline-flex h-8 min-w-[40px] items-center justify-center rounded-xl px-2 text-sm font-black ${col.bg} ${col.text} border ${col.border}`}>
                                                                     {val}
@@ -257,7 +257,7 @@ function ClassementInner() {
                                                         </td>
                                                     );
                                                 })}
-                                                <td className="px-3 py-3 text-center">
+                                                <td className="px-2 py-3 text-center">
                                                     <span className="text-sm font-black text-teal-600">{c.moyenneArticles.toFixed(2)}</span>
                                                 </td>
                                                 <td className="px-4 py-3 text-right">

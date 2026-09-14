@@ -11,7 +11,7 @@ export const couleursProduits: Record<string, string> = {
 
   "Avis Google": "from-yellow-500 to-amber-400",
 
-  "Récap commercial": "from-teal-500 to-emerald-400",
+  "Récap Co": "from-teal-500 to-emerald-400",
 
   Spiderhome: "from-sky-500 to-cyan-400",
 };
@@ -29,7 +29,7 @@ export const couleursProgression: Record<string, string> = {
 
   "Avis Google": "bg-yellow-500",
 
-  "Récap commercial": "bg-teal-500",
+  "Récap Co": "bg-teal-500",
 
   Spiderhome: "bg-sky-500",
 };
