@@ -5,8 +5,16 @@ import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import { getCoeffRecapCommercial } from "@/services/recapCommercialConfig";
 import { calculerObjectifs, EtatObjectif } from "@/engine/objectifEngine";
 import { periodeSemaineEffective } from "@/utils/periodes";
-import type { ProduitCode } from "@/utils/produits";
+import { PRODUITS_ORDRE, type ProduitCode } from "@/utils/produits";
 import { supabase } from "@/lib/supabase";
+
+/** Nom affiché → code produit. Priorité au mapping canonique (le nom affiché peut diverger
+ *  du code réel en base, ex. "Récap Co" affiché mais code resté "recap_commercial"). */
+function codeDepuisNom(nom: string): string {
+    const connu = PRODUITS_ORDRE.find((p) => p.label === nom)?.code;
+    if (connu) return connu;
+    return nom.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ /g, "_");
+}
 
 type ProduitLie = { nom: string; code: string };
 type ObjectifSupabase = { objectif: number; produits: ProduitLie | ProduitLie[] | null };
@@ -131,8 +139,7 @@ export async function getMissionsReelles(conseillerId: string) {
     const objSemaine = objSemaineParConseiller[conseillerId] ?? {};
 
     return resultats.map((m) => {
-        // Normalise le nom produit en code : "Téléphones" → "telephones", "Avis Google" → "avis_google"
-        const code = m.produit.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ /g, "_");
+        const code = codeDepuisNom(m.produit);
         const realiseAujourdhui = realiseJour[code] ?? 0;
 
         if (code === "spiderhome" || code === "recap_commercial") {
