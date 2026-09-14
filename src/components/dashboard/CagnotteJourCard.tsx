@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 
 type Props = {
     total: number;
+    /** Cagnotte d'hier, pour le badge de progression. `null` = pas encore chargée (badge masqué). */
+    hier?: number | null;
     flash: { key: number; montant: number; label?: string } | null;
 };
 
@@ -11,7 +14,7 @@ function fmtEuro(n: number) {
     return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 
-export default function CagnotteJourCard({ total, flash }: Props) {
+export default function CagnotteJourCard({ total, hier, flash }: Props) {
     const [visible, setVisible] = useState<{ key: number; montant: number; label?: string } | null>(null);
 
     useEffect(() => {
@@ -21,6 +24,10 @@ export default function CagnotteJourCard({ total, flash }: Props) {
         return () => clearTimeout(t);
     }, [flash]);
 
+    // Badge "vs hier" : seulement s'il y a une référence exploitable (hier chargé et non nul).
+    const progression = hier != null && hier > 0 ? Math.round(((total - hier) / hier) * 100) : null;
+    const montrerNouveau = hier === 0 && total > 0;
+
     return (
         <div className="relative flex h-full flex-col justify-center overflow-hidden rounded-[24px] bg-gradient-to-br from-violet-600 to-fuchsia-600 px-6 py-5 shadow-[0_12px_40px_rgba(139,92,246,.35)]">
             <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
@@ -29,6 +36,27 @@ export default function CagnotteJourCard({ total, flash }: Props) {
                 <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Ma cagnotte du jour</p>
                     <p className="mt-2 text-4xl font-black text-white tabular-nums">{fmtEuro(total)}</p>
+                    {progression !== null && (
+                        <div
+                            className={`mt-2 inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-bold tabular-nums ${
+                                progression >= 0 ? "text-emerald-200" : "text-rose-200"
+                            }`}
+                        >
+                            {progression >= 0 ? (
+                                <TrendingUp size={13} aria-hidden="true" />
+                            ) : (
+                                <TrendingDown size={13} aria-hidden="true" />
+                            )}
+                            {progression >= 0 ? "+" : ""}
+                            {progression} % vs hier
+                        </div>
+                    )}
+                    {montrerNouveau && (
+                        <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-bold text-emerald-200">
+                            <TrendingUp size={13} aria-hidden="true" />
+                            Premiers actes du jour
+                        </div>
+                    )}
                 </div>
                 <span className="text-4xl">💰</span>
             </div>

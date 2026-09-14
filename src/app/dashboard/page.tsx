@@ -43,6 +43,7 @@ import {
     enregistrerActeJour,
     compterVentesMoisParProduit,
     jourCourant,
+    jourPrecedent,
 } from "@/services/variableConseiller";
 import { creerFicheBoxRaccordement } from "@/services/boxRaccordement";
 import { creerForfait4PDiffere } from "@/services/forfait4P";
@@ -128,6 +129,7 @@ export default function Dashboard() {
     const [bareme, setBareme] = useState<BaremeVariable>(BAREME_DEFAUT);
     const [bonusManuels, setBonusManuels] = useState<BonusManuel[]>([]);
     const [cagnotteTotal, setCagnotteTotal] = useState(0);
+    const [cagnotteHier, setCagnotteHier] = useState<number | null>(null);
     const [cagnotteFlash, setCagnotteFlash] = useState<{ key: number; montant: number; label?: string } | null>(null);
     const [cagnotteActes, setCagnotteActes] = useState<ActeJour[]>([]);
 
@@ -341,6 +343,10 @@ export default function Dashboard() {
                     setCagnotteActes(actes);
                 }
             );
+            // Cagnotte d'hier — juste pour le badge de progression, non bloquant.
+            getCagnotteJour(conseillerId, jourPrecedent()).then((actes) => {
+                setCagnotteHier(actes.reduce((t, a) => t + a.montant, 0));
+            });
         }
 
         // Prochain trophée à débloquer (widget Accueil) — non bloquant, best-effort.
@@ -1138,7 +1144,7 @@ export default function Dashboard() {
                             rang={rang}
                         />
                     </div>
-                    <CagnotteJourCard total={cagnotteTotal} flash={cagnotteFlash} />
+                    <CagnotteJourCard total={cagnotteTotal} hier={cagnotteHier} flash={cagnotteFlash} />
                 </div>
             ) : (
                 <StatsBar

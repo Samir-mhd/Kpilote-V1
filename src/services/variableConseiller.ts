@@ -476,6 +476,12 @@ export function jourCourant(): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+export function jourPrecedent(jour: string = jourCourant()): string {
+    const [y, m, d] = jour.split("-").map(Number);
+    const veille = new Date(y, m - 1, d - 1);
+    return `${veille.getFullYear()}-${String(veille.getMonth() + 1).padStart(2, "0")}-${String(veille.getDate()).padStart(2, "0")}`;
+}
+
 function mapActe(r: any): ActeJour {
     return {
         id: r.id,
