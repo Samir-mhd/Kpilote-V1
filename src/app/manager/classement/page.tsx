@@ -279,6 +279,11 @@ export default function ClassementPage() {
                                                         const barColor = taux >= 100
                                                             ? "bg-emerald-500"
                                                             : taux >= 50 ? "bg-amber-400" : "bg-red-400";
+                                                        // Taux de placement assurance = assurance / téléphones × 100 (à côté du compteur, pas une colonne).
+                                                        const telephones = c.produits.telephones ?? 0;
+                                                        const tauxAssurance = p.key === "assurance" && telephones > 0
+                                                            ? Math.round((realise / telephones) * 100)
+                                                            : null;
 
                                                         return (
                                                             <td key={p.key} className="px-2 py-3 text-center">
@@ -286,6 +291,14 @@ export default function ClassementPage() {
                                                                     {realise}
                                                                     {objectif > 0 && (
                                                                         <span className="text-xs font-normal text-slate-300"> /{objectif}</span>
+                                                                    )}
+                                                                    {tauxAssurance !== null && (
+                                                                        <span
+                                                                            className={`ml-1 text-xs font-black ${tauxAssurance >= 24 ? "text-emerald-600" : "text-red-500"}`}
+                                                                            title="Taux de placement assurance / téléphones"
+                                                                        >
+                                                                            {tauxAssurance}%
+                                                                        </span>
                                                                     )}
                                                                 </p>
                                                                 <div className="mx-auto mt-1 h-1 w-12 overflow-hidden rounded-full bg-slate-200">
