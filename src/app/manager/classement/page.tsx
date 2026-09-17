@@ -279,9 +279,9 @@ export default function ClassementPage() {
                                                         const barColor = taux >= 100
                                                             ? "bg-emerald-500"
                                                             : taux >= 50 ? "bg-amber-400" : "bg-red-400";
-                                                        // Taux de placement assurance = assurance / téléphones × 100 (à côté du compteur, pas une colonne).
+                                                        // Taux de placement (assurance ou McAfee / téléphones × 100), à côté du compteur, pas une colonne.
                                                         const telephones = c.produits.telephones ?? 0;
-                                                        const tauxAssurance = p.key === "assurance" && telephones > 0
+                                                        const tauxPlacement = (p.key === "assurance" || p.key === "mcafee") && telephones > 0
                                                             ? Math.round((realise / telephones) * 100)
                                                             : null;
 
@@ -292,12 +292,12 @@ export default function ClassementPage() {
                                                                     {objectif > 0 && (
                                                                         <span className="text-xs font-normal text-slate-300"> /{objectif}</span>
                                                                     )}
-                                                                    {tauxAssurance !== null && (
+                                                                    {tauxPlacement !== null && (
                                                                         <span
-                                                                            className={`ml-1 text-xs font-black ${tauxAssurance >= 24 ? "text-emerald-600" : "text-red-500"}`}
-                                                                            title="Taux de placement assurance / téléphones"
+                                                                            className={`ml-1 text-xs font-black ${tauxPlacement >= 24 ? "text-emerald-600" : "text-red-500"}`}
+                                                                            title={`Taux de placement ${p.label} / téléphones`}
                                                                         >
-                                                                            {tauxAssurance}%
+                                                                            {tauxPlacement}%
                                                                         </span>
                                                                     )}
                                                                 </p>

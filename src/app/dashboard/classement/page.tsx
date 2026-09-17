@@ -239,9 +239,9 @@ function ClassementInner() {
                                                     const val = c.produits[p.key];
                                                     const obj = getObjDynamic(c, p.key);
                                                     const col = couleurTaux(val, obj);
-                                                    // Taux de placement assurance = assurance / téléphones × 100 (à côté du compteur, pas une colonne).
+                                                    // Taux de placement (assurance ou McAfee / téléphones × 100), à côté du compteur, pas une colonne.
                                                     const telephones = c.produits.telephones ?? 0;
-                                                    const tauxAssurance = p.key === "assurance" && telephones > 0
+                                                    const tauxPlacement = (p.key === "assurance" || p.key === "mcafee") && telephones > 0
                                                         ? Math.round((val / telephones) * 100)
                                                         : null;
                                                     return (
@@ -251,12 +251,12 @@ function ClassementInner() {
                                                                     <div className={`inline-flex h-8 min-w-[40px] items-center justify-center rounded-xl px-2 text-sm font-black ${col.bg} ${col.text} border ${col.border}`}>
                                                                         {val}
                                                                     </div>
-                                                                    {tauxAssurance !== null && (
+                                                                    {tauxPlacement !== null && (
                                                                         <span
-                                                                            className={`text-[11px] font-black ${tauxAssurance >= 24 ? "text-emerald-600" : "text-red-500"}`}
-                                                                            title="Taux de placement assurance / téléphones"
+                                                                            className={`text-[11px] font-black ${tauxPlacement >= 24 ? "text-emerald-600" : "text-red-500"}`}
+                                                                            title={`Taux de placement ${p.label} / téléphones`}
                                                                         >
-                                                                            {tauxAssurance}%
+                                                                            {tauxPlacement}%
                                                                         </span>
                                                                     )}
                                                                 </div>
