@@ -239,10 +239,13 @@ function ClassementInner() {
                                                     const val = c.produits[p.key];
                                                     const obj = getObjDynamic(c, p.key);
                                                     const col = couleurTaux(val, obj);
-                                                    // Taux de placement (assurance ou McAfee / téléphones × 100), à côté du compteur, pas une colonne.
+                                                    // Taux de placement, à côté du compteur (pas une colonne) : assurance / téléphones,
+                                                    // McAfee / box (le McAfee se vend avec une box, pas un téléphone).
                                                     const telephones = c.produits.telephones ?? 0;
-                                                    const tauxPlacement = (p.key === "assurance" || p.key === "mcafee") && telephones > 0
-                                                        ? Math.round((val / telephones) * 100)
+                                                    const box = c.produits.box ?? 0;
+                                                    const tauxPlacement =
+                                                        p.key === "assurance" && telephones > 0 ? Math.round((val / telephones) * 100)
+                                                        : p.key === "mcafee" && box > 0 ? Math.round((val / box) * 100)
                                                         : null;
                                                     return (
                                                         <td key={p.code} className="px-2 py-3 text-center">
@@ -254,7 +257,7 @@ function ClassementInner() {
                                                                     {tauxPlacement !== null && (
                                                                         <span
                                                                             className={`text-[11px] font-black ${tauxPlacement >= 24 ? "text-emerald-600" : "text-red-500"}`}
-                                                                            title={`Taux de placement ${p.label} / téléphones`}
+                                                                            title={`Taux de placement ${p.label} / ${p.key === "mcafee" ? "box" : "téléphones"}`}
                                                                         >
                                                                             {tauxPlacement}%
                                                                         </span>

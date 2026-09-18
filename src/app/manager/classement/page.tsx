@@ -279,10 +279,13 @@ export default function ClassementPage() {
                                                         const barColor = taux >= 100
                                                             ? "bg-emerald-500"
                                                             : taux >= 50 ? "bg-amber-400" : "bg-red-400";
-                                                        // Taux de placement (assurance ou McAfee / téléphones × 100), à côté du compteur, pas une colonne.
+                                                        // Taux de placement, à côté du compteur (pas une colonne) : assurance / téléphones,
+                                                        // McAfee / box (le McAfee se vend avec une box, pas un téléphone).
                                                         const telephones = c.produits.telephones ?? 0;
-                                                        const tauxPlacement = (p.key === "assurance" || p.key === "mcafee") && telephones > 0
-                                                            ? Math.round((realise / telephones) * 100)
+                                                        const box = c.produits.box ?? 0;
+                                                        const tauxPlacement =
+                                                            p.key === "assurance" && telephones > 0 ? Math.round((realise / telephones) * 100)
+                                                            : p.key === "mcafee" && box > 0 ? Math.round((realise / box) * 100)
                                                             : null;
 
                                                         return (
@@ -295,7 +298,7 @@ export default function ClassementPage() {
                                                                     {tauxPlacement !== null && (
                                                                         <span
                                                                             className={`ml-1 text-xs font-black ${tauxPlacement >= 24 ? "text-emerald-600" : "text-red-500"}`}
-                                                                            title={`Taux de placement ${p.label} / téléphones`}
+                                                                            title={`Taux de placement ${p.label} / ${p.key === "mcafee" ? "box" : "téléphones"}`}
                                                                         >
                                                                             {tauxPlacement}%
                                                                         </span>
