@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { PRODUITS_CLASSEMENT, PRODUITS_HORS_TOTAL_CLASSEMENT } from "@/utils/produits";
 import { Periode, PERIODE_LABELS, couleurTaux, periodeSemaineEffective } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
+import { construireClassementTrophees, ConseillerTrophees } from "@/services/badgesManagerService";
 import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import { getJoursTravailPlageTous } from "@/services/planningService";
 import type { ProduitCode } from "@/utils/produits";
@@ -13,6 +14,12 @@ import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { supabase } from "@/lib/supabase";
 
 const medals = ["🥇", "🥈", "🥉"];
+const ONGLETS: { id: Periode | "trophees"; label: string }[] = [
+    { id: "jour", label: PERIODE_LABELS.jour },
+    { id: "semaine", label: PERIODE_LABELS.semaine },
+    { id: "mois", label: PERIODE_LABELS.mois },
+    { id: "trophees", label: "🏆 Trophées" },
+];
 
 function ClassementInner() {
     const searchParams  = useSearchParams();
@@ -27,6 +34,11 @@ function ClassementInner() {
     const [photos, setPhotos]               = useState<Record<string, string | null>>({});
     const [loading, setLoading]             = useState(true);
     const [maj, setMaj]                     = useState("");
+
+    const [ongletTrophees, setOngletTrophees] = useState(false);
+    const [trophees, setTrophees]             = useState<ConseillerTrophees[]>([]);
+    const [photosTrophees, setPhotosTrophees] = useState<Record<string, string | null>>({});
+    const [loadingTrophees, setLoadingTrophees] = useState(true);
 
     async function charger(p: Periode, opts?: { silencieux?: boolean }) {
         if (!opts?.silencieux) setLoading(true);
@@ -83,6 +95,32 @@ function ClassementInner() {
         return () => { supabase.removeChannel(channel); clearInterval(interval); };
     }, [periode]);
 
+    // Trophées : lecture seule (conseiller_badges déjà débloqués), chargé une fois au montage
+    // pour que le passage sur l'onglet soit instantané. Rafraîchi aussi sur nouveau badge.
+    useEffect(() => {
+        function chargerTrophees(opts?: { silencieux?: boolean }) {
+            if (!opts?.silencieux) setLoadingTrophees(true);
+            construireClassementTrophees()
+                .then(async (data) => {
+                    setTrophees(data);
+                    const ids = data.map(c => c.id);
+                    setPhotosTrophees(await getPhotosByIds(ids).catch(() => ({})));
+                })
+                .catch(() => {})
+                .finally(() => { if (!opts?.silencieux) setLoadingTrophees(false); });
+        }
+        chargerTrophees();
+
+        const channel = supabase
+            .channel("classement-trophees")
+            .on("postgres_changes", { event: "INSERT", schema: "public", table: "conseiller_badges" }, () => {
+                chargerTrophees({ silencieux: true });
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, []);
+
     // Objectif par conseiller × produit :
     // - "mois"    : fixé par le manager
     // - "semaine" : figé au premier calcul de la semaine (reste à faire du mois ÷ jours planifiés
@@ -105,6 +143,7 @@ function ClassementInner() {
     }
 
     const monRang = classement.findIndex(c => c.id === conseillerId) + 1;
+    const monRangTrophees = trophees.findIndex(c => c.id === conseillerId) + 1;
     const top3    = classement.slice(0, 3);
     const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : [];
     const podiumRangs = [2, 1, 3];
@@ -126,27 +165,86 @@ function ClassementInner() {
                         </p>
                     )}
                 </div>
-                {monRang > 0 && (
-                    <div className="rounded-2xl bg-green-50 px-5 py-3 text-center">
-                        <p className="text-xs font-bold text-green-600">Ma position</p>
-                        <p className="text-2xl font-black text-green-700">#{monRang}</p>
+                {ongletTrophees
+                    ? monRangTrophees > 0 && (
+                        <div className="rounded-2xl bg-amber-50 px-5 py-3 text-center">
+                            <p className="text-xs font-bold text-amber-600">Ma position</p>
+                            <p className="text-2xl font-black text-amber-700">#{monRangTrophees}</p>
+                        </div>
+                    )
+                    : monRang > 0 && (
+                        <div className="rounded-2xl bg-green-50 px-5 py-3 text-center">
+                            <p className="text-xs font-bold text-green-600">Ma position</p>
+                            <p className="text-2xl font-black text-green-700">#{monRang}</p>
+                        </div>
+                    )}
+            </div>
+
+            {/* Onglets */}
+            <div className="flex flex-wrap gap-2">
+                {ONGLETS.map(o => {
+                    const actif = o.id === "trophees" ? ongletTrophees : (!ongletTrophees && periode === o.id);
+                    return (
+                        <button
+                            key={o.id}
+                            onClick={() => {
+                                if (o.id === "trophees") setOngletTrophees(true);
+                                else { setOngletTrophees(false); setPeriode(o.id); }
+                            }}
+                            className={`rounded-2xl px-5 py-2.5 text-sm font-bold transition-all ${
+                                actif
+                                    ? o.id === "trophees" ? "bg-amber-500 text-white" : "bg-slate-900 text-white"
+                                    : "bg-white text-slate-500 shadow-sm hover:bg-slate-50"
+                            }`}
+                        >
+                            {o.label}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {ongletTrophees ? (
+                loadingTrophees ? (
+                    <div className="flex h-48 items-center justify-center">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
                     </div>
-                )}
-            </div>
-
-            {/* Période */}
-            <div className="flex gap-2">
-                {(["jour", "semaine", "mois"] as Periode[]).map(p => (
-                    <button key={p} onClick={() => setPeriode(p)}
-                        className={`rounded-2xl px-5 py-2.5 text-sm font-bold transition-all ${
-                            periode === p ? "bg-slate-900 text-white" : "bg-white text-slate-500 shadow-sm hover:bg-slate-50"
-                        }`}>
-                        {PERIODE_LABELS[p]}
-                    </button>
-                ))}
-            </div>
-
-            {loading ? (
+                ) : (
+                    <div className="overflow-hidden rounded-[24px] bg-white shadow-[0_4px_24px_rgba(15,23,42,.07)]">
+                        <div className="px-7 pt-7 pb-3">
+                            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">🏆 Classement trophées</p>
+                        </div>
+                        <div className="space-y-1.5 px-3 pb-5">
+                            {trophees.map((c, idx) => {
+                                const isMoi = c.id === conseillerId;
+                                return (
+                                    <div
+                                        key={c.id}
+                                        className={`flex items-center gap-4 rounded-2xl px-4 py-3 transition-colors ${
+                                            isMoi ? "bg-amber-50" : "bg-slate-50 hover:bg-slate-100"
+                                        }`}
+                                    >
+                                        <span className="w-6 shrink-0 text-center">
+                                            {idx < 3 ? <span className="text-xl">{medals[idx]}</span> : <span className="text-sm font-black text-slate-400">{idx + 1}</span>}
+                                        </span>
+                                        <div className="overflow-hidden rounded-full shrink-0">
+                                            <PhotoAvatar nom={c.nom} photoUrl={photosTrophees[c.id]} size={36} />
+                                        </div>
+                                        <span className={`flex-1 truncate font-black text-sm ${isMoi ? "text-amber-700" : "text-slate-800"}`}>
+                                            {c.nom} {isMoi && <span className="text-xs font-semibold text-amber-500">(moi)</span>}
+                                        </span>
+                                        <span className="flex items-center gap-1.5 text-lg font-black text-amber-600">
+                                            🏆 {c.total}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="px-7 pb-5 pt-2 text-xs text-slate-300">
+                            Tous les trophées débloqués à vie : maîtrise produit, box &amp; 4P, défis, séries et jours parfaits.
+                        </div>
+                    </div>
+                )
+            ) : loading ? (
                 <div className="flex h-48 items-center justify-center">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
                 </div>

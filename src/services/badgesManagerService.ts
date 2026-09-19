@@ -29,6 +29,32 @@ export async function getDetenteursBadges(): Promise<Record<string, DetenteurBad
     return parBadge;
 }
 
+export type ConseillerTrophees = { id: string; nom: string; total: number; dernierLe: string | null };
+
+/** Classement par nombre de trophées débloqués à vie (tous types confondus) — lecture seule,
+ *  ne calcule ni ne débloque rien. Inclut les conseillers à 0 trophée. Profils désactivés exclus. */
+export async function construireClassementTrophees(): Promise<ConseillerTrophees[]> {
+    const [{ data: conseillers }, parBadge] = await Promise.all([
+        supabase.from("conseillers").select("id, nom, profil_actif"),
+        getDetenteursBadges(),
+    ]);
+
+    const map = new Map<string, ConseillerTrophees>();
+    (conseillers ?? []).forEach((c: any) => {
+        if (c.profil_actif === false) return;
+        map.set(c.id, { id: c.id, nom: c.nom, total: 0, dernierLe: null });
+    });
+
+    Object.values(parBadge).flat().forEach((h) => {
+        const row = map.get(h.conseillerId);
+        if (!row) return;
+        row.total += 1;
+        if (!row.dernierLe || h.obtenuLe > row.dernierLe) row.dernierLe = h.obtenuLe;
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.total - a.total || a.nom.localeCompare(b.nom));
+}
+
 export type BadgeDebloqueLe = DetenteurBadge & { badgeCode: string };
 
 /** Badges débloqués un jour précis (format "YYYY-MM-DD") — utilisé par le brief du matin pour "hier".
