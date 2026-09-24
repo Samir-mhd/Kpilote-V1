@@ -67,9 +67,10 @@ const CELEBRATIONS = ["🎉", "🔥", "⚡", "🚀", "💪", "🏆"];
 
 // Uniquement des messages neutres/encourageants — le retard est déjà géré par le hero/coach au-dessus.
 type StatusCfg = { icon: string; label: string; color: string };
-function getStatus(pct: number, realise: number, objectif: number, isHistorisation: boolean, isAvisGoogle: boolean): StatusCfg {
+function getStatus(pct: number, realise: number, objectif: number, isHistorisation: boolean, isAvisGoogle: boolean, isRecapCo: boolean): StatusCfg {
     if (realise === 0 && isHistorisation) return { icon: "🌱", label: "N'oublie pas d'historiser !", color: "#94a3b8" };
     if (realise === 0 && isAvisGoogle) return { icon: "🌱", label: "Pas encore d'avis Google aujourd'hui", color: "#94a3b8" };
+    if (realise === 0 && isRecapCo) return { icon: "🌱", label: "Pas encore de Récap Co aujourd'hui", color: "#94a3b8" };
     if (realise === 0) return { icon: "🌱", label: "En attente de ta première vente", color: "#94a3b8" };
     // Pas d'objectif fixé : chaque vente est une avance pure, pas un "démarrage"
     if (objectif === 0) return { icon: "🚀", label: `+${realise} d'avance sur l'objectif`, color: "#34d399" };
@@ -137,7 +138,8 @@ export default function MissionCard({
     const displayTitre = getDisplayTitre(titre);
     const isHistorisation = titre.toLowerCase() === "spiderhome";
     const isAvisGoogle = titre.toLowerCase() === "avis google";
-    const status = getStatus(pct, realise, objectif, isHistorisation, isAvisGoogle);
+    const isRecapCo = titre.toLowerCase() === "récap co";
+    const status = getStatus(pct, realise, objectif, isHistorisation, isAvisGoogle, isRecapCo);
 
     // La vente doit être committée avant le choix variable : le boost auto compte le volume
     // réel du mois, il a donc besoin que CETTE vente soit déjà en base au moment du comptage.
@@ -355,7 +357,7 @@ export default function MissionCard({
                         className="rounded-xl px-4 py-2.5 text-sm font-black text-white"
                         style={{ background: `${pal.hex}22`, border: `1px solid ${pal.hex}40` }}
                     >
-                        ✅ {isHistorisation ? "Une historisation" : isAvisGoogle ? "Un avis Google" : `${article.charAt(0).toUpperCase() + article.slice(1)} ${displayTitre}`} de plus — excellent !
+                        ✅ {isHistorisation ? "Une historisation" : isAvisGoogle ? "Un avis Google" : isRecapCo ? "Un Récap Co" : `${article.charAt(0).toUpperCase() + article.slice(1)} ${displayTitre}`} de plus — excellent !
                     </div>
                 </div>
 
@@ -366,7 +368,7 @@ export default function MissionCard({
                     className={`group mt-6 flex w-full items-center justify-between rounded-2xl bg-gradient-to-r ${pal.gradient} px-6 py-4 text-sm font-black text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50`}
                     style={{ boxShadow: `0 4px 20px ${pal.glow}` }}
                 >
-                    <span>{isHistorisation ? "J'ai fait une historisation" : isAvisGoogle ? "J'ai eu un avis Google" : `J'ai vendu ${article} ${displayTitre}`}</span>
+                    <span>{isHistorisation ? "J'ai fait une historisation" : isAvisGoogle ? "J'ai eu un avis Google" : isRecapCo ? "J'ai fait un Récap Co" : `J'ai vendu ${article} ${displayTitre}`}</span>
                     <svg
                         width="16" height="16"
                         viewBox="0 0 24 24" fill="none" stroke="currentColor"
