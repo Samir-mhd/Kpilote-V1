@@ -46,7 +46,7 @@ export const CATEGORIES_VENTES: { titre: string; accent: string; categorieKey: s
         champs: [
             { key: "actes_ast_box", label: "Nb actes AST box (Siebel)" },
             { key: "assurance_nouveau_mobile", label: "Assurance Nouveau Mobile — validées (mois précédent)" },
-            { key: "assurance_essentielle", label: "Assurance Essentielle" },
+            { key: "assurance_essentielle", label: "Assurance Essentielle — validées (mois précédent)" },
             { key: "mcafee_499", label: "McAfee 4,99€" },
             { key: "mcafee_699", label: "McAfee 6,99€" },
             { key: "canal_option1", label: "Canal+ Option 1" },

@@ -459,7 +459,23 @@ const CHAMPS_NON_SYNCHRONISES = new Set<string>([
     "box_ultra", "box_pop", "box_pop_s_revolution_5g",
     "mcafee_499", "mcafee_699",
     "assurance_nouveau_mobile", // M+1 : le clic Accueil ne crédite plus la variable, seule la validation manuelle du mois précédent compte.
+    "assurance_essentielle", // M+1, même principe.
 ]);
+
+/** Un bonus manuel "McAfee Mobile" (catégorie "autres_primes", libellé contenant "mcafee") est
+ *  payé à M+2 comme le McAfee standalone : jamais synchronisé automatiquement, le conseiller le
+ *  déclare lui-même chaque mois sur /dashboard/variable. Les bonus manuels sont une liste libre
+ *  créée par le manager (pas de champ dédié) — détection par libellé, requête dédiée pour rester
+ *  correct même quand l'appelant (annulation) n'a pas la liste des bonus sous la main. */
+async function bonusEstDiffere(bonusManuelId: string): Promise<boolean> {
+    const { data } = await supabase
+        .from("variable_bonus_manuels")
+        .select("label, categorie")
+        .eq("id", bonusManuelId)
+        .maybeSingle();
+    if (!data || data.categorie !== "autres_primes") return false;
+    return data.label.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes("mcafee");
+}
 
 export type ActeJour = {
     id: string;
@@ -538,13 +554,14 @@ export async function enregistrerActeJour(
         .single();
     if (error) throw new Error(error.message ?? "Erreur enregistrement acte");
 
-    if ((champ && !CHAMPS_NON_SYNCHRONISES.has(champ)) || bonusManuelId) {
+    const bonusSynchronise = bonusManuelId ? !(await bonusEstDiffere(bonusManuelId)) : false;
+    if ((champ && !CHAMPS_NON_SYNCHRONISES.has(champ)) || bonusSynchronise) {
         const mois = moisCourant();
         const actuel = await getVentesConseillerMois(conseillerId, mois);
         if (champ && !CHAMPS_NON_SYNCHRONISES.has(champ)) {
             actuel.ventes = { ...actuel.ventes, [champ]: (actuel.ventes[champ] as number) + 1 };
         }
-        if (bonusManuelId) {
+        if (bonusManuelId && bonusSynchronise) {
             actuel.bonusVolumes = {
                 ...actuel.bonusVolumes,
                 [bonusManuelId]: (actuel.bonusVolumes[bonusManuelId] ?? 0) + 1,
@@ -560,14 +577,15 @@ export async function enregistrerActeJour(
 export async function annulerActeJour(conseillerId: string, acte: ActeJour): Promise<void> {
     await supabase.from("variable_actes_jour").delete().eq("id", acte.id);
 
-    if ((acte.champ && !CHAMPS_NON_SYNCHRONISES.has(acte.champ)) || acte.bonusManuelId) {
+    const bonusSynchronise = acte.bonusManuelId ? !(await bonusEstDiffere(acte.bonusManuelId)) : false;
+    if ((acte.champ && !CHAMPS_NON_SYNCHRONISES.has(acte.champ)) || bonusSynchronise) {
         const mois = moisCourant();
         const actuel = await getVentesConseillerMois(conseillerId, mois);
         if (acte.champ && !CHAMPS_NON_SYNCHRONISES.has(acte.champ)) {
             const champ = acte.champ;
             actuel.ventes = { ...actuel.ventes, [champ]: Math.max(0, (actuel.ventes[champ] as number) - 1) };
         }
-        if (acte.bonusManuelId) {
+        if (acte.bonusManuelId && bonusSynchronise) {
             const id = acte.bonusManuelId;
             actuel.bonusVolumes = {
                 ...actuel.bonusVolumes,
