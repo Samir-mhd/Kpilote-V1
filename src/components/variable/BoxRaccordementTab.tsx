@@ -161,7 +161,7 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
                             value={commentaires[f.id] ?? ""}
                             onChange={(e) => changerCommentaire(f.id, e.target.value)}
                             placeholder="Commentaire (ex: identifiant client)"
-                            className="mt-2 h-8 w-full max-w-xs rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-700 outline-none focus:border-violet-400"
+                            className="mt-2 h-8 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-700 outline-none focus:border-violet-400"
                         />
                     </div>
                     <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
