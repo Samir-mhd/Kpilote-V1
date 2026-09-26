@@ -323,9 +323,15 @@ function VariableInner() {
                             const nb4PForfait = contributionForfait4P?.nb ?? 0;
                             const nb4PTotal = nb4PBox + nb4PForfait;
                             const montant4PTotal = (contributionBox?.prime4P ?? 0) + (contributionForfait4P?.montantTotal ?? 0);
-                            const boxHors4P = (contributionBox?.total ?? 0) - (contributionBox?.prime4P ?? 0);
+                            const nbRaccordees = contributionBox?.nbRaccordees ?? 0;
                             return [
-                                { label: `Box raccordées (${nomMois(moisM2)}, figé)`, montant: boxHors4P },
+                                {
+                                    label: `${nbRaccordees > 0 ? `${nbRaccordees} box raccordées` : "Box raccordées"} (${nomMois(moisM2)}, figé)`,
+                                    montant: contributionBox?.primeBox ?? 0,
+                                },
+                                { label: `Boost individuel box (${nomMois(moisM2)}, figé)`, montant: contributionBox?.boostIndividuel ?? 0 },
+                                { label: `McAfee sur box (${nomMois(moisM2)}, figé)`, montant: contributionBox?.primeMcafee ?? 0 },
+                                { label: `Canal+ sur box (${nomMois(moisM2)}, figé)`, montant: contributionBox?.primeCanal ?? 0 },
                                 {
                                     label: nb4PTotal > 0
                                         ? `${nb4PTotal} abonnés 4P en ${nomMois(moisM2)} dont ${nb4PForfait} sur le forfait et ${nb4PBox} sur la box`

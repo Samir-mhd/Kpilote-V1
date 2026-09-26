@@ -453,10 +453,12 @@ export async function sauvegarderVentesConseillerMois(
 // incrémente le volume correspondant dans variable_ventes_conseiller du mois
 // (pour que le simulateur /dashboard/variable reste juste, sans double saisie).
 
-// Champs payés à M+2 : jamais synchronisés avec le simulateur mensuel (déclaration manuelle uniquement).
+// Champs payés en décalé (M+1 ou M+2) : jamais synchronisés avec le simulateur mensuel
+// (déclaration manuelle uniquement, du nombre déjà validé pour la période écoulée).
 const CHAMPS_NON_SYNCHRONISES = new Set<string>([
     "box_ultra", "box_pop", "box_pop_s_revolution_5g",
     "mcafee_499", "mcafee_699",
+    "assurance_nouveau_mobile", // M+1 : le clic Accueil ne crédite plus la variable, seule la validation manuelle du mois précédent compte.
 ]);
 
 export type ActeJour = {
