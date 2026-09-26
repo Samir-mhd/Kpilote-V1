@@ -157,12 +157,6 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
                             {variante === "perdue" && f.boxKo && !estPerdueParDelai(f) && ` · marquée Box KO · non payée`}
                             {variante === "perdue" && estPerdueParDelai(f) && ` · non raccordée avant le paiement de ${nomMois(f.moisPaiement)} · non payée`}
                         </p>
-                        <input
-                            value={commentaires[f.id] ?? ""}
-                            onChange={(e) => changerCommentaire(f.id, e.target.value)}
-                            placeholder="Commentaire (ex: identifiant client)"
-                            className="mt-2 h-8 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-700 outline-none focus:border-violet-400"
-                        />
                     </div>
                     <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
                         {variante !== "perdue" && (
@@ -236,6 +230,12 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
                         </button>
                     </div>
                 </div>
+                <input
+                    value={commentaires[f.id] ?? ""}
+                    onChange={(e) => changerCommentaire(f.id, e.target.value)}
+                    placeholder="Commentaire (ex: identifiant client)"
+                    className="mt-3 h-8 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-700 outline-none focus:border-violet-400"
+                />
             </div>
         );
     }
