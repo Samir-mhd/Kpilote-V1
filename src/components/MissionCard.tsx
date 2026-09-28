@@ -139,19 +139,27 @@ export default function MissionCard({
     const isHistorisation = titre.toLowerCase() === "spiderhome";
     const isAvisGoogle = titre.toLowerCase() === "avis google";
     const isRecapCo = titre.toLowerCase() === "récap co";
+    // Simples clics d'enregistrement (pas une vente) : pas de célébration, juste le compteur qui bouge.
+    const sansAnimation = isHistorisation || isAvisGoogle || isRecapCo;
     const status = getStatus(pct, realise, objectif, isHistorisation, isAvisGoogle, isRecapCo);
 
     // La vente doit être committée avant le choix variable : le boost auto compte le volume
     // réel du mois, il a donc besoin que CETTE vente soit déjà en base au moment du comptage.
     async function declencherVente(choix?: ChoixActe) {
-        setCelebEmoji(CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)]);
         setCelebrating(true);
-        setParticles(genParticles());
+        if (!sansAnimation) {
+            setCelebEmoji(CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)]);
+            setParticles(genParticles());
+        }
         let boostInfo: BoostInfo | undefined;
         await onSale(titre);
         if (choix) boostInfo = (await onChoixVariable?.(choix)) || undefined;
-        setTimeout(() => setParticles([]), 750);
-        setTimeout(() => setCelebrating(false), 1600);
+        if (sansAnimation) {
+            setCelebrating(false);
+        } else {
+            setTimeout(() => setParticles([]), 750);
+            setTimeout(() => setCelebrating(false), 1600);
+        }
         boostEnAttenteRef.current = boostInfo;
 
         // Questions de rebond (assurance essentielle, Canal+, boost constructeur...) calculées
@@ -249,7 +257,7 @@ export default function MissionCard({
         <section
             className="relative overflow-hidden rounded-[28px] border border-white/6 bg-slate-900 transition-all duration-300 hover:-translate-y-1"
             style={{
-                boxShadow: celebrating
+                boxShadow: celebrating && !sansAnimation
                     ? `0 20px 60px ${pal.glow}, 0 0 0 1px ${pal.hex}40`
                     : "0 16px 48px rgba(0,0,0,.40)",
             }}
@@ -263,7 +271,7 @@ export default function MissionCard({
             />
 
             {/* Burst célébration */}
-            {celebrating && (
+            {celebrating && !sansAnimation && (
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                     <div
                         className="absolute h-32 w-32 rounded-full animate-ping"
@@ -351,7 +359,11 @@ export default function MissionCard({
                 {/* ── Message célébration ─── */}
                 <div
                     className="overflow-hidden transition-all duration-400"
-                    style={{ maxHeight: celebrating ? "56px" : "0px", opacity: celebrating ? 1 : 0, marginTop: celebrating ? "12px" : "0" }}
+                    style={{
+                        maxHeight: celebrating && !sansAnimation ? "56px" : "0px",
+                        opacity: celebrating && !sansAnimation ? 1 : 0,
+                        marginTop: celebrating && !sansAnimation ? "12px" : "0",
+                    }}
                 >
                     <div
                         className="rounded-xl px-4 py-2.5 text-sm font-black text-white"
