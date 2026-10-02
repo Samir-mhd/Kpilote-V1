@@ -48,10 +48,11 @@ function VariableInner() {
     const [contributionForfait4P, setContributionForfait4P] = useState<ContributionForfait4P | null>(null);
 
     const mois = useMemo(() => moisCourant(), []);
-    // Mois M-2 : les box payées ce mois-ci reflètent le R/O du mois où elles ont été vendues.
-    const moisM2 = useMemo(() => {
+    // Mois M-3 : "M+2 révolu" — une box vendue en juin (fenêtre de raccordement jusqu'à fin août)
+    // n'est créditée qu'en septembre, une fois ce mois d'août entièrement terminé.
+    const moisVenteBoxPayee = useMemo(() => {
         const [y, m] = mois.split("-").map(Number);
-        const d = new Date(y, m - 1 - 2, 1);
+        const d = new Date(y, m - 1 - 3, 1);
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
     }, [mois]);
     const boxVerrouille = useMemo(() => new Date() >= VERROUILLAGE_BOX, []);
@@ -294,7 +295,7 @@ function VariableInner() {
                         </p>
                         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                             <NumberField
-                                label={`R/O box boutique — ${nomMois(moisM2)} (%)`}
+                                label={`R/O box boutique — ${nomMois(moisVenteBoxPayee)} (%)`}
                                 value={boost.ro_box_boutique}
                                 onChange={(v) => updateBoost("ro_box_boutique", v)}
                             />
@@ -302,7 +303,7 @@ function VariableInner() {
                             <NumberField label="R/O smartphone boutique (%)" value={boost.ro_smartphone_boutique} onChange={(v) => updateBoost("ro_smartphone_boutique", v)} />
                         </div>
                         <p className="mt-2 text-[11px] text-white/30">
-                            Les box sont payées à M+2 : le boost collectif box de ce mois se base sur le R/O du mois où elles ont été vendues ({nomMois(moisM2)}), pas sur le R/O de ce mois-ci.
+                            Les box sont payées à M+2 : le boost collectif box de ce mois se base sur le R/O du mois où elles ont été vendues ({nomMois(moisVenteBoxPayee)}), pas sur le R/O de ce mois-ci.
                         </p>
                     </CardShell>
 
@@ -326,15 +327,15 @@ function VariableInner() {
                             const nbRaccordees = contributionBox?.nbRaccordees ?? 0;
                             return [
                                 {
-                                    label: `${nbRaccordees > 0 ? `${nbRaccordees} box raccordées` : "Box raccordées"} (${nomMois(moisM2)}, figé)`,
+                                    label: `${nbRaccordees > 0 ? `${nbRaccordees} box raccordées` : "Box raccordées"} (${nomMois(moisVenteBoxPayee)}, figé)`,
                                     montant: contributionBox?.primeBox ?? 0,
                                 },
-                                { label: `Boost individuel box (${nomMois(moisM2)}, figé)`, montant: contributionBox?.boostIndividuel ?? 0 },
-                                { label: `McAfee sur box (${nomMois(moisM2)}, figé)`, montant: contributionBox?.primeMcafee ?? 0 },
-                                { label: `Canal+ sur box (${nomMois(moisM2)}, figé)`, montant: contributionBox?.primeCanal ?? 0 },
+                                { label: `Boost individuel box (${nomMois(moisVenteBoxPayee)}, figé)`, montant: contributionBox?.boostIndividuel ?? 0 },
+                                { label: `McAfee sur box (${nomMois(moisVenteBoxPayee)}, figé)`, montant: contributionBox?.primeMcafee ?? 0 },
+                                { label: `Canal+ sur box (${nomMois(moisVenteBoxPayee)}, figé)`, montant: contributionBox?.primeCanal ?? 0 },
                                 {
                                     label: nb4PTotal > 0
-                                        ? `${nb4PTotal} abonnés 4P en ${nomMois(moisM2)} dont ${nb4PForfait} sur le forfait et ${nb4PBox} sur la box`
+                                        ? `${nb4PTotal} abonnés 4P en ${nomMois(moisVenteBoxPayee)} dont ${nb4PForfait} sur le forfait et ${nb4PBox} sur la box`
                                         : "",
                                     montant: montant4PTotal,
                                 },

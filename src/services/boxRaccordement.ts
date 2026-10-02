@@ -234,12 +234,19 @@ function round2(n: number): number {
 
 /**
  * Contribution figée (box + 4P + McAfee + Canal+ + boost individuel du cohort) à ajouter à la
- * variable du mois de paiement donné — recalculée à chaque nouveau raccordement de ce cohort.
+ * variable du mois affiché — recalculée à chaque nouveau raccordement de ce cohort.
+ *
+ * `mois_paiement` sur la fiche marque la fin de la fenêtre de raccordement (M+2 depuis la vente :
+ * vendue en juin -> fenêtre jusqu'à fin août). "M+2 révolu" veut dire que ce mois doit être
+ * entièrement terminé avant que le crédit apparaisse : il n'arrive donc dans le simulateur/
+ * historique que le mois SUIVANT `mois_paiement`, pas pendant `mois_paiement` lui-même. Une box
+ * vendue en juin (mois_paiement = août) se voit donc créditée en septembre, pas en août.
  */
 export async function getContributionBoxMoisPaiement(
     conseillerId: string,
-    moisPaiement: string
+    moisAffiche: string
 ): Promise<ContributionBoxMoisPaiement> {
+    const moisPaiement = moisPlus(moisAffiche, -1);
     const { data } = await supabase
         .from("box_raccordements")
         .select(SELECT_FICHE)
