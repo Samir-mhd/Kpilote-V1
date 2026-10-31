@@ -48,11 +48,11 @@ function VariableInner() {
     const [contributionForfait4P, setContributionForfait4P] = useState<ContributionForfait4P | null>(null);
 
     const mois = useMemo(() => moisCourant(), []);
-    // Mois M-3 : "M+2 révolu" — une box vendue en juin (fenêtre de raccordement jusqu'à fin août)
-    // n'est créditée qu'en septembre, une fois ce mois d'août entièrement terminé.
+    // Mois M-2 : les box/4P payés ce mois-ci correspondent aux ventes d'il y a 2 mois
+    // (vendue en août -> créditée en octobre, vente+2 = mois affiché directement).
     const moisVenteBoxPayee = useMemo(() => {
         const [y, m] = mois.split("-").map(Number);
-        const d = new Date(y, m - 1 - 3, 1);
+        const d = new Date(y, m - 1 - 2, 1);
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
     }, [mois]);
     const boxVerrouille = useMemo(() => new Date() >= VERROUILLAGE_BOX, []);

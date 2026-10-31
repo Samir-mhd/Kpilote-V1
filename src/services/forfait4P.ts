@@ -39,18 +39,16 @@ export async function getNbForfait4PDifferesConseiller(conseillerId: string): Pr
 
 export type ContributionForfait4P = { nb: number; montantTotal: number };
 
-/** Même règle "M+2 révolu" que la box (voir boxRaccordement.ts) : `mois_paiement` marque la fin
- *  du délai, le crédit n'apparaît que le mois suivant dans le simulateur/historique. */
+/** Même règle que la box (voir boxRaccordement.ts) : vente+2 = mois affiché, directement. */
 export async function getContributionForfait4PMoisPaiement(
     conseillerId: string,
     moisAffiche: string
 ): Promise<ContributionForfait4P> {
-    const moisPaiement = moisPlus(moisAffiche, -1);
     const { data } = await supabase
         .from("forfait_4p_differes")
         .select("montant")
         .eq("conseiller_id", conseillerId)
-        .eq("mois_paiement", moisPaiement);
+        .eq("mois_paiement", moisAffiche);
 
     const rows = data ?? [];
     return {
