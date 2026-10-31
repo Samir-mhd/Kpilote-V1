@@ -458,9 +458,62 @@ export async function sauvegarderVentesConseillerMois(
 const CHAMPS_NON_SYNCHRONISES = new Set<string>([
     "box_ultra", "box_pop", "box_pop_s_revolution_5g",
     "mcafee_499", "mcafee_699",
-    "assurance_nouveau_mobile", // M+1 : le clic Accueil ne crédite plus la variable, seule la validation manuelle du mois précédent compte.
-    "assurance_essentielle", // M+1, même principe.
+    "assurance_nouveau_mobile", // M+2 : le clic Accueil ne crédite plus ce champ manuel — voir getContributionAssuranceMoisAffiche, calcul automatique.
+    "assurance_essentielle", // M+2, même principe.
 ]);
+
+function moisPlusLocal(mois: string, delta: number): string {
+    const [y, m] = mois.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+export type ContributionAssurance = {
+    nbNouveauMobile: number;
+    montantNouveauMobile: number;
+    nbEssentielle: number;
+    montantEssentielle: number;
+};
+
+/**
+ * Assurance (Nouveau Mobile + Essentielle) : même principe que Box/4P — vente+2 = mois affiché,
+ * calculé AUTOMATIQUEMENT à partir des vrais actes enregistrés (clic Accueil ->
+ * `variable_actes_jour`), aucune saisie manuelle requise. Barème du mois courant appliqué (pas
+ * de figeage, contrairement à Box).
+ */
+export async function getContributionAssuranceMoisAffiche(
+    conseillerId: string,
+    moisAffiche: string,
+    bareme: BaremeVariable
+): Promise<ContributionAssurance> {
+    const moisVente = moisPlusLocal(moisAffiche, -2);
+    const [y, m] = moisVente.split("-").map(Number);
+    const debut = moisVente;
+    const fin = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+
+    const { data } = await supabase
+        .from("variable_actes_jour")
+        .select("champ, quantite")
+        .eq("conseiller_id", conseillerId)
+        .in("champ", ["assurance_nouveau_mobile", "assurance_essentielle"])
+        .gte("jour", debut)
+        .lte("jour", fin);
+
+    const lignes = (data ?? []) as { champ: string; quantite: number | null }[];
+    const nbNouveauMobile = lignes
+        .filter((l) => l.champ === "assurance_nouveau_mobile")
+        .reduce((t, l) => t + (l.quantite ?? 1), 0);
+    const nbEssentielle = lignes
+        .filter((l) => l.champ === "assurance_essentielle")
+        .reduce((t, l) => t + (l.quantite ?? 1), 0);
+
+    return {
+        nbNouveauMobile,
+        montantNouveauMobile: round2(nbNouveauMobile * bareme.assurance_nouveau_mobile),
+        nbEssentielle,
+        montantEssentielle: round2(nbEssentielle * bareme.assurance_essentielle),
+    };
+}
 
 /** Un bonus manuel "McAfee Mobile" (catégorie "autres_primes", libellé contenant "mcafee") est
  *  payé à M+2 comme le McAfee standalone : jamais synchronisé automatiquement, le conseiller le

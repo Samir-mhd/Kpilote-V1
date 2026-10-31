@@ -16,6 +16,7 @@ import {
     getBaremeAuMois,
     getBonusManuels,
     getVentesConseillerMois,
+    getContributionAssuranceMoisAffiche,
 } from "./variableConseiller";
 import { getContributionBoxMoisPaiement } from "./boxRaccordement";
 import { getContributionForfait4PMoisPaiement } from "./forfait4P";
@@ -115,6 +116,8 @@ export async function genererHistoriqueMoisSiManquant(conseillerId: string, mois
         getContributionBoxMoisPaiement(conseillerId, mois),
         getContributionForfait4PMoisPaiement(conseillerId, mois),
     ]);
+    // Barème du mois figé (pas le barème courant) : cohérent avec le reste de cet enregistrement.
+    const contributionAssurance = await getContributionAssuranceMoisAffiche(conseillerId, mois, bareme);
 
     const ventesAvecPresence = {
         ...ventesMois.ventes,
@@ -139,12 +142,15 @@ export async function genererHistoriqueMoisSiManquant(conseillerId: string, mois
 
     const boxHors4P = contributionBox.total - contributionBox.prime4P;
     const montant4PTotal = contributionBox.prime4P + contributionForfait4P.montantTotal;
+    const montantAssurance = contributionAssurance.montantNouveauMobile + contributionAssurance.montantEssentielle;
     const extra: LigneExtra[] = [
         { label: "Box raccordées (figé)", montant: Math.round(boxHors4P * 100) / 100 },
         { label: "Cross-sell 4P (box + forfait)", montant: Math.round(montant4PTotal * 100) / 100 },
+        { label: `Assurance Nouveau Mobile — ${contributionAssurance.nbNouveauMobile}`, montant: contributionAssurance.montantNouveauMobile },
+        { label: `Assurance Essentielle — ${contributionAssurance.nbEssentielle}`, montant: contributionAssurance.montantEssentielle },
     ].filter((l) => l.montant > 0);
 
-    const total = Math.round((detail.total + boxHors4P + montant4PTotal) * 100) / 100;
+    const total = Math.round((detail.total + boxHors4P + montant4PTotal + montantAssurance) * 100) / 100;
 
     await supabase.from("variable_historique_mensuelle").insert({
         conseiller_id: conseillerId,

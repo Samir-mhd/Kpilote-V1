@@ -18,6 +18,8 @@ import {
     sauvegarderVentesConseillerMois,
     moisCourant,
     BonusVolumes,
+    getContributionAssuranceMoisAffiche,
+    ContributionAssurance,
 } from "@/services/variableConseiller";
 import { CATEGORIES_VENTES, NumberField, CardShell, BonusManuelsCard, BonusManuelsInline, DetailResultatsCard } from "@/components/variable/variableUi";
 import BoxRaccordementTab from "@/components/variable/BoxRaccordementTab";
@@ -46,6 +48,7 @@ function VariableInner() {
     const [onglet, setOnglet] = useState<"simulation" | "box" | "historique">("simulation");
     const [contributionBox, setContributionBox] = useState<ContributionBoxMoisPaiement | null>(null);
     const [contributionForfait4P, setContributionForfait4P] = useState<ContributionForfait4P | null>(null);
+    const [contributionAssurance, setContributionAssurance] = useState<ContributionAssurance | null>(null);
 
     const mois = useMemo(() => moisCourant(), []);
     // Mois M-2 : les box/4P payés ce mois-ci correspondent aux ventes d'il y a 2 mois
@@ -92,6 +95,13 @@ function VariableInner() {
         getContributionBoxMoisPaiement(conseillerId, mois).then(setContributionBox).catch(() => {});
         getContributionForfait4PMoisPaiement(conseillerId, mois).then(setContributionForfait4P).catch(() => {});
     }, [conseillerId, mois, onglet]);
+
+    // Assurance : même principe M+2, mais calculée automatiquement (pas de table figée comme la
+    // box — le barème du mois courant s'applique, donc dépend du vrai barème chargé).
+    useEffect(() => {
+        if (!conseillerId) return;
+        getContributionAssuranceMoisAffiche(conseillerId, mois, bareme).then(setContributionAssurance).catch(() => {});
+    }, [conseillerId, mois, onglet, bareme]);
 
     // Live : les boosts constructeur/déstockage ajoutés par le manager apparaissent sans recharger la page
     useEffect(() => {
@@ -208,7 +218,10 @@ function VariableInner() {
                 {/* ── Formulaire ─────────────────────────────────────────────── */}
                 <div className="space-y-6">
                     {CATEGORIES_VENTES.map((cat) => {
-                        const champVerrouille = cat.categorieKey === "box" && boxVerrouille;
+                        const champsAssurance = new Set(["assurance_nouveau_mobile", "assurance_essentielle"]);
+                        const champVerrouilleKey = (key: string) =>
+                            (cat.categorieKey === "box" && boxVerrouille) || champsAssurance.has(key);
+                        const aChampAssurance = cat.champs.some((c) => champsAssurance.has(c.key));
                         return (
                         <CardShell key={cat.titre}>
                             <p className={`mb-4 text-xs font-black uppercase tracking-widest ${cat.accent}`}>
@@ -221,13 +234,18 @@ function VariableInner() {
                                         label={c.label}
                                         value={ventes[c.key]}
                                         onChange={(v) => updateVente(c.key, v)}
-                                        readOnly={champVerrouille}
+                                        readOnly={champVerrouilleKey(c.key)}
                                     />
                                 ))}
                             </div>
-                            {champVerrouille && (
+                            {cat.categorieKey === "box" && boxVerrouille && (
                                 <p className="mt-3 text-[11px] text-white/30">
                                     🔒 Depuis le 01/09/2026, la box n'est plus déclarée ici — elle est alimentée automatiquement par tes raccordements (onglet "📦 Mes box").
+                                </p>
+                            )}
+                            {aChampAssurance && (
+                                <p className="mt-3 text-[11px] text-white/30">
+                                    🔒 L&apos;assurance n&apos;est plus déclarée ici — elle est comptée automatiquement à partir de tes ventes (voir le détail à droite).
                                 </p>
                             )}
                             {bonusManuels.some((b) => b.categorie === cat.categorieKey) && (
@@ -338,6 +356,14 @@ function VariableInner() {
                                         ? `${nb4PTotal} abonnés 4P en ${nomMois(moisVenteBoxPayee)} dont ${nb4PForfait} sur le forfait et ${nb4PBox} sur la box`
                                         : "",
                                     montant: montant4PTotal,
+                                },
+                                {
+                                    label: `Assurance Nouveau Mobile (${nomMois(moisVenteBoxPayee)})${(contributionAssurance?.nbNouveauMobile ?? 0) > 0 ? ` — ${contributionAssurance!.nbNouveauMobile}` : ""}`,
+                                    montant: contributionAssurance?.montantNouveauMobile ?? 0,
+                                },
+                                {
+                                    label: `Assurance Essentielle (${nomMois(moisVenteBoxPayee)})${(contributionAssurance?.nbEssentielle ?? 0) > 0 ? ` — ${contributionAssurance!.nbEssentielle}` : ""}`,
+                                    montant: contributionAssurance?.montantEssentielle ?? 0,
                                 },
                             ];
                         })()}
