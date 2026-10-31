@@ -130,6 +130,8 @@ export default function MissionCard({
     const [questionActive, setQuestionActive] = useState<QuestionCrossSell | null>(null);
     const [pickerOuvert, setPickerOuvert] = useState(false);
     const [envoiCrossSellEnCours, setEnvoiCrossSellEnCours] = useState(false);
+    const [commentaireBoxChoix, setCommentaireBoxChoix] = useState<ChoixActe | null>(null);
+    const [commentaireBoxTexte, setCommentaireBoxTexte] = useState("");
     const boostEnAttenteRef = useRef<BoostInfo | undefined>(undefined);
 
     const pal   = PALETTE[couleur] ?? DEFAULT_PAL;
@@ -139,6 +141,7 @@ export default function MissionCard({
     const isHistorisation = titre.toLowerCase() === "spiderhome";
     const isAvisGoogle = titre.toLowerCase() === "avis google";
     const isRecapCo = titre.toLowerCase() === "récap co";
+    const isBox = titre.toLowerCase() === "box";
     // Simples clics d'enregistrement (pas une vente) : pas de célébration, juste le compteur qui bouge.
     const sansAnimation = isHistorisation || isAvisGoogle || isRecapCo;
     const status = getStatus(pct, realise, objectif, isHistorisation, isAvisGoogle, isRecapCo);
@@ -198,7 +201,22 @@ export default function MissionCard({
 
     function handleChoix(choix: ChoixActe) {
         setModalOuverte(false);
-        declencherVente(choix);
+        // Box : une étape de commentaire s'intercale avant de déclencher la vente, pour que le
+        // conseiller n'ait pas besoin de revenir sur "Mes box" ensuite pour le renseigner.
+        if (isBox) {
+            setCommentaireBoxChoix(choix);
+        } else {
+            declencherVente(choix);
+        }
+    }
+
+    function validerCommentaireBox() {
+        const choix = commentaireBoxChoix;
+        if (!choix) return;
+        const commentaire = commentaireBoxTexte.trim();
+        setCommentaireBoxChoix(null);
+        setCommentaireBoxTexte("");
+        declencherVente(commentaire ? { ...choix, commentaire } : choix);
     }
 
     async function handleReponse4P(oui: boolean) {
@@ -400,6 +418,38 @@ export default function MissionCard({
                     onChoisir={handleChoix}
                     onClose={() => setModalOuverte(false)}
                 />
+            )}
+
+            {commentaireBoxChoix && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                    onClick={validerCommentaireBox}
+                >
+                    <div
+                        className="mx-4 w-full max-w-xs rounded-[28px] bg-slate-900 p-7 text-center shadow-[0_24px_64px_rgba(0,0,0,.5)]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <p className="text-4xl">📝</p>
+                        <p className="mt-3 text-lg font-black text-white">Un commentaire pour cette box ?</p>
+                        <p className="mt-1 text-xs text-white/40">Identifiant client, RDV technicien... (optionnel)</p>
+                        <input
+                            autoFocus
+                            value={commentaireBoxTexte}
+                            onChange={(e) => setCommentaireBoxTexte(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && validerCommentaireBox()}
+                            placeholder="Commentaire"
+                            className="mt-4 h-11 w-full rounded-2xl border border-white/15 bg-white/5 px-4 text-sm text-white outline-none focus:border-violet-400"
+                        />
+                        <div className="mt-5 flex gap-3">
+                            <button
+                                onClick={validerCommentaireBox}
+                                className="flex-1 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 py-3 text-sm font-black text-white transition-all hover:opacity-90"
+                            >
+                                {commentaireBoxTexte.trim() ? "Valider" : "Passer"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {question4POuverte && (

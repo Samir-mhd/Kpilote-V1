@@ -9,6 +9,8 @@ export type ChoixActe = {
     bonusManuelId?: string;
     /** Code de la carte accueil concernée (box/forfaits/telephones/mcafee/assurance) — permet la correction du jour. */
     produitCode?: string;
+    /** Commentaire saisi au moment de la vente (box) — reporté automatiquement sur la fiche de suivi. */
+    commentaire?: string;
 };
 
 type Props = {

@@ -38,6 +38,17 @@ function fmtDateVente(dateIso: string) {
 
 const MODELES: ModeleBox[] = ["box_ultra", "box_pop", "box_pop_s_revolution_5g"];
 
+/** Regroupe une liste déjà triée par date (desc) en blocs par mois de vente consécutifs. */
+function grouperParMois(liste: FicheBoxRaccordement[]): { mois: string; fiches: FicheBoxRaccordement[] }[] {
+    const groupes: { mois: string; fiches: FicheBoxRaccordement[] }[] = [];
+    liste.forEach((f) => {
+        const dernier = groupes[groupes.length - 1];
+        if (dernier && dernier.mois === f.moisVente) dernier.fiches.push(f);
+        else groupes.push({ mois: f.moisVente, fiches: [f] });
+    });
+    return groupes;
+}
+
 export default function BoxRaccordementTab({ conseillerId, bareme }: { conseillerId: string; bareme: BaremeVariable }) {
     const [fiches, setFiches] = useState<FicheBoxRaccordement[]>([]);
     const [loading, setLoading] = useState(true);
@@ -287,21 +298,42 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
                 {enAttente.length === 0 ? (
                     <p className="mt-4 py-6 text-center text-sm text-slate-300">Aucune box en attente de raccordement.</p>
                 ) : (
-                    <div className="mt-4 space-y-3">{enAttente.map((f) => ligneFiche(f, "attente"))}</div>
+                    <div className="mt-4 space-y-5">
+                        {grouperParMois(enAttente).map((g) => (
+                            <div key={g.mois}>
+                                <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-400">{nomMois(g.mois)}</p>
+                                <div className="space-y-3">{g.fiches.map((f) => ligneFiche(f, "attente"))}</div>
+                            </div>
+                        ))}
+                    </div>
                 )}
             </div>
 
             {raccordees.length > 0 && (
                 <div className="rounded-[24px] bg-white p-6 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
                     <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600">✓ Raccordées</p>
-                    <div className="mt-4 space-y-3">{raccordees.map((f) => ligneFiche(f, "raccordee"))}</div>
+                    <div className="mt-4 space-y-5">
+                        {grouperParMois(raccordees).map((g) => (
+                            <div key={g.mois}>
+                                <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-400">{nomMois(g.mois)}</p>
+                                <div className="space-y-3">{g.fiches.map((f) => ligneFiche(f, "raccordee"))}</div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 
             {perdues.length > 0 && (
                 <div className="rounded-[24px] bg-white p-6 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
                     <p className="text-xs font-black uppercase tracking-[0.2em] text-red-500">✕ Perdues (Box KO ou délai dépassé)</p>
-                    <div className="mt-4 space-y-3">{perdues.map((f) => ligneFiche(f, "perdue"))}</div>
+                    <div className="mt-4 space-y-5">
+                        {grouperParMois(perdues).map((g) => (
+                            <div key={g.mois}>
+                                <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-400">{nomMois(g.mois)}</p>
+                                <div className="space-y-3">{g.fiches.map((f) => ligneFiche(f, "perdue"))}</div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
         </div>

@@ -124,7 +124,8 @@ function mapFiche(r: any): FicheBoxRaccordement {
 export async function creerFicheBoxRaccordement(
     conseillerId: string,
     modele: ModeleBox,
-    dateVente?: string
+    dateVente?: string,
+    commentaire?: string
 ): Promise<void> {
     const dateVenteFinale = dateVente ?? dateDuJour();
     const moisVente = moisDe(dateVenteFinale);
@@ -143,6 +144,7 @@ export async function creerFicheBoxRaccordement(
         montant_canal3: bareme.canal_option3,
         seuil_box: bareme.seuil_box,
         boost_individuel_box: bareme.boost_individuel_box,
+        commentaire: commentaire?.trim() || null,
     });
 }
 
