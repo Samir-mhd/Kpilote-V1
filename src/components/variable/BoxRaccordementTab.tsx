@@ -80,10 +80,14 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
         await mettreAJourFiche(f.id, { quatreP: next });
     }
 
-    async function toggleMcafee(f: FicheBoxRaccordement) {
-        const next = !f.mcafee;
-        patchLocal(f.id, { mcafee: next });
-        await mettreAJourFiche(f.id, { mcafee: next });
+    // Deux paliers distincts (4,99€ vendu -> 1,50€ payé / 6,99€ vendu -> 2,00€ payé), pas un simple
+    // oui/non : recliquer la variante déjà sélectionnée désactive, cliquer l'autre bascule dessus.
+    async function toggleMcafee(f: FicheBoxRaccordement, variante: "499" | "699") {
+        const montant = variante === "499" ? bareme.mcafee_499 : bareme.mcafee_699;
+        const dejaCetteVariante = f.mcafee && f.montantMcafee === montant;
+        const next = !dejaCetteVariante;
+        patchLocal(f.id, { mcafee: next, montantMcafee: montant });
+        await mettreAJourFiche(f.id, { mcafee: next, montantMcafee: montant });
     }
 
     async function toggleCanal(f: FicheBoxRaccordement, cle: CanalOption) {
@@ -181,12 +185,26 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
                                     4P {f.quatreP ? "✓" : ""}
                                 </button>
                                 <button
-                                    onClick={() => toggleMcafee(f)}
+                                    onClick={() => toggleMcafee(f, "499")}
+                                    title={`McAfee 4,99€ vendu -> ${fmtEuro(bareme.mcafee_499)} payé`}
                                     className={`rounded-xl px-3 py-2 text-xs font-black transition-all ${
-                                        f.mcafee ? "bg-emerald-500 text-white" : "border border-slate-200 bg-white text-slate-400"
+                                        f.mcafee && f.montantMcafee === bareme.mcafee_499
+                                            ? "bg-emerald-500 text-white"
+                                            : "border border-slate-200 bg-white text-slate-400"
                                     }`}
                                 >
-                                    McAfee {f.mcafee ? "✓" : ""}
+                                    McAfee 4,99€ {f.mcafee && f.montantMcafee === bareme.mcafee_499 ? "✓" : ""}
+                                </button>
+                                <button
+                                    onClick={() => toggleMcafee(f, "699")}
+                                    title={`McAfee 6,99€ vendu -> ${fmtEuro(bareme.mcafee_699)} payé`}
+                                    className={`rounded-xl px-3 py-2 text-xs font-black transition-all ${
+                                        f.mcafee && f.montantMcafee === bareme.mcafee_699
+                                            ? "bg-emerald-500 text-white"
+                                            : "border border-slate-200 bg-white text-slate-400"
+                                    }`}
+                                >
+                                    McAfee 6,99€ {f.mcafee && f.montantMcafee === bareme.mcafee_699 ? "✓" : ""}
                                 </button>
                                 {CANAUX.map((c) => (
                                     <button

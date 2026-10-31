@@ -21,9 +21,6 @@ export const MODELE_BOX_LABELS: Record<ModeleBox, string> = {
     box_pop_s_revolution_5g: "POP S / Révolution / Box 5G",
 };
 
-/** Montant unique McAfee pour le raccordement (oui/non, sans distinction de palier). */
-export const MONTANT_MCAFEE_RACCORDEMENT = 4.99;
-
 export type CanalOption = "canal1" | "canal2" | "canal3";
 
 export const CANAL_LABELS: Record<CanalOption, string> = {
@@ -138,7 +135,7 @@ export async function creerFicheBoxRaccordement(
         modele,
         montant_box: bareme[modele],
         montant_4p: bareme.cross_sell_4p,
-        montant_mcafee: MONTANT_MCAFEE_RACCORDEMENT,
+        montant_mcafee: 0, // fixé au palier (4,99€ -> 1,50 / 6,99€ -> 2,00) au moment du choix sur "Mes box", pas encore connu à la vente.
         montant_canal1: bareme.canal_option1,
         montant_canal2: bareme.canal_option2,
         montant_canal3: bareme.canal_option3,
@@ -202,11 +199,12 @@ export async function basculerBoxKo(ficheId: string, boxKo: boolean): Promise<vo
 /** Met à jour 4P / McAfee / Canal+ / commentaire — enregistré immédiatement, indépendamment du raccordement. */
 export async function mettreAJourFiche(
     ficheId: string,
-    valeurs: Partial<{ quatreP: boolean; mcafee: boolean; canal1: boolean; canal2: boolean; canal3: boolean; commentaire: string }>
+    valeurs: Partial<{ quatreP: boolean; mcafee: boolean; montantMcafee: number; canal1: boolean; canal2: boolean; canal3: boolean; commentaire: string }>
 ): Promise<void> {
     const payload: Record<string, unknown> = {};
     if (valeurs.quatreP !== undefined) payload.quatre_p = valeurs.quatreP;
     if (valeurs.mcafee !== undefined) payload.mcafee = valeurs.mcafee;
+    if (valeurs.montantMcafee !== undefined) payload.montant_mcafee = valeurs.montantMcafee;
     if (valeurs.canal1 !== undefined) payload.canal1 = valeurs.canal1;
     if (valeurs.canal2 !== undefined) payload.canal2 = valeurs.canal2;
     if (valeurs.canal3 !== undefined) payload.canal3 = valeurs.canal3;
