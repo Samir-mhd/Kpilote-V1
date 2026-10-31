@@ -349,7 +349,10 @@ function VariableInner() {
                                     montant: contributionBox?.primeBox ?? 0,
                                 },
                                 { label: `Boost individuel box (${nomMois(moisVenteBoxPayee)}, figé)`, montant: contributionBox?.boostIndividuel ?? 0 },
-                                { label: `McAfee sur box (${nomMois(moisVenteBoxPayee)}, figé)`, montant: contributionBox?.primeMcafee ?? 0 },
+                                {
+                                    label: `${(contributionBox?.nbMcafee ?? 0) > 0 ? `${contributionBox!.nbMcafee} McAfee` : "McAfee"} sur box (${nomMois(moisVenteBoxPayee)}, figé)`,
+                                    montant: contributionBox?.primeMcafee ?? 0,
+                                },
                                 { label: `Canal+ sur box (${nomMois(moisVenteBoxPayee)}, figé)`, montant: contributionBox?.primeCanal ?? 0 },
                                 {
                                     label: nb4PTotal > 0

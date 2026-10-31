@@ -49,6 +49,18 @@ function grouperParMois(liste: FicheBoxRaccordement[]): { mois: string; fiches: 
     return groupes;
 }
 
+/** Séparateur de mois bien visible (pastille colorée + trait) — avec le nombre de box entre parenthèses. */
+function EnTeteMois({ mois, nb, classes }: { mois: string; nb: number; classes: string }) {
+    return (
+        <div className="mb-3 flex items-center gap-3">
+            <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-black uppercase tracking-wider ${classes}`}>
+                {nomMois(mois)} ({nb})
+            </span>
+            <div className="h-px flex-1 bg-slate-200" />
+        </div>
+    );
+}
+
 export default function BoxRaccordementTab({ conseillerId, bareme }: { conseillerId: string; bareme: BaremeVariable }) {
     const [fiches, setFiches] = useState<FicheBoxRaccordement[]>([]);
     const [loading, setLoading] = useState(true);
@@ -319,7 +331,7 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
                     <div className="mt-4 space-y-5">
                         {grouperParMois(enAttente).map((g) => (
                             <div key={g.mois}>
-                                <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-400">{nomMois(g.mois)}</p>
+                                <EnTeteMois mois={g.mois} nb={g.fiches.length} classes="bg-violet-100 text-violet-700" />
                                 <div className="space-y-3">{g.fiches.map((f) => ligneFiche(f, "attente"))}</div>
                             </div>
                         ))}
@@ -333,7 +345,7 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
                     <div className="mt-4 space-y-5">
                         {grouperParMois(raccordees).map((g) => (
                             <div key={g.mois}>
-                                <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-400">{nomMois(g.mois)}</p>
+                                <EnTeteMois mois={g.mois} nb={g.fiches.length} classes="bg-emerald-100 text-emerald-700" />
                                 <div className="space-y-3">{g.fiches.map((f) => ligneFiche(f, "raccordee"))}</div>
                             </div>
                         ))}
@@ -347,7 +359,7 @@ export default function BoxRaccordementTab({ conseillerId, bareme }: { conseille
                     <div className="mt-4 space-y-5">
                         {grouperParMois(perdues).map((g) => (
                             <div key={g.mois}>
-                                <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-400">{nomMois(g.mois)}</p>
+                                <EnTeteMois mois={g.mois} nb={g.fiches.length} classes="bg-red-100 text-red-600" />
                                 <div className="space-y-3">{g.fiches.map((f) => ligneFiche(f, "perdue"))}</div>
                             </div>
                         ))}

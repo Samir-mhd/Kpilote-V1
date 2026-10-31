@@ -222,6 +222,7 @@ export type ContributionBoxMoisPaiement = {
     prime4P: number;
     nb4P: number;
     primeMcafee: number;
+    nbMcafee: number;
     primeCanal: number;
     boostIndividuel: number;
     total: number;
@@ -255,7 +256,8 @@ export async function getContributionBoxMoisPaiement(
     const primeBox = raccordees.reduce((t, f) => t + f.montantBox, 0);
     const box4P = raccordees.filter((f) => f.quatreP);
     const prime4P = box4P.reduce((t, f) => t + f.montant4P, 0);
-    const primeMcafee = raccordees.filter((f) => f.mcafee).reduce((t, f) => t + f.montantMcafee, 0);
+    const boxMcafee = raccordees.filter((f) => f.mcafee);
+    const primeMcafee = boxMcafee.reduce((t, f) => t + f.montantMcafee, 0);
     const primeCanal =
         raccordees.filter((f) => f.canal1).reduce((t, f) => t + f.montantCanal1, 0) +
         raccordees.filter((f) => f.canal2).reduce((t, f) => t + f.montantCanal2, 0) +
@@ -271,6 +273,7 @@ export async function getContributionBoxMoisPaiement(
         prime4P: round2(prime4P),
         nb4P: box4P.length,
         primeMcafee: round2(primeMcafee),
+        nbMcafee: boxMcafee.length,
         primeCanal: round2(primeCanal),
         boostIndividuel: round2(boostIndividuel),
         total: round2(primeBox + prime4P + primeMcafee + primeCanal + boostIndividuel),
