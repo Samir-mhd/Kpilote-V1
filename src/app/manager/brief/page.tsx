@@ -510,56 +510,6 @@ export default function BriefPage() {
                 <AvanceeSection titre="Avancée du mois" badge="Mois en cours" produits={data.moisAvancee} />
             </div>
 
-            {/* ── Situation du mois ─────────────────────────────────────────── */}
-            <div className="rounded-[24px] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Situation du mois</p>
-                        <p className="mt-1 text-2xl font-black text-slate-900">{data.totalMois} / {data.totalObjectif} <span className="text-base font-normal text-slate-400">objectif global</span></p>
-                    </div>
-                    <div className="text-right">
-                        <p className={`text-4xl font-black ${data.tauxMois >= 100 ? "text-emerald-500" : data.tauxMois >= 70 ? "text-amber-500" : "text-red-500"}`}>{data.tauxMois}%</p>
-                        <p className="text-xs text-slate-400">J-{data.joursRestants} · rythme {data.rythmeNecessaire}/jour</p>
-                    </div>
-                </div>
-
-                {/* Barre globale */}
-                <div className="mb-6 h-3 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                        className={`h-full rounded-full transition-all duration-700 ${data.tauxMois >= 100 ? "bg-emerald-500" : data.tauxMois >= 70 ? "bg-amber-400" : "bg-red-400"}`}
-                        style={{ width: `${data.tauxMois}%` }}
-                    />
-                </div>
-
-                {/* Par produit */}
-                <div className="space-y-4">
-                    {data.produitsMois.map(p => {
-                        const barColor = p.taux >= 100 ? "bg-emerald-500" : p.taux >= 70 ? "bg-amber-400" : "bg-red-400";
-                        const textColor = p.taux >= 100 ? "text-emerald-600" : p.taux >= 70 ? "text-amber-600" : "text-red-500";
-                        return (
-                            <div key={p.code}>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-sm font-bold text-slate-700">{p.emoji} {p.label}</span>
-                                    <div className="flex items-center gap-3">
-                                        {p.dailyTarget > 0 && (
-                                            <span className="text-[10px] font-bold text-slate-400">cible/jour : {p.dailyTarget}</span>
-                                        )}
-                                        <span className="text-sm font-black text-slate-700">{p.ventes}<span className="font-normal text-slate-400">/{p.objectif}</span></span>
-                                        <span className={`w-10 text-right text-xs font-black ${textColor}`}>{p.taux}%</span>
-                                    </div>
-                                </div>
-                                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                                    <div
-                                        className={`h-full rounded-full transition-all duration-700 ${barColor}`}
-                                        style={{ width: `${p.taux}%` }}
-                                    />
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-
             {/* ── Lancer un défi ───────────────────────────────────────────── */}
             {data.conseillers.length >= 2 && (
                 <LancerDefiCard conseillers={data.conseillers} />

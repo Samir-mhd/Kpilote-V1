@@ -1191,13 +1191,16 @@ export default function Dashboard() {
 
                 <button
                     onClick={() => (variableActivee ? setComboOuvert(true) : setComboSansVarianteOuvert(true))}
-                    className="relative mb-5 flex w-full items-center gap-4 overflow-hidden rounded-[28px] border-2 border-amber-300 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-6 text-left shadow-[0_8px_24px_rgba(217,119,6,.12)] transition-all hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-[0_12px_32px_rgba(217,119,6,.22)]"
+                    className="group relative mb-5 flex w-full items-center gap-6 overflow-hidden rounded-[28px] border-2 border-amber-300 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-8 text-left shadow-[0_8px_24px_rgba(217,119,6,.12)] transition-all hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-[0_16px_40px_rgba(217,119,6,.25)]"
                 >
-                    <div className="pointer-events-none absolute -top-8 -right-8 h-28 w-28 rounded-full bg-amber-300/25 blur-2xl" />
-                    <span className="relative shrink-0 text-4xl leading-none">📱💻🛡️✅💪🎉</span>
-                    <span className="relative">
-                        <span className="block font-black text-amber-700">Vente combo</span>
-                        <span className="block text-xs font-semibold text-amber-500">Box + forfait + assurance + tout d&apos;un coup</span>
+                    <div className="pointer-events-none absolute -top-10 -right-10 h-40 w-40 rounded-full bg-amber-300/25 blur-3xl" />
+                    <span className="relative shrink-0 text-6xl leading-none">📱💻🛡️✅💪🎉</span>
+                    <span className="relative flex-1">
+                        <span className="block text-2xl font-black text-amber-700">Vente combo</span>
+                        <span className="mt-1 block text-sm font-semibold text-amber-600">Box + forfait + assurance + tout d&apos;un coup</span>
+                    </span>
+                    <span className="relative hidden shrink-0 items-center justify-center rounded-full bg-amber-400 text-white shadow-[0_4px_16px_rgba(217,119,6,.35)] transition-transform group-hover:translate-x-1 sm:flex h-12 w-12 text-2xl">
+                        →
                     </span>
                 </button>
 

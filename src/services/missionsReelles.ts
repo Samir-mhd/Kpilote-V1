@@ -3,7 +3,7 @@ import { getVentesDuJour, getVentesDuMois, getVentesDepuisLundi } from "@/servic
 import { getJoursTravail, getJoursTravailPlage } from "@/services/planningService";
 import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import { getCoeffRecapCommercial } from "@/services/recapCommercialConfig";
-import { getRealiseVentesComboMoisCourant, RealiseVentesCombo } from "@/services/variableConseiller";
+import { getRealiseVentesComboMoisCourant, getRealiseVentesCombo, RealiseVentesCombo } from "@/services/variableConseiller";
 import { calculerObjectifs, EtatObjectif } from "@/engine/objectifEngine";
 import { periodeSemaineEffective } from "@/utils/periodes";
 import { PRODUITS_ORDRE, type ProduitCode } from "@/utils/produits";
@@ -220,6 +220,16 @@ export async function getMissionsCompletes(conseillerId: string, excludeCodes: r
     }));
 }
 
+/** Produits exclus de l'historique mensuel : historisation (Spiderhome) ou suivis sans prime,
+ *  pas de vrais actes commerciaux (Récap Co, Avis Google). */
+const CODES_HORS_HISTORIQUE = new Set(["spiderhome", "recap_commercial", "avis_google"]);
+
+const LABELS_VENTES_COMBO: Record<(typeof CODES_VENTES_COMBO)[number], string> = {
+    mcafee_mobile: "McAfee Mobile",
+    assurance_essentielle: "Assurance Essentielle",
+    canal_plus: "Canal+",
+};
+
 /** Ventes d'un mois précis par produit (historique).
  *  Filtre par created_at si la colonne existe, sinon retourne vide pour les mois passés. */
 export async function getVentesParMois(
@@ -228,15 +238,18 @@ export async function getVentesParMois(
     mois: number
 ): Promise<Record<string, number>> {
     const dernierJour = new Date(annee, mois, 0).getDate();
-    const debut = `${annee}-${String(mois).padStart(2, "0")}-01T00:00:00.000Z`;
-    const fin = `${annee}-${String(mois).padStart(2, "0")}-${String(dernierJour).padStart(2, "0")}T23:59:59.999Z`;
+    const jourDebut = `${annee}-${String(mois).padStart(2, "0")}-01`;
+    const jourFin = `${annee}-${String(mois).padStart(2, "0")}-${String(dernierJour).padStart(2, "0")}`;
 
-    const { data, error } = await supabase
-        .from("ventes")
-        .select("quantite, produits(nom, code)")
-        .eq("conseiller_id", conseillerId)
-        .gte("created_at", debut)
-        .lte("created_at", fin);
+    const [{ data, error }, combo] = await Promise.all([
+        supabase
+            .from("ventes")
+            .select("quantite, produits(nom, code)")
+            .eq("conseiller_id", conseillerId)
+            .gte("created_at", `${jourDebut}T00:00:00.000Z`)
+            .lte("created_at", `${jourFin}T23:59:59.999Z`),
+        getRealiseVentesCombo(conseillerId, jourDebut, jourFin).catch(() => null),
+    ]);
 
     // Colonne created_at absente → retour vide (pas d'historique possible)
     if (error) return {};
@@ -244,9 +257,17 @@ export async function getVentesParMois(
     const result: Record<string, number> = {};
     (data ?? []).forEach((row: any) => {
         const produit = Array.isArray(row.produits) ? row.produits[0] : row.produits;
-        if (produit?.code === "spiderhome") return; // historisation, pas un acte commercial
+        if (produit?.code && CODES_HORS_HISTORIQUE.has(produit.code)) return;
         if (produit?.nom) result[produit.nom] = (result[produit.nom] ?? 0) + row.quantite;
     });
+
+    if (combo) {
+        CODES_VENTES_COMBO.forEach((code) => {
+            const n = combo[code];
+            if (n > 0) result[LABELS_VENTES_COMBO[code]] = n;
+        });
+    }
+
     return result;
 }
 

@@ -7,7 +7,6 @@ import { construireClassementPeriode, ConseillerStats } from "@/services/classem
 import { getObjectifsBoutique } from "@/services/objectifs";
 import MeteoEquipe from "@/components/manager/MeteoEquipe";
 import TeamFeed from "@/components/dashboard/TeamFeed";
-import AlertesLive from "@/components/manager/AlertesLive";
 import LancerDefiCard from "@/components/manager/LancerDefiCard";
 
 function dateAujourdhui() {
@@ -129,20 +128,10 @@ export default function ManagerDashboard() {
                 <div className="relative p-8">
 
                     {/* Header */}
-                    <div className="flex items-start justify-between mb-8">
-                        <div>
-                            <p className="text-xs font-black uppercase tracking-[0.4em] text-violet-400">KPILOTE Manager</p>
-                            <h1 className="mt-2 text-4xl font-black text-white">Objectifs du jour</h1>
-                            <p className="mt-1 text-sm font-medium capitalize text-white/40">{dateAujourdhui()}</p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1.5">
-                            <span className="rounded-2xl bg-white/8 px-4 py-2 text-xs font-black text-white/60">
-                                J-{daysLeft} avant fin de mois
-                            </span>
-                            <span className="rounded-2xl bg-white/8 px-4 py-2 text-xs font-semibold text-white/40">
-                                Cible = rythme dynamique
-                            </span>
-                        </div>
+                    <div className="mb-8">
+                        <p className="text-xs font-black uppercase tracking-[0.4em] text-violet-400">KPILOTE Manager</p>
+                        <h1 className="mt-2 text-4xl font-black text-white">Objectifs du jour</h1>
+                        <p className="mt-1 text-sm font-medium capitalize text-white/40">{dateAujourdhui()}</p>
                     </div>
 
                     {/* Race bars */}
@@ -268,9 +257,6 @@ export default function ManagerDashboard() {
                 <MeteoEquipe />
                 <TeamFeed conseillerId="" />
             </div>
-
-            {/* ── Alertes live ─────────────────────────────────────────────── */}
-            <AlertesLive />
 
             {/* ── Lancer un défi / challenge ───────────────────────────────── */}
             {dashboard.classement.length >= 2 && (

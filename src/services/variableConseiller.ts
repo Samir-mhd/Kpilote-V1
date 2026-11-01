@@ -522,29 +522,31 @@ export type RealiseVentesCombo = {
 };
 
 /**
- * Ventes du mois en cours pour les 3 items "déclarés lors des ventes combos" qui n'ont pas de
- * ligne dans la table `ventes` (contrairement à Box/Forfaits/...) : McAfee Mobile (bonus manuel
+ * Ventes sur une période donnée pour les 3 items "déclarés lors des ventes combos" qui n'ont pas
+ * de ligne dans la table `ventes` (contrairement à Box/Forfaits/...) : McAfee Mobile (bonus manuel
  * détecté par libellé) et Assurance essentielle (champ dédié) après un Forfait, Canal+ après une
  * Box Ultra — mais ici au jour de la VENTE (objectif), pas au mois de paiement M+2 (variable).
- * Canal+ : uniquement les options 2 et 3 (l'option 1 ne compte pas pour l'objectif conseiller).
+ * Canal+ : uniquement les options 2 et 3 (l'option 1 ne compte pas pour l'objectif).
+ * conseillerId = null → agrège toute l'équipe (vue manager).
  */
-export async function getRealiseVentesComboMoisCourant(conseillerId: string): Promise<RealiseVentesCombo> {
-    const mois = moisCourant();
-    const [y, m] = mois.split("-").map(Number);
-    const debut = mois;
-    const fin = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+export async function getRealiseVentesCombo(
+    conseillerId: string | null,
+    debut: string,
+    fin: string
+): Promise<RealiseVentesCombo> {
+    let requete = supabase
+        .from("variable_actes_jour")
+        .select("champ, label, bonus_manuel_id, quantite")
+        .gte("jour", debut)
+        .lte("jour", fin);
+    if (conseillerId) requete = requete.eq("conseiller_id", conseillerId);
 
     const [{ data: bonusMcafee }, { data: actes }] = await Promise.all([
         supabase
             .from("variable_bonus_manuels")
             .select("id, label, categorie")
             .eq("categorie", "autres_primes"),
-        supabase
-            .from("variable_actes_jour")
-            .select("champ, label, bonus_manuel_id, quantite")
-            .eq("conseiller_id", conseillerId)
-            .gte("jour", debut)
-            .lte("jour", fin),
+        requete,
     ]);
 
     const idsMcafeeMobile = new Set(
@@ -566,6 +568,15 @@ export async function getRealiseVentesComboMoisCourant(conseillerId: string): Pr
         .reduce((t, l) => t + (l.quantite ?? 1), 0);
 
     return { mcafee_mobile, assurance_essentielle, canal_plus };
+}
+
+/** Ventes du mois en cours pour un conseiller (voir getRealiseVentesCombo). */
+export async function getRealiseVentesComboMoisCourant(conseillerId: string): Promise<RealiseVentesCombo> {
+    const mois = moisCourant();
+    const [y, m] = mois.split("-").map(Number);
+    const debut = mois;
+    const fin = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+    return getRealiseVentesCombo(conseillerId, debut, fin);
 }
 
 /** Un bonus manuel "McAfee Mobile" (catégorie "autres_primes", libellé contenant "mcafee") est
