@@ -12,11 +12,6 @@ const menu = [
         icon: "trend" as const,
     },
     {
-        label: "Brief du matin",
-        href: "/manager/brief",
-        icon: "brain" as const,
-    },
-    {
         label: "Classement",
         href: "/manager/classement",
         icon: "trophy" as const,

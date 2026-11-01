@@ -99,7 +99,7 @@ export default function LancerDefiCard({ conseillers }: Props) {
                         Lancer un défi ou un challenge
                     </h3>
                     <p className="mt-1 text-sm text-white/40">
-                        Crée une dynamique dans ton équipe depuis le brief.
+                        Crée une dynamique dans ton équipe.
                     </p>
                 </div>
 

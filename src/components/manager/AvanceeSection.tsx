@@ -1,9 +1,8 @@
 "use client";
 
 import { couleurTaux } from "@/utils/periodes";
-import type { ProduitCode } from "@/utils/produits";
 
-export type AvanceeProduit = { code: ProduitCode; label: string; emoji: string; realise: number; objectif: number };
+export type AvanceeProduit = { code: string; label: string; emoji: string; realise: number; objectif: number };
 
 export default function AvanceeSection({ titre, badge, produits }: { titre: string; badge: string; produits: AvanceeProduit[] }) {
     const totalRealise  = produits.reduce((t, p) => t + p.realise, 0);
