@@ -233,7 +233,7 @@ export async function getVentesParMois(
 
     const { data, error } = await supabase
         .from("ventes")
-        .select("quantite, produits(nom)")
+        .select("quantite, produits(nom, code)")
         .eq("conseiller_id", conseillerId)
         .gte("created_at", debut)
         .lte("created_at", fin);
@@ -243,8 +243,9 @@ export async function getVentesParMois(
 
     const result: Record<string, number> = {};
     (data ?? []).forEach((row: any) => {
-        const nom = Array.isArray(row.produits) ? row.produits[0]?.nom : row.produits?.nom;
-        if (nom) result[nom] = (result[nom] ?? 0) + row.quantite;
+        const produit = Array.isArray(row.produits) ? row.produits[0] : row.produits;
+        if (produit?.code === "spiderhome") return; // historisation, pas un acte commercial
+        if (produit?.nom) result[produit.nom] = (result[produit.nom] ?? 0) + row.quantite;
     });
     return result;
 }
