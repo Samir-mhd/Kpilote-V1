@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getMissionsCompletes } from "@/services/missionsReelles";
+import { getMissionsCompletes, CODES_VENTES_COMBO } from "@/services/missionsReelles";
 import { ajusterCheckCerebro } from "@/services/resetService";
 
 type Props = {
@@ -46,7 +46,7 @@ export default function MorningCheck({ nom, conseillerId, isReset = false, onVal
 
     useEffect(() => {
         if (!conseillerId) { setItems(FALLBACK); setOriginalItems(FALLBACK); setLoading(false); return; }
-        getMissionsCompletes(conseillerId)
+        getMissionsCompletes(conseillerId, CODES_VENTES_COMBO)
             .then((missions) => {
                 const loaded = missions.map((m) => ({ produit: m.produit, valeur: m.realise }));
                 setItems(loaded);

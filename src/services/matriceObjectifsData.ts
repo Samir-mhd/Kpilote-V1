@@ -1,5 +1,18 @@
 import { supabase } from "@/lib/supabase";
-import { ItemLieConfig, MatriceConfig, ConseillerMatriceInput, ItemPrincipal, Profil } from "./matriceObjectifs";
+import { ItemLieConfig, MatriceConfig, ConseillerMatriceInput, ItemPrincipal, Profil, ResultatMatrice } from "./matriceObjectifs";
+
+/** Item de la matrice -> code produit dans `produits`/`objectifs_mensuels`. Fixe (les items liés
+ *  ne sont pas renommables en UI), "Téléphone" (matrice, singulier) -> "telephones" (produit). */
+const ITEM_VERS_CODE_PRODUIT: Record<string, string> = {
+    "Box": "box",
+    "Forfaits": "forfaits",
+    "Téléphone": "telephones",
+    "McAfee": "mcafee",
+    "Assurance": "assurance",
+    "McAfee mobile": "mcafee_mobile",
+    "Assurance essentielle": "assurance_essentielle",
+    "Canal+": "canal_plus",
+};
 
 const ITEMS_LIES_DEFAUT: ItemLieConfig[] = [
     { name: "McAfee", base: "Box", shopRate: 0.25, tauxDefaut: 0.20 },
@@ -186,6 +199,60 @@ export function versConseillerCalcul(
         },
         taux,
     };
+}
+
+/**
+ * Publie les objectifs calculés par la matrice (8 items) dans `objectifs_mensuels`, pour que les
+ * conseillers (page /dashboard/resultats) et le manager (page Objectifs conseiller) voient
+ * directement le résultat — remplace la saisie manuelle pour ces items. Écrit 0 pour un
+ * conseiller qui n'a pas d'objectif sur un item (ex. pas de profil Téléphone) plutôt que de ne
+ * rien toucher, pour que l'objectif reflète toujours exactement ce qu'affiche la matrice.
+ */
+export async function appliquerMatriceVersObjectifsConseiller(resultat: ResultatMatrice): Promise<void> {
+    const { data: produits, error: errProduits } = await supabase.from("produits").select("id, code");
+    if (errProduits) throw errProduits;
+    const produitIdParCode = new Map<string, string>((produits ?? []).map((p: { id: string; code: string }) => [p.code, p.id]));
+
+    const conseillerIds = resultat.conseillers.map((c) => c.id);
+    const produitIds = Object.values(ITEM_VERS_CODE_PRODUIT)
+        .map((code) => produitIdParCode.get(code))
+        .filter((id): id is string => !!id);
+
+    const { data: existants, error: errExistants } = await supabase
+        .from("objectifs_mensuels")
+        .select("id, conseiller_id, produit_id")
+        .in("conseiller_id", conseillerIds)
+        .in("produit_id", produitIds);
+    if (errExistants) throw errExistants;
+
+    const idExistant = new Map<string, string>(
+        (existants ?? []).map((r: { id: string; conseiller_id: string; produit_id: string }) => [`${r.conseiller_id}:${r.produit_id}`, r.id])
+    );
+
+    const mois = moisCourantISO();
+    const updates: { id: string; objectif: number }[] = [];
+    const inserts: { conseiller_id: string; produit_id: string; objectif: number; mois: string }[] = [];
+
+    for (const c of resultat.conseillers) {
+        for (const [item, code] of Object.entries(ITEM_VERS_CODE_PRODUIT)) {
+            const produitId = produitIdParCode.get(code);
+            if (!produitId) continue;
+            const objectif = c.final[item] ?? 0;
+            const rowId = idExistant.get(`${c.id}:${produitId}`);
+            if (rowId) updates.push({ id: rowId, objectif });
+            else inserts.push({ conseiller_id: c.id, produit_id: produitId, objectif, mois });
+        }
+    }
+
+    const resultatsUpdate = await Promise.all(
+        updates.map((u) => supabase.from("objectifs_mensuels").update({ objectif: u.objectif }).eq("id", u.id))
+    );
+    const erreurUpdate = resultatsUpdate.find((r) => r.error)?.error;
+    if (erreurUpdate) throw erreurUpdate;
+    if (inserts.length > 0) {
+        const { error: errInsert } = await supabase.from("objectifs_mensuels").insert(inserts);
+        if (errInsert) throw errInsert;
+    }
 }
 
 export { COLONNE_TAUX };

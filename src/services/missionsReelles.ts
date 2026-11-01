@@ -3,17 +3,26 @@ import { getVentesDuJour, getVentesDuMois, getVentesDepuisLundi } from "@/servic
 import { getJoursTravail, getJoursTravailPlage } from "@/services/planningService";
 import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import { getCoeffRecapCommercial } from "@/services/recapCommercialConfig";
+import { getRealiseVentesComboMoisCourant, RealiseVentesCombo } from "@/services/variableConseiller";
 import { calculerObjectifs, EtatObjectif } from "@/engine/objectifEngine";
 import { periodeSemaineEffective } from "@/utils/periodes";
 import { PRODUITS_ORDRE, type ProduitCode } from "@/utils/produits";
 import { supabase } from "@/lib/supabase";
+
+/** McAfee Mobile, Assurance essentielle, Canal+ : pas de ligne dans `ventes` (déclarés via les
+ *  questions de rebond des ventes combo, pas comme un acte "produit" classique) — leur réalisé
+ *  vient de getRealiseVentesComboMoisCourant() à la place. Visibles uniquement sur la vue
+ *  Objectifs (getMissionsCompletes), jamais sur l'Accueil (getMissionsReelles et le Cerebro
+ *  Check du matin les excluent tous les deux — aucune correction manuelle possible pour ces
+ *  3 items, leur réalisé ne vient pas de la table `ventes`). */
+export const CODES_VENTES_COMBO = ["mcafee_mobile", "assurance_essentielle", "canal_plus"] as const;
 
 /** Nom affiché → code produit. Priorité au mapping canonique (le nom affiché peut diverger
  *  du code réel en base, ex. "Récap Co" affiché mais code resté "recap_commercial"). */
 function codeDepuisNom(nom: string): string {
     const connu = PRODUITS_ORDRE.find((p) => p.label === nom)?.code;
     if (connu) return connu;
-    return nom.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ /g, "_");
+    return nom.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\+/g, " plus").replace(/ /g, "_");
 }
 
 type ProduitLie = { nom: string; code: string };
@@ -26,24 +35,30 @@ function getProduit(produits: ProduitLie | ProduitLie[] | null) {
 }
 
 export function couleurProduit(produit: string): string {
-    if (produit === "Box")              return "bg-green-500";
-    if (produit === "Forfaits")         return "bg-blue-500";
-    if (produit === "Téléphones")       return "bg-purple-500";
-    if (produit === "McAfee")           return "bg-orange-500";
-    if (produit === "Avis Google")      return "bg-yellow-500";
-    if (produit === "Récap Co")         return "bg-teal-500";
-    if (produit === "Spiderhome")       return "bg-sky-500";
+    if (produit === "Box")                   return "bg-green-500";
+    if (produit === "Forfaits")              return "bg-blue-500";
+    if (produit === "Téléphones")            return "bg-purple-500";
+    if (produit === "McAfee")                return "bg-orange-500";
+    if (produit === "Avis Google")           return "bg-yellow-500";
+    if (produit === "Récap Co")              return "bg-teal-500";
+    if (produit === "Spiderhome")            return "bg-sky-500";
+    if (produit === "McAfee Mobile")         return "bg-amber-500";
+    if (produit === "Assurance Essentielle") return "bg-rose-500";
+    if (produit === "Canal+")                return "bg-indigo-500";
     return "bg-red-500";
 }
 
 export function couleurGradientProduit(produit: string): string {
-    if (produit === "Box")              return "from-green-500 to-emerald-400";
-    if (produit === "Forfaits")         return "from-blue-500 to-cyan-400";
-    if (produit === "Téléphones")       return "from-purple-500 to-violet-400";
-    if (produit === "McAfee")           return "from-orange-500 to-amber-400";
-    if (produit === "Avis Google")      return "from-yellow-500 to-amber-400";
-    if (produit === "Récap Co")         return "from-teal-500 to-emerald-400";
-    if (produit === "Spiderhome")       return "from-sky-500 to-cyan-400";
+    if (produit === "Box")                   return "from-green-500 to-emerald-400";
+    if (produit === "Forfaits")              return "from-blue-500 to-cyan-400";
+    if (produit === "Téléphones")            return "from-purple-500 to-violet-400";
+    if (produit === "McAfee")                return "from-orange-500 to-amber-400";
+    if (produit === "Avis Google")           return "from-yellow-500 to-amber-400";
+    if (produit === "Récap Co")              return "from-teal-500 to-emerald-400";
+    if (produit === "Spiderhome")            return "from-sky-500 to-cyan-400";
+    if (produit === "McAfee Mobile")         return "from-amber-500 to-orange-400";
+    if (produit === "Assurance Essentielle") return "from-rose-500 to-red-400";
+    if (produit === "Canal+")                return "from-indigo-500 to-violet-400";
     return "from-red-500 to-rose-400";
 }
 
@@ -67,13 +82,22 @@ export type MissionComplete = {
 
 type VentesGetter = (id: string) => Promise<VenteSupabase[]>;
 
-async function calcul(conseillerId: string, annee: number, mois: number, ventesGetter: VentesGetter = getVentesDuMois) {
-    const [objectifs, ventes, joursTravail, coeffRecap] = await Promise.all([
+async function calcul(
+    conseillerId: string,
+    annee: number,
+    mois: number,
+    ventesGetter: VentesGetter = getVentesDuMois,
+    excludeCodes: readonly string[] = []
+) {
+    const exclude = new Set(excludeCodes);
+    const [objectifsBruts, ventes, joursTravail, coeffRecap, realiseCombo] = await Promise.all([
         getObjectifsMensuels(conseillerId) as Promise<ObjectifSupabase[]>,
         ventesGetter(conseillerId) as Promise<VenteSupabase[]>,
         getJoursTravail(conseillerId, annee, mois),
         getCoeffRecapCommercial(),
+        getRealiseVentesComboMoisCourant(conseillerId),
     ]);
+    const objectifs = objectifsBruts.filter((o) => !exclude.has(getProduit(o.produits)?.code ?? ""));
 
     const { travailles: joursTravailles, restants: joursRestants } = joursTravail;
 
@@ -82,9 +106,11 @@ async function calcul(conseillerId: string, annee: number, mois: number, ventesG
         const produitNom = produitObjectif?.nom ?? "Produit";
         const produitCode = produitObjectif?.code ?? "";
 
-        const realise = ventes
-            .filter((v) => getProduit(v.produits)?.code === produitCode)
-            .reduce((t, v) => t + v.quantite, 0);
+        const realise = (CODES_VENTES_COMBO as readonly string[]).includes(produitCode)
+            ? (realiseCombo[produitCode as keyof RealiseVentesCombo] ?? 0)
+            : ventes
+                .filter((v) => getProduit(v.produits)?.code === produitCode)
+                .reduce((t, v) => t + v.quantite, 0);
 
         // Spiderhome et Récap commercial : objectif mensuel auto = coeff × total jours planifiés du mois
         const objectifMensuel =
@@ -115,7 +141,8 @@ export async function getMissionsReelles(conseillerId: string) {
     const { debut, fin } = periodeSemaineEffective(now);
 
     const [resultats, ventesJour, objSemaineParConseiller, ventesSemaine, joursRestantsSemaine] = await Promise.all([
-        calcul(conseillerId, annee, mois, getVentesDuMois), // conserve le calcul mensuel (Spiderhome + messages)
+        // McAfee Mobile / Assurance essentielle / Canal+ : visibles uniquement sur la vue Objectifs, jamais sur l'Accueil.
+        calcul(conseillerId, annee, mois, getVentesDuMois, CODES_VENTES_COMBO),
         getVentesDuJour(conseillerId),
         getObjectifsSemaineFiges([conseillerId], debut, fin),
         getVentesDepuisLundi(conseillerId, debut),
@@ -171,10 +198,12 @@ export async function getMissionsReelles(conseillerId: string) {
     });
 }
 
-/** Vue complète (page Résultats : projections, état, historique) — ventes du MOIS entier */
-export async function getMissionsCompletes(conseillerId: string): Promise<MissionComplete[]> {
+/** Vue complète (page Résultats : projections, état, historique) — ventes du MOIS entier.
+ *  excludeCodes : utilisé par le Cerebro Check du matin pour retirer McAfee Mobile/Assurance
+ *  essentielle/Canal+ (pas de correction manuelle possible, leur réalisé ne vient pas de `ventes`). */
+export async function getMissionsCompletes(conseillerId: string, excludeCodes: readonly string[] = []): Promise<MissionComplete[]> {
     const now = new Date();
-    const resultats = await calcul(conseillerId, now.getFullYear(), now.getMonth() + 1, getVentesDuMois);
+    const resultats = await calcul(conseillerId, now.getFullYear(), now.getMonth() + 1, getVentesDuMois, excludeCodes);
 
     return resultats.map((m) => ({
         produit: m.produit,

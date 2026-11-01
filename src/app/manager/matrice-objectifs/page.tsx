@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
     getMoisMatriceDisponibles, getOuCreerMatriceConfig, mettreAJourMatriceConfig,
     versConfigCalcul, getConseillersActifs, getMatriceConseillers, upsertMatriceConseiller,
-    versConseillerCalcul, moisCourantISO,
+    versConseillerCalcul, moisCourantISO, appliquerMatriceVersObjectifsConseiller,
     MatriceConfigRow, MatriceConseillerRow, ConseillerActif,
 } from "@/services/matriceObjectifsData";
 import { calculerMatrice, ITEMS_PRINCIPAUX, PROFILS, Profil, ItemLieConfig } from "@/services/matriceObjectifs";
@@ -62,6 +62,7 @@ export default function MatriceObjectifsPage() {
     const [configEdits, setConfigEdits] = useState<Partial<MatriceConfigRow>>({});
     const [loading, setLoading] = useState(true);
     const [enregistrement, setEnregistrement] = useState(false);
+    const [application, setApplication] = useState(false);
     const [confirmation, setConfirmation] = useState<string | null>(null);
 
     async function charger(m: string) {
@@ -144,6 +145,17 @@ export default function MatriceObjectifsPage() {
             await charger(mois);
         } finally {
             setEnregistrement(false);
+        }
+    }
+
+    async function appliquerVersObjectifs() {
+        if (!resultat) return;
+        setApplication(true);
+        try {
+            await appliquerMatriceVersObjectifsConseiller(resultat);
+            setConfirmation("Objectifs conseiller mis à jour à partir de la matrice.");
+        } finally {
+            setApplication(false);
         }
     }
 
@@ -413,7 +425,17 @@ export default function MatriceObjectifsPage() {
 
             {/* ── Résultats ─────────────────────────────────────────────────── */}
             <div className="mt-8 overflow-x-auto rounded-[28px] border border-slate-200 bg-white p-5">
-                <p className="text-[10px] font-black uppercase tracking-[0.35em] text-violet-500">Objectifs calculés</p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.35em] text-violet-500">Objectifs calculés</p>
+                    <button
+                        onClick={appliquerVersObjectifs}
+                        disabled={application}
+                        title="Écrit ces 8 objectifs (Box, Forfaits, Téléphone, McAfee, Assurance, McAfee mobile, Assurance essentielle, Canal+) dans Objectifs conseiller, pour chaque conseiller listé ci-dessous."
+                        className="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-2 text-xs font-black text-white shadow-sm transition-all hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                        {application ? "Application..." : "Appliquer vers Objectifs conseiller"}
+                    </button>
+                </div>
                 <table className="mt-3 w-full min-w-[1100px] text-sm">
                     <thead>
                         <tr className="text-left text-[10px] font-bold uppercase tracking-wide text-slate-400">

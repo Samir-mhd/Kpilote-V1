@@ -515,6 +515,59 @@ export async function getContributionAssuranceMoisAffiche(
     };
 }
 
+export type RealiseVentesCombo = {
+    mcafee_mobile: number;
+    assurance_essentielle: number;
+    canal_plus: number;
+};
+
+/**
+ * Ventes du mois en cours pour les 3 items "déclarés lors des ventes combos" qui n'ont pas de
+ * ligne dans la table `ventes` (contrairement à Box/Forfaits/...) : McAfee Mobile (bonus manuel
+ * détecté par libellé) et Assurance essentielle (champ dédié) après un Forfait, Canal+ après une
+ * Box Ultra — mais ici au jour de la VENTE (objectif), pas au mois de paiement M+2 (variable).
+ * Canal+ : uniquement les options 2 et 3 (l'option 1 ne compte pas pour l'objectif conseiller).
+ */
+export async function getRealiseVentesComboMoisCourant(conseillerId: string): Promise<RealiseVentesCombo> {
+    const mois = moisCourant();
+    const [y, m] = mois.split("-").map(Number);
+    const debut = mois;
+    const fin = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+
+    const [{ data: bonusMcafee }, { data: actes }] = await Promise.all([
+        supabase
+            .from("variable_bonus_manuels")
+            .select("id, label, categorie")
+            .eq("categorie", "autres_primes"),
+        supabase
+            .from("variable_actes_jour")
+            .select("champ, label, bonus_manuel_id, quantite")
+            .eq("conseiller_id", conseillerId)
+            .gte("jour", debut)
+            .lte("jour", fin),
+    ]);
+
+    const idsMcafeeMobile = new Set(
+        (bonusMcafee ?? [])
+            .filter((b: { label: string }) => b.label.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes("mcafee"))
+            .map((b: { id: string }) => b.id)
+    );
+
+    const lignes = (actes ?? []) as { champ: string | null; label: string; bonus_manuel_id: string | null; quantite: number | null }[];
+
+    const assurance_essentielle = lignes
+        .filter((l) => l.champ === "assurance_essentielle")
+        .reduce((t, l) => t + (l.quantite ?? 1), 0);
+    const mcafee_mobile = lignes
+        .filter((l) => l.bonus_manuel_id && idsMcafeeMobile.has(l.bonus_manuel_id))
+        .reduce((t, l) => t + (l.quantite ?? 1), 0);
+    const canal_plus = lignes
+        .filter((l) => l.label === "Canal+ Option 2" || l.label === "Canal+ Option 3")
+        .reduce((t, l) => t + (l.quantite ?? 1), 0);
+
+    return { mcafee_mobile, assurance_essentielle, canal_plus };
+}
+
 /** Un bonus manuel "McAfee Mobile" (catégorie "autres_primes", libellé contenant "mcafee") est
  *  payé à M+2 comme le McAfee standalone : jamais synchronisé automatiquement, le conseiller le
  *  déclare lui-même chaque mois sur /dashboard/variable. Les bonus manuels sont une liste libre

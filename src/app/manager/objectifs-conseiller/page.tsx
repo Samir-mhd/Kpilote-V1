@@ -27,6 +27,9 @@ const PRODUITS_MANUELS = [
     { label: "McAfee",     code: "mcafee",     emoji: "🔒", text: "text-orange-600",  bg: "bg-orange-50/70",  border: "border-orange-100",  focus: "focus:border-orange-400 focus:ring-orange-100" },
     { label: "Assurance",  code: "assurance",  emoji: "🛡️", text: "text-red-600",     bg: "bg-red-50/70",     border: "border-red-100",     focus: "focus:border-red-400 focus:ring-red-100" },
     { label: "Avis Google", code: "avis_google", emoji: "⭐", text: "text-amber-600",  bg: "bg-amber-50/70",   border: "border-amber-100",   focus: "focus:border-amber-400 focus:ring-amber-100" },
+    { label: "McAfee Mobile",         code: "mcafee_mobile",         emoji: "📶", text: "text-amber-600", bg: "bg-amber-50/70", border: "border-amber-100", focus: "focus:border-amber-400 focus:ring-amber-100" },
+    { label: "Assurance Essentielle", code: "assurance_essentielle", emoji: "🧩", text: "text-rose-600",  bg: "bg-rose-50/70",  border: "border-rose-100",  focus: "focus:border-rose-400 focus:ring-rose-100" },
+    { label: "Canal+",                code: "canal_plus",            emoji: "📺", text: "text-indigo-600", bg: "bg-indigo-50/70", border: "border-indigo-100", focus: "focus:border-indigo-400 focus:ring-indigo-100" },
 ];
 
 // Spiderhome et Récap commercial : objectif auto (coeff × jours), pas un acte commercial →
