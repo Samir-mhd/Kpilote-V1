@@ -26,6 +26,8 @@ import {
 
     Euro,
 
+    LayoutGrid,
+
 } from "lucide-react";
 
 type Props = {
@@ -42,7 +44,8 @@ type Props = {
         | "box"
         | "users"
         | "settings"
-        | "euro";
+        | "euro"
+        | "grid";
 
     size?: number;
 
@@ -113,6 +116,10 @@ export default function KPIIcon({
         case "euro":
 
             return <Euro {...props}/>;
+
+        case "grid":
+
+            return <LayoutGrid {...props}/>;
 
         default:
 

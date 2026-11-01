@@ -32,6 +32,11 @@ const menu = [
         icon: "target" as const,
     },
     {
+        label: "Matrice objectifs",
+        href: "/manager/matrice-objectifs",
+        icon: "grid" as const,
+    },
+    {
         label: "Défis & Challenges",
         href: "/manager/defis",
         icon: "challenge" as const,
