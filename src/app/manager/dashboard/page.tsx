@@ -279,26 +279,6 @@ export default function ManagerDashboard() {
                 />
             )}
 
-            {/* ── Recommandation IA ────────────────────────────────────────── */}
-            {dashboard.recommandations.length > 0 && (
-                <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-r from-violet-600 to-indigo-600 p-7 shadow-[0_8px_32px_rgba(109,40,217,.30)]">
-                    <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5 blur-2xl pointer-events-none" />
-                    <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-                        <div className="flex items-start gap-4">
-                            <span className="text-3xl flex-shrink-0">💡</span>
-                            <div>
-                                <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-200 mb-1">Recommandation IA</p>
-                                <p className="text-lg font-black text-white">{dashboard.recommandations[0].titre}</p>
-                                <p className="mt-1 text-sm text-violet-100">{dashboard.recommandations[0].action}</p>
-                            </div>
-                        </div>
-                        <button className="flex-shrink-0 rounded-2xl bg-white px-6 py-3 font-black text-violet-700 shadow transition-all hover:scale-[1.02]">
-                            Lancer un challenge →
-                        </button>
-                    </div>
-                </div>
-            )}
-
         </main>
     );
 }

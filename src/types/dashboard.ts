@@ -1,5 +1,4 @@
 import { BriefManager } from "@/services/briefManager";
-import { RecommandationManager } from "@/services/recommandationsManager";
 import { ConseillerClassement } from "@/services/classementManager";
 import { CoachManagerResult } from "@/services/coachManager";
 
@@ -23,7 +22,6 @@ export type DashboardManagerData = {
   classement: ConseillerClassement[];
   coach: CoachManagerResult;
   briefs: BriefManager[];
-  recommandations: RecommandationManager[];
   realiseGlobal: number;
   objectifGlobal: number;
   tauxGlobal: number;

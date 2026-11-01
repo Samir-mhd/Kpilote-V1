@@ -4,7 +4,6 @@ import { fetchToutesLesLignes } from "@/utils/supabasePaging";
 import { construireClassementManager } from "./classementManager";
 import { construireCoachManager } from "./coachManager";
 import { construireBriefManager } from "./briefManager";
-import { construireRecommandationsManager } from "./recommandationsManager";
 
 import { couleursProduits } from "@/utils/colors";
 import { KPI } from "@/types/dashboard";
@@ -146,9 +145,6 @@ export async function construireDashboardManager() {
 
   });
 
-  const recommandations =
-    construireRecommandationsManager(kpis);
-
   return {
 
     conseillers: conseillers ?? [],
@@ -160,8 +156,6 @@ export async function construireDashboardManager() {
     coach,
 
     briefs,
-
-    recommandations,
 
     realiseGlobal,
 

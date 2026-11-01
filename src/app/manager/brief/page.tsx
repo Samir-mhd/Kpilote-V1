@@ -27,7 +27,6 @@ type ConseillerHier = {
 };
 type ProduitHier  = { code: string; label: string; emoji: string; total: number };
 type ProduitMois  = { code: string; label: string; emoji: string; ventes: number; objectif: number; taux: number; dailyTarget: number };
-type Proposition  = { type: "feliciter" | "encourager" | "focus" | "alerte" | "defi"; emoji: string; titre: string; detail: string };
 type ClassementLigne = { id: string; nom: string; prenom: string; total: number };
 type StreakLigne = { id: string; nom: string; prenom: string; streak: number; risque: boolean };
 
@@ -41,7 +40,6 @@ type BriefData = {
     totalMois: number; totalObjectif: number; tauxMois: number;
     joursRestants: number; rythmeNecessaire: number; rythmeActuel: number;
     scriptOral: string;
-    propositions: Proposition[];
     conseillers: { id: string; prenom: string }[];
     classementVendeur: ClassementLigne[];
     streaks: StreakLigne[];
@@ -79,7 +77,7 @@ function dateLabel(d: Date) {
 
 /* ─── Génération script oral ─────────────────────────────────────────────── */
 
-function genererScript(data: Omit<BriefData, "scriptOral" | "propositions" | "conseillers">): string {
+function genererScript(data: Omit<BriefData, "scriptOral" | "conseillers">): string {
     const segs: string[] = ["Bonjour l'équipe !"];
 
     if (data.totalHier === 0) {
@@ -122,87 +120,6 @@ function genererScript(data: Omit<BriefData, "scriptOral" | "propositions" | "co
     segs.push("C'est parti pour une belle journée ! 🚀");
     return segs.join(" ");
 }
-
-/* ─── Génération propositions ────────────────────────────────────────────── */
-
-function genererPropositions(data: Omit<BriefData, "scriptOral" | "propositions" | "conseillers">): Proposition[] {
-    const props: Proposition[] = [];
-
-    if (data.topPerformers.length > 0) {
-        const top = data.topPerformers[0];
-        props.push({
-            type: "feliciter", emoji: "🏆",
-            titre: `Féliciter ${top.prenom} devant l'équipe`,
-            detail: `${top.prenom} a réalisé ${top.total} vente${top.total > 1 ? "s" : ""} hier — la meilleure performance. Invitez-le·la à partager sa technique : un pitch, un argument, une approche qui a fonctionné.`,
-        });
-    }
-
-    const zero = data.enDifficulte.filter(c => c.total === 0);
-    if (zero.length > 0) {
-        const noms = zero.slice(0, 2).map(c => c.prenom).join(", ");
-        const plural = zero.length > 1;
-        props.push({
-            type: "encourager", emoji: "💬",
-            titre: `Check-in 5 min avec ${noms}`,
-            detail: `${plural ? "Ces conseillers n'ont" : `${noms} n'a`} enregistré aucune vente hier. Avant l'ouverture : identifier les freins (objections clients ? difficulté produit ?), proposer un accompagnement et fixer un mini-objectif pour la matinée.`,
-        });
-    } else if (data.enDifficulte.length > 0) {
-        const pen = data.enDifficulte[0];
-        props.push({
-            type: "encourager", emoji: "💬",
-            titre: `Mobiliser ${pen.prenom}`,
-            detail: `${pen.prenom} a fait ${pen.total} vente${pen.total > 1 ? "s" : ""} hier — en dessous du rythme. Un mot d'encouragement personnalisé et un objectif concret pour la journée peuvent changer la dynamique.`,
-        });
-    }
-
-    const prodFaible = [...data.produitsMois]
-        .filter(p => p.objectif > 0)
-        .sort((a, b) => a.taux - b.taux)[0];
-    if (prodFaible && prodFaible.taux < 75) {
-        props.push({
-            type: "focus", emoji: "🎯",
-            titre: `Sprint ${prodFaible.emoji} ${prodFaible.label} — 1 vente par conseiller avant 14h`,
-            detail: `${prodFaible.label} est à ${prodFaible.taux}% de l'objectif mensuel — le plus en retard. Annoncer un mini-challenge collectif : chaque conseiller vise 1 vente ${prodFaible.label} avant 14h. Cible journalière boutique : ${prodFaible.dailyTarget}.`,
-        });
-    }
-
-    if (data.tauxMois < 60 && data.joursRestants <= 12) {
-        props.push({
-            type: "alerte", emoji: "🚨",
-            titre: `Sprint final — ${data.rythmeNecessaire} ventes/jour nécessaires`,
-            detail: `Avec ${data.joursRestants} jours ouvrés restants et ${data.tauxMois}% de l'objectif atteint, la situation est tendue. Communiquer clairement la cible collective : ${data.rythmeNecessaire} ventes par jour. Afficher le compteur en temps réel sur KPILOTE.`,
-        });
-    } else if (data.rythmeNecessaire > 0 && data.rythmeActuel > 0 && data.rythmeNecessaire > data.rythmeActuel * 1.15) {
-        props.push({
-            type: "alerte", emoji: "📈",
-            titre: `Accélérer — cible ${data.rythmeNecessaire} ventes/jour`,
-            detail: `Rythme actuel : ${Math.round(data.rythmeActuel * 10) / 10} ventes/jour. Rythme nécessaire : ${data.rythmeNecessaire}. Partager cet écart à l'équipe pour créer la prise de conscience et l'élan collectif.`,
-        });
-    }
-
-    if (data.topPerformers.length >= 2) {
-        const [c1, c2] = data.topPerformers;
-        const prod = prodFaible?.label ?? "Forfaits";
-        const prodEmoji = prodFaible?.emoji ?? "📱";
-        props.push({
-            type: "defi", emoji: "⚔️",
-            titre: `Défi ${prodEmoji} ${prod} : ${c1.prenom} vs ${c2.prenom}`,
-            detail: `Les deux meilleurs vendeurs d'hier s'affrontent sur le produit prioritaire. Un défi visible stimule toute l'équipe — utilisez le bouton ci-dessous pour le lancer en 30 secondes.`,
-        });
-    }
-
-    return props.slice(0, 5);
-}
-
-/* ─── Couleurs ───────────────────────────────────────────────────────────── */
-
-const PROP_STYLE: Record<Proposition["type"], { bg: string; border: string; label: string; labelColor: string; numBg: string }> = {
-    feliciter: { bg: "bg-amber-50",   border: "border-amber-200",  label: "Reconnaissance",  labelColor: "text-amber-600",  numBg: "bg-amber-500"   },
-    encourager:{ bg: "bg-blue-50",    border: "border-blue-200",   label: "Coaching",        labelColor: "text-blue-600",   numBg: "bg-blue-500"    },
-    focus:     { bg: "bg-violet-50",  border: "border-violet-200", label: "Focus produit",   labelColor: "text-violet-600", numBg: "bg-violet-500"  },
-    alerte:    { bg: "bg-red-50",     border: "border-red-200",    label: "Urgence",         labelColor: "text-red-600",    numBg: "bg-red-500"     },
-    defi:      { bg: "bg-slate-900",  border: "border-slate-700",  label: "Challenge",       labelColor: "text-violet-400", numBg: "bg-violet-600"  },
-};
 
 /* ─── Composant principal ────────────────────────────────────────────────── */
 
@@ -355,7 +272,6 @@ export default function BriefPage() {
             setData({
                 ...partial,
                 scriptOral: genererScript(partial),
-                propositions: genererPropositions(partial),
                 conseillers: tousConseillers.map((c: any) => ({ id: c.id, prenom: c.nom.split(" ")[0] })),
             });
         } catch {
@@ -637,34 +553,6 @@ export default function BriefPage() {
                                         className={`h-full rounded-full transition-all duration-700 ${barColor}`}
                                         style={{ width: `${p.taux}%` }}
                                     />
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* ── Propositions d'action ─────────────────────────────────────── */}
-            <div>
-                <p className="mb-4 text-xs font-black uppercase tracking-[0.3em] text-slate-400">⚡ Propositions d'action pour aujourd'hui</p>
-                <div className="space-y-3">
-                    {data.propositions.map((prop, i) => {
-                        const style = PROP_STYLE[prop.type];
-                        const isDefi = prop.type === "defi";
-                        return (
-                            <div key={i} className={`flex items-start gap-5 rounded-[20px] border p-5 ${style.bg} ${style.border}`}>
-                                <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-black text-white ${style.numBg}`}>
-                                    {i + 1}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-0.5">
-                                        <span className="text-base">{prop.emoji}</span>
-                                        <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isDefi ? style.labelColor : style.labelColor}`}>
-                                            {style.label}
-                                        </span>
-                                    </div>
-                                    <p className={`font-black text-sm ${isDefi ? "text-white" : "text-slate-900"}`}>{prop.titre}</p>
-                                    <p className={`mt-1 text-xs leading-relaxed ${isDefi ? "text-white/60" : "text-slate-500"}`}>{prop.detail}</p>
                                 </div>
                             </div>
                         );
