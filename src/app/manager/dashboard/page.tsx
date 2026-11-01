@@ -421,9 +421,9 @@ export default function ManagerDashboard() {
 
             {/* ── Onglet Activité équipe ───────────────────────────────────── */}
             {tab === "activite" && (
-                <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+                <div className="space-y-6">
                     <MeteoEquipe />
-                    <TeamFeed conseillerId="" />
+                    <TeamFeed conseillerId="" grand />
                 </div>
             )}
 

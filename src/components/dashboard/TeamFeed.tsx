@@ -171,7 +171,7 @@ function extractProduit(v: any): { produitNom: string; produitCode: string } {
     return { produitNom: p.nom ?? p.code ?? "Produit", produitCode: p.code ?? "" };
 }
 
-export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
+export default function TeamFeed({ conseillerId, grand = false }: { conseillerId: string; grand?: boolean }) {
     const [entries, setEntries] = useState<Entry[]>([]);
     const [dbError, setDbError] = useState<string | null>(null);
     const namesRef    = useRef<Record<string, string>>({});
@@ -367,54 +367,57 @@ export default function TeamFeed({ conseillerId }: { conseillerId: string }) {
         return () => { supabase.removeChannel(channel); };
     }, []);
 
+    const visibleRows = grand ? 10 : 5;
+    const rowHeight = grand ? 78 : 62;
+
     return (
-        <div className="rounded-[24px] bg-white p-6 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
-            <div className="mb-5 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-50 text-xl">⚡</div>
+        <div className={`rounded-[24px] bg-white shadow-[0_4px_24px_rgba(15,23,42,.07)] ${grand ? "p-8" : "p-6"}`}>
+            <div className={`flex items-center gap-3 ${grand ? "mb-6" : "mb-5"}`}>
+                <div className={`flex items-center justify-center rounded-2xl bg-violet-50 ${grand ? "h-14 w-14 text-3xl" : "h-10 w-10 text-xl"}`}>⚡</div>
                 <div className="flex-1">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">Live</p>
-                    <p className="text-sm font-black text-slate-900">Ventes équipe</p>
+                    <p className={`font-bold uppercase tracking-[0.3em] text-slate-400 ${grand ? "text-xs" : "text-[10px]"}`}>Live</p>
+                    <p className={`font-black text-slate-900 ${grand ? "text-2xl" : "text-sm"}`}>Ventes équipe</p>
                 </div>
-                <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                <span className={`inline-flex rounded-full bg-green-500 animate-pulse ${grand ? "h-3 w-3" : "h-2 w-2"}`} />
             </div>
 
             {dbError ? (
                 <p className="py-4 rounded-xl bg-red-50 px-4 text-xs text-red-500 font-mono break-all">{dbError}</p>
             ) : entries.length === 0 ? (
-                <p className="py-6 text-center text-sm text-slate-300">
+                <p className={`text-center text-slate-300 ${grand ? "py-12 text-base" : "py-6 text-sm"}`}>
                     Pas encore de vente aujourd'hui — soyez le premier ! 🚀
                 </p>
             ) : (
                 <>
                     <div
                         className="space-y-2 overflow-y-auto pr-1"
-                        style={{ maxHeight: "calc(5 * 62px + 4 * 8px)" }}
+                        style={{ maxHeight: `calc(${visibleRows} * ${rowHeight}px + ${visibleRows - 1} * 8px)` }}
                     >
                         {entries.map((e) => {
                             const isMoi = e.conseiller_id === conseillerId;
                             return (
                                 <div
                                     key={e.id}
-                                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
+                                    className={`flex items-center gap-3 rounded-2xl transition-all ${grand ? "px-5 py-4" : "px-4 py-3"} ${
                                         isMoi ? "bg-violet-50 border border-violet-100" : "bg-slate-50"
                                     } ${e.isNew ? "animate-feedIn" : ""}`}
                                 >
-                                    <CartoonAvatar prenom={e.nom} etat="souriant_main" size={34} />
+                                    <CartoonAvatar prenom={e.nom} etat="souriant_main" size={grand ? 46 : 34} />
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-semibold text-slate-900 leading-snug">
+                                        <p className={`font-semibold text-slate-900 leading-snug ${grand ? "text-base" : "text-sm"}`}>
                                             {e.message}
                                             {isMoi && <span className="ml-1.5 text-[10px] font-bold text-violet-500">(toi)</span>}
                                         </p>
                                     </div>
                                     <div className="flex-shrink-0 text-right">
-                                        <p className="text-xs font-black text-green-600">+1</p>
-                                        <p className="text-[10px] text-slate-300">{timeAgo(e.created_at)}</p>
+                                        <p className={`font-black text-green-600 ${grand ? "text-sm" : "text-xs"}`}>+1</p>
+                                        <p className={`text-slate-300 ${grand ? "text-xs" : "text-[10px]"}`}>{timeAgo(e.created_at)}</p>
                                     </div>
                                 </div>
                             );
                         })}
                     </div>
-                    {entries.length > 5 && (
+                    {entries.length > visibleRows && (
                         <p className="mt-3 text-center text-[10px] text-slate-300">
                             {entries.length} ventes aujourd'hui · défiler pour tout voir
                         </p>
