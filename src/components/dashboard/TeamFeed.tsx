@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { PRODUITS_ORDRE } from "@/utils/produits";
+import { PRODUITS_ORDRE, PRODUITS_HORS_ACTES, type ProduitCode } from "@/utils/produits";
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 
 type Entry = {
@@ -215,10 +215,10 @@ export default function TeamFeed({ conseillerId, grand = false }: { conseillerId
             namesRef.current = map;
             actifsRef.current = amap;
 
-            // Spiderhome = historisation, profil désactivé = restreint → exclus du feed (comme partout ailleurs)
+            // Spiderhome/Avis Google/Récap Co = pas des actes commerciaux, profil désactivé = restreint → exclus du feed (comme partout ailleurs)
             const rawVentes = (resV.data ?? []).filter((v: any) =>
                 v.source !== "cerebro_check"
-                && extractProduit(v).produitCode !== "spiderhome"
+                && !PRODUITS_HORS_ACTES.includes(extractProduit(v).produitCode as ProduitCode)
                 && amap[v.conseiller_id] !== false
             );
 
@@ -295,7 +295,7 @@ export default function TeamFeed({ conseillerId, grand = false }: { conseillerId
             .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventes" }, async (payload: any) => {
                 const v = payload.new;
                 if (v.source === "cerebro_check") return;
-                if (produitsRef.current[v.produit_id] === "spiderhome") return;
+                if (PRODUITS_HORS_ACTES.includes(produitsRef.current[v.produit_id] as ProduitCode)) return;
                 if (actifsRef.current[v.conseiller_id] === false) return;
 
                 const cid = v.conseiller_id;

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 import type { AvatarEtat } from "@/components/avatar/CartoonAvatar";
+import { PRODUITS_HORS_ACTES, type ProduitCode } from "@/utils/produits";
 
 type ConseillerMeteo = {
     id: string;
@@ -65,28 +66,32 @@ export default function MeteoEquipe() {
                 .eq("jour", today),
             supabase
                 .from("ventes")
-                .select("conseiller_id, created_at, source, produits(code)")
+                .select("conseiller_id, created_at, source, quantite, produits(code)")
                 .gte("created_at", debut.toISOString()),
         ]);
 
         const tous       = resC.data ?? [];
         const planning   = resP.data ?? [];
-        // Spiderhome = historisation, pas un acte commercial → exclu (comme partout ailleurs)
+        // Spiderhome, Avis Google, Récap Co : pas des actes commerciaux → exclus (comme partout ailleurs)
         const ventesRaw  = (resV.data ?? []).filter((v: any) => {
             if (v.source === "cerebro_check") return false;
             const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code;
-            return code !== "spiderhome";
+            return !PRODUITS_HORS_ACTES.includes(code as ProduitCode);
         });
 
         // Map statut planning : absent = explicitement off/formation/congé/etc.
         const statutMap: Record<string, string> = {};
         planning.forEach((p: any) => { statutMap[p.conseiller_id] = p.statut; });
 
-        // Regrouper les timestamps de ventes par conseiller
+        // Regrouper les timestamps de ventes par conseiller (pour l'humeur) et le total net
+        // (somme des quantités, pas le nombre de lignes — une correction manager a une quantité
+        // négative et doit réduire le total, pas en ajouter une de plus)
         const ventesMap: Record<string, number[]> = {};
+        const ventesQuantiteMap: Record<string, number> = {};
         ventesRaw.forEach((v: any) => {
             if (!ventesMap[v.conseiller_id]) ventesMap[v.conseiller_id] = [];
             ventesMap[v.conseiller_id].push(new Date(v.created_at).getTime());
+            ventesQuantiteMap[v.conseiller_id] = (ventesQuantiteMap[v.conseiller_id] ?? 0) + (v.quantite ?? 1);
         });
 
         const result: ConseillerMeteo[] = tous
@@ -102,7 +107,7 @@ export default function MeteoEquipe() {
                 id:        c.id,
                 nom:       c.nom,
                 etat:      computeEtatManager(ventesMap[c.id] ?? []),
-                ventesAuj: (ventesMap[c.id] ?? []).length,
+                ventesAuj: Math.max(ventesQuantiteMap[c.id] ?? 0, 0),
             }))
             // Trier : en_feu d'abord, puis par nb de ventes desc
             .sort((a, b) => {
