@@ -32,12 +32,13 @@ const PRODUITS_MANUELS = [
     { label: "Canal+",                code: "canal_plus",            emoji: "📺", text: "text-indigo-600", bg: "bg-indigo-50/70", border: "border-indigo-100", focus: "focus:border-indigo-400 focus:ring-indigo-100" },
 ];
 
-// Spiderhome et Récap commercial : objectif auto (coeff × jours), pas un acte commercial →
-// encarts à part, affichés côte à côte hors de la grille des actes, toujours présents en PDF.
+// Récap commercial : objectif auto (coeff × jours), pas un acte commercial → encart à part,
+// affiché hors de la grille des actes, toujours présent en PDF. Spiderhome n'apparaît pas dans
+// le récap imprimé. Avis Google est repoussé en dernière colonne du PDF.
 const colonnesProduits = [
-    ...PRODUITS_MANUELS.map((p) => ({ label: p.label, code: p.code })),
-    { label: "Spiderhome", code: "spiderhome", auto: true },
+    ...PRODUITS_MANUELS.filter((p) => p.code !== "avis_google").map((p) => ({ label: p.label, code: p.code })),
     { label: "Récap Co", code: "recap_commercial", auto: true },
+    { label: "Avis Google", code: "avis_google" },
 ];
 
 type LigneConseiller = {
@@ -148,22 +149,18 @@ export default function ObjectifsConseillerPage() {
     }
 
     function handleExportPDF() {
-        const lignesAvecSpider = lignes.map((l) => ({
+        const lignesAvecRecap = lignes.map((l) => ({
             ...l,
             photoUrl: photos[l.conseillerId] ?? null,
             cellules: {
                 ...l.cellules,
-                spiderhome: {
-                    id: l.cellules["spiderhome"]?.id ?? "",
-                    objectif: coeff * (joursPlanifies[l.conseillerId] ?? 0),
-                },
                 recap_commercial: {
                     id: l.cellules["recap_commercial"]?.id ?? "",
                     objectif: coeffRecap * (joursPlanifies[l.conseillerId] ?? 0),
                 },
             },
         }));
-        exporterObjectifsPDF(lignesAvecSpider, colonnesProduits);
+        exporterObjectifsPDF(lignesAvecRecap, colonnesProduits);
     }
 
     async function handleExportSemainePDF() {
@@ -186,10 +183,6 @@ export default function ObjectifsConseillerPage() {
                     };
                 }
             });
-            cellules["spiderhome"] = {
-                id: l.cellules["spiderhome"]?.id ?? "",
-                objectif: coeff * (joursSemaine[l.conseillerId] ?? 0),
-            };
             cellules["recap_commercial"] = {
                 id: l.cellules["recap_commercial"]?.id ?? "",
                 objectif: coeffRecap * (joursSemaine[l.conseillerId] ?? 0),

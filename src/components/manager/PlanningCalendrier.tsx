@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { getPlanningMois, savePlanning, genererPrePlanificationTous, StatutJour } from "@/services/planningService";
+import { invaliderObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 
 type Conseiller = { id: string; nom: string };
 type Props = { conseillers: Conseiller[] };
@@ -106,6 +107,7 @@ export default function PlanningCalendrier({ conseillers }: Props) {
         try {
             // Boutique + tous les conseillers
             await genererPrePlanificationTous([BOUTIQUE_ID, ...conseillers.map(c => c.id)], annee, mois);
+            await invaliderObjectifsSemaineFiges(conseillers.map(c => c.id)).catch(() => {});
             const data = await getPlanningMois(conseillerId, annee, mois).catch(() => null);
             if (data) setPlanning(data);
             setModifications({});
@@ -125,6 +127,9 @@ export default function PlanningCalendrier({ conseillers }: Props) {
         setErreurMsg("");
         try {
             await savePlanning(conseillerId, modifications);
+            if (conseillerId !== BOUTIQUE_ID) {
+                await invaliderObjectifsSemaineFiges([conseillerId]).catch(() => {});
+            }
             // Recharge pour confirmer ce qui est en base
             const fresh = await getPlanningMois(conseillerId, annee, mois).catch(() => null);
             if (fresh !== null) {
