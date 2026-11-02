@@ -17,6 +17,7 @@ import { exporterObjectifsPDF, exporterObjectifsSemainePDF } from "@/utils/expor
 import { periodeSemaineEffective } from "@/utils/periodes";
 import { getObjectifsSemaineFiges, invaliderObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import { getCoeffRecapCommercial, sauvegarderCoeffRecapCommercial } from "@/services/recapCommercialConfig";
+import { getCoeffAvisGoogle, sauvegarderCoeffAvisGoogle } from "@/services/avisGoogleConfig";
 import type { ProduitCode } from "@/utils/produits";
 import Link from "next/link";
 
@@ -76,12 +77,14 @@ export default function ObjectifsConseillerPage() {
     const [joursPlanifies, setJoursPlanifies]     = useState<Record<string, number>>({});
     const [coeff, setCoeff]                       = useState(25);
     const [coeffRecap, setCoeffRecap]             = useState(1);
+    const [coeffAvis, setCoeffAvis]               = useState(1);
     const [photos, setPhotos]                     = useState<Record<string, string | null>>({});
 
     useEffect(() => {
         const stored = localStorage.getItem("spiderhome_coeff");
         if (stored) setCoeff(Math.max(1, Number(stored) || 25));
         getCoeffRecapCommercial().then((c) => setCoeffRecap(Math.max(1, c || 1)));
+        getCoeffAvisGoogle().then((c) => setCoeffAvis(Math.max(0, c ?? 1)));
     }, []);
 
     async function charger() {
@@ -114,6 +117,15 @@ export default function ObjectifsConseillerPage() {
         const v = Math.max(1, Math.min(999, isNaN(val) ? 1 : val));
         setCoeffRecap(v);
         sauvegarderCoeffRecapCommercial(v);
+    }
+
+    // Change l'objectif mensuel Avis Google de tout le monde → l'objectif semaine figé (calculé
+    // avec l'ancien coefficient) doit être recalculé.
+    async function handleCoeffAvis(val: number) {
+        const v = Math.max(0, Math.min(99, isNaN(val) ? 1 : val));
+        setCoeffAvis(v);
+        await sauvegarderCoeffAvisGoogle(v);
+        await invaliderObjectifsSemaineFiges(regrouperParConseiller(rows).map((l) => l.conseillerId));
     }
 
     if (loading) {
@@ -157,6 +169,10 @@ export default function ObjectifsConseillerPage() {
                 recap_commercial: {
                     id: l.cellules["recap_commercial"]?.id ?? "",
                     objectif: coeffRecap * (joursPlanifies[l.conseillerId] ?? 0),
+                },
+                avis_google: {
+                    id: l.cellules["avis_google"]?.id ?? "",
+                    objectif: Math.round(coeffAvis * (joursPlanifies[l.conseillerId] ?? 0)),
                 },
             },
         }));
@@ -286,6 +302,22 @@ export default function ObjectifsConseillerPage() {
                                     />
                                     <span className="text-[10px] font-semibold text-white/40">× jours</span>
                                 </div>
+
+                                {/* Coefficient journalier Avis Google */}
+                                <div className="flex items-center gap-2 rounded-xl bg-white/8 px-3 py-1.5">
+                                    <span className="text-sm">⭐</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-wide text-amber-300">Avis/j</span>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        max={99}
+                                        step={0.5}
+                                        value={coeffAvis}
+                                        onChange={(e) => handleCoeffAvis(Number(e.target.value))}
+                                        className="w-12 rounded-lg border border-white/15 bg-slate-950 px-1 py-1 text-center text-sm font-black text-amber-300 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20"
+                                    />
+                                    <span className="text-[10px] font-semibold text-white/40">× jours</span>
+                                </div>
                             </div>
                         </div>
 
@@ -322,7 +354,7 @@ export default function ObjectifsConseillerPage() {
 
                                             {/* Grille produits */}
                                             <div className="grid grid-cols-3 gap-1.5 p-2 sm:grid-cols-8">
-                                                {PRODUITS_MANUELS.map((prod) => {
+                                                {PRODUITS_MANUELS.filter((prod) => prod.code !== "avis_google").map((prod) => {
                                                     const cellule = ligne.cellules[prod.code];
                                                     return (
                                                         <div key={prod.code} className={`flex flex-col gap-1 rounded-xl border p-2 ${prod.bg} ${prod.border}`}>
@@ -351,6 +383,20 @@ export default function ObjectifsConseillerPage() {
                                                         </div>
                                                     );
                                                 })}
+
+                                                {/* Avis Google auto — objectif mensuel = coeff × jours planifiés */}
+                                                <div className="flex flex-col gap-1 rounded-xl border border-amber-100 bg-amber-50/70 p-2">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-xs">⭐</span>
+                                                        <span className="text-[9px] font-black uppercase tracking-wide text-amber-600">Avis Google</span>
+                                                    </div>
+                                                    <div className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-amber-200 bg-white/70 py-1">
+                                                        <span className="text-base font-black text-amber-700 tabular-nums">
+                                                            {Math.round(coeffAvis * jours)}
+                                                        </span>
+                                                        <span className="text-[9px] text-amber-500">auto</span>
+                                                    </div>
+                                                </div>
 
                                                 {/* Spiderhome auto */}
                                                 <div className="flex flex-col gap-1 rounded-xl border border-sky-100 bg-sky-50/70 p-2">

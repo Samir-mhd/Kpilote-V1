@@ -7,6 +7,7 @@ import { PRODUITS_ORDRE, PRODUITS_HORS_TOTAL_CLASSEMENT, ProduitCode } from "@/u
 import { Periode, dateDebutPeriode } from "@/utils/periodes";
 import { fetchToutesLesLignes } from "@/utils/supabasePaging";
 import { getMoyenneArticlesParConseiller } from "@/services/ventesTransactions";
+import { getObjectifsAvisGoogleMois } from "@/services/avisGoogleConfig";
 
 export type ConseillerStats = {
     id: string;
@@ -98,6 +99,12 @@ export async function construireClassementPeriode(
         if (code && row.objectifs[code] !== undefined) {
             row.objectifs[code] += o.objectif ?? 0;
         }
+    });
+
+    // Avis Google : objectif mensuel auto (coeff × jours planifiés), pas la saisie manuelle.
+    const avisGoogleMois = await getObjectifsAvisGoogleMois([...map.keys()]).catch(() => ({} as Record<string, number>));
+    map.forEach((row) => {
+        if (avisGoogleMois[row.id] !== undefined) row.objectifs.avis_google = avisGoogleMois[row.id];
     });
 
     // Moyenne d'articles par vente, sur la même période

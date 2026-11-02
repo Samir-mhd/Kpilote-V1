@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { fetchToutesLesLignes } from "@/utils/supabasePaging";
+import { getObjectifsAvisGoogleMois } from "@/services/avisGoogleConfig";
 
 export type ObjectifsProduits = {
   box: number;
@@ -179,6 +180,12 @@ export async function construireClassementManager() {
 
   appliquerVentes(classement, ventes ?? []);
   appliquerObjectifs(classement, objectifs ?? []);
+
+  // Avis Google : objectif mensuel auto (coeff × jours planifiés), pas la saisie manuelle.
+  const avisGoogleMois = await getObjectifsAvisGoogleMois(classement.map((c) => c.id)).catch(() => ({} as Record<string, number>));
+  classement.forEach((c) => {
+    if (avisGoogleMois[c.id] !== undefined) c.objectifs.avis_google = avisGoogleMois[c.id];
+  });
 
   classement.sort((a, b) => b.ventes - a.ventes);
 

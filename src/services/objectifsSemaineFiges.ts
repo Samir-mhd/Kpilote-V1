@@ -11,6 +11,7 @@ import { fetchToutesLesLignes } from "@/utils/supabasePaging";
 import { periodeSemaineEffective } from "@/utils/periodes";
 import { getRealiseVentesComboParConseiller } from "@/services/variableConseiller";
 import type { ComboCode } from "@/utils/classementGroupes";
+import { getObjectifsAvisGoogleMois } from "@/services/avisGoogleConfig";
 
 function dateStr(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -78,9 +79,10 @@ export async function getObjectifsSemaineFiges(
 
     if (manquants.length === 0) return result as Record<string, Record<ProduitCode, number>>;
 
-    const [{ data: objectifsMensuels }, { data: produits }] = await Promise.all([
+    const [{ data: objectifsMensuels }, { data: produits }, avisGoogleMois] = await Promise.all([
         supabase.from("objectifs_mensuels").select("conseiller_id, objectif, produits(code)").in("conseiller_id", conseillerIds),
         supabase.from("produits").select("id, code").in("code", CODES_FIGES),
+        getObjectifsAvisGoogleMois(conseillerIds, debut),
     ]);
 
     const produitIdParCode: Record<string, string> = {};
@@ -92,6 +94,10 @@ export async function getObjectifsSemaineFiges(
         if (!code) return;
         if (!objMensuelMap[o.conseiller_id]) objMensuelMap[o.conseiller_id] = {};
         objMensuelMap[o.conseiller_id][code] = (objMensuelMap[o.conseiller_id][code] ?? 0) + (o.objectif ?? 0);
+    });
+    // Avis Google : objectif mensuel auto (coeff × jours planifiés), pas la saisie manuelle.
+    Object.entries(avisGoogleMois).forEach(([conseillerId, objectif]) => {
+        (objMensuelMap[conseillerId] ??= {})["avis_google"] = objectif;
     });
 
     // Réalisé du mois AVANT le début de la semaine : le figé donne le même résultat qu'il soit

@@ -3,6 +3,7 @@ import { getVentesDuJour, getVentesDuMois, getVentesDepuisLundi } from "@/servic
 import { getJoursTravail, getJoursTravailPlage } from "@/services/planningService";
 import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import { getCoeffRecapCommercial } from "@/services/recapCommercialConfig";
+import { getCoeffAvisGoogle } from "@/services/avisGoogleConfig";
 import { getRealiseVentesComboMoisCourant, getRealiseVentesCombo, RealiseVentesCombo } from "@/services/variableConseiller";
 import { calculerObjectifs, EtatObjectif } from "@/engine/objectifEngine";
 import { periodeSemaineEffective } from "@/utils/periodes";
@@ -90,11 +91,12 @@ async function calcul(
     excludeCodes: readonly string[] = []
 ) {
     const exclude = new Set(excludeCodes);
-    const [objectifsBruts, ventes, joursTravail, coeffRecap, realiseCombo] = await Promise.all([
+    const [objectifsBruts, ventes, joursTravail, coeffRecap, coeffAvisGoogle, realiseCombo] = await Promise.all([
         getObjectifsMensuels(conseillerId) as Promise<ObjectifSupabase[]>,
         ventesGetter(conseillerId) as Promise<VenteSupabase[]>,
         getJoursTravail(conseillerId, annee, mois),
         getCoeffRecapCommercial(),
+        getCoeffAvisGoogle(),
         getRealiseVentesComboMoisCourant(conseillerId),
     ]);
     const objectifs = objectifsBruts.filter((o) => !exclude.has(getProduit(o.produits)?.code ?? ""));
@@ -112,10 +114,11 @@ async function calcul(
                 .filter((v) => getProduit(v.produits)?.code === produitCode)
                 .reduce((t, v) => t + v.quantite, 0);
 
-        // Spiderhome et Récap commercial : objectif mensuel auto = coeff × total jours planifiés du mois
+        // Spiderhome, Récap commercial et Avis Google : objectif mensuel auto = coeff × total jours planifiés du mois
         const objectifMensuel =
             produitCode === "spiderhome" ? 25 * (joursTravailles + joursRestants)
             : produitCode === "recap_commercial" ? coeffRecap * (joursTravailles + joursRestants)
+            : produitCode === "avis_google" ? Math.round(coeffAvisGoogle * (joursTravailles + joursRestants))
             : objectif.objectif;
 
         return { produit: produitNom, objectifMensuel, realise, joursTravailles, joursRestants };
