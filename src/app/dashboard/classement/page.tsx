@@ -11,6 +11,7 @@ import { getJoursTravailPlageTous } from "@/services/planningService";
 import type { ProduitCode } from "@/utils/produits";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
+import PodiumTopPerformers from "@/components/dashboard/PodiumTopPerformers";
 import { supabase } from "@/lib/supabase";
 import { getRealiseVentesComboParConseiller, getObjectifsComboParConseiller, RealiseVentesCombo } from "@/services/variableConseiller";
 import { GROUPES, GroupeId, COMBO_META, ComboCode } from "@/utils/classementGroupes";
@@ -182,11 +183,6 @@ function ClassementInner() {
 
     const monRang = classement.findIndex(c => c.id === conseillerId) + 1;
     const monRangTrophees = trophees.findIndex(c => c.id === conseillerId) + 1;
-    const top3    = classement.slice(0, 3);
-    const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : [];
-    const podiumRangs = [2, 1, 3];
-    const podiumH     = ["h-20", "h-28", "h-16"];
-    const podiumSizes = [56, 72, 56];
 
     const groupeActif = GROUPES.find((g) => g.id === groupe) ?? GROUPES[0];
     const produitsGroupeCourant = PRODUITS_CLASSEMENT.filter((p) => groupeActif.codesCore.includes(p.code));
@@ -315,40 +311,7 @@ function ClassementInner() {
                 </div>
             ) : (
                 <>
-                    {/* Podium */}
-                    {podiumOrder.length === 3 && (
-                        <div className="rounded-[24px] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
-                            <p className="mb-6 text-center text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
-                                🏆 Top performers — {PERIODE_LABELS[periode]}
-                            </p>
-                            <div className="flex items-end justify-center gap-4">
-                                {podiumOrder.map((c, i) => {
-                                    const rang  = podiumRangs[i];
-                                    const first = rang === 1;
-                                    const isMoi = c.id === conseillerId;
-                                    return (
-                                        <div key={c.id} className="flex flex-col items-center gap-3">
-                                            <div className="relative">
-                                                {first && <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xl">👑</span>}
-                                                <div className={`overflow-hidden rounded-full shadow-lg ${isMoi ? "ring-4 ring-green-500" : "ring-2 ring-slate-100"}`}>
-                                                    <PhotoAvatar nom={c.nom} photoUrl={photos[c.id]} size={podiumSizes[i]} />
-                                                </div>
-                                            </div>
-                                            <div className="text-center">
-                                                <p className={`font-black ${isMoi ? "text-green-700" : "text-slate-800"}`}>{c.nom}</p>
-                                                <p className="text-sm text-slate-400">{c.total} ventes</p>
-                                            </div>
-                                            <div className={`flex ${podiumH[i]} w-24 flex-col items-center justify-center rounded-t-2xl ${
-                                                rang === 1 ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-slate-200"
-                                            }`}>
-                                                <span className="text-2xl">{medals[rang - 1]}</span>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
+                    <PodiumTopPerformers classement={classement} conseillerId={conseillerId} periode={periode} />
 
                     {/* Tableau détaillé style manager équipe */}
                     <div className="overflow-hidden rounded-[24px] bg-white shadow-[0_4px_24px_rgba(15,23,42,.07)]">
