@@ -10,6 +10,7 @@ import { getJoursTravailPlageTous } from "@/services/planningService";
 import type { ProduitCode } from "@/utils/produits";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
+import PodiumTopPerformers from "@/components/dashboard/PodiumTopPerformers";
 import FelicitationCard from "@/components/manager/FelicitationCard";
 import { feliciterConseiller } from "@/services/congratulationService";
 import { getRealiseVentesComboParConseiller, getObjectifsComboParConseiller, RealiseVentesCombo } from "@/services/variableConseiller";
@@ -160,7 +161,6 @@ export default function ClassementPage() {
         }
     }
 
-    const [premier, deuxieme, troisieme] = classement;
 
     const groupeActif = GROUPES.find((g) => g.id === groupe) ?? GROUPES[0];
     const produitsGroupeCourant = PRODUITS_CLASSEMENT.filter((p) => groupeActif.codesCore.includes(p.code));
@@ -248,59 +248,7 @@ export default function ClassementPage() {
                 </div>
             ) : (
                 <>
-                    {/* Podium top 3 */}
-                    {classement.length >= 2 && (
-                        <div className="rounded-[24px] bg-white p-8 shadow-[0_4px_24px_rgba(15,23,42,.08)]">
-                            <p className="text-xs font-bold uppercase tracking-[0.25em] text-amber-500">
-                                🏆 Podium — {PERIODE_LABELS[periode]}
-                            </p>
-
-                            <div className="mt-8 flex items-end justify-center gap-4">
-
-                                {/* 2e place */}
-                                {deuxieme && (
-                                    <div className="flex flex-col items-center gap-3">
-                                        <PhotoAvatar nom={deuxieme.nom} photoUrl={photos[deuxieme.id]} size={48} />
-                                        <p className="text-sm font-black text-slate-700">{deuxieme.nom.split(" ")[0]}</p>
-                                        <div className="flex h-20 w-28 flex-col items-center justify-center rounded-t-2xl bg-slate-200">
-                                            <span className="text-2xl">🥈</span>
-                                            <p className="mt-1 text-xl font-black text-slate-700">{deuxieme.total}</p>
-                                            <p className="text-xs text-slate-400">ventes</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* 1re place */}
-                                {premier && (
-                                    <div className="flex flex-col items-center gap-3">
-                                        <div className="relative">
-                                            <PhotoAvatar nom={premier.nom} photoUrl={photos[premier.id]} size={72} />
-                                            <span className="absolute -right-2 -top-2 text-2xl">👑</span>
-                                        </div>
-                                        <p className="font-black text-slate-900">{premier.nom.split(" ")[0]}</p>
-                                        <div className="flex h-28 w-32 flex-col items-center justify-center rounded-t-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg">
-                                            <span className="text-2xl">🥇</span>
-                                            <p className="mt-1 text-2xl font-black text-white">{premier.total}</p>
-                                            <p className="text-xs text-amber-100">ventes</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* 3e place */}
-                                {troisieme && (
-                                    <div className="flex flex-col items-center gap-3">
-                                        <PhotoAvatar nom={troisieme.nom} photoUrl={photos[troisieme.id]} size={48} />
-                                        <p className="text-sm font-black text-slate-700">{troisieme.nom.split(" ")[0]}</p>
-                                        <div className="flex h-16 w-28 flex-col items-center justify-center rounded-t-2xl bg-amber-900/20">
-                                            <span className="text-2xl">🥉</span>
-                                            <p className="mt-1 text-xl font-black text-slate-600">{troisieme.total}</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                            </div>
-                        </div>
-                    )}
+                    <PodiumTopPerformers classement={classement} periode={periode} />
 
                     {/* Tableau détaillé */}
                     <div className="rounded-[24px] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,.08)]">

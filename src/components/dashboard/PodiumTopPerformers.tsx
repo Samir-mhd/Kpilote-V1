@@ -7,7 +7,8 @@ type Participant = { id: string; nom: string; total: number };
 
 type Props = {
     classement: Participant[];
-    conseillerId: string;
+    /** Conseiller connecté — absent côté manager (bandeau équipe au lieu du message perso). */
+    conseillerId?: string;
     periode: Periode;
 };
 
@@ -90,13 +91,33 @@ function messageMotivation(classement: Participant[], conseillerId: string): str
     return `🚀 Tu es #${rang}. Plus que ${pluriel(ecartPodium, "vente")} pour monter sur le podium !`;
 }
 
+/** Bandeau côté manager : avance du leader + qui est le plus proche d'entrer sur le podium. */
+function messageEquipe(classement: Participant[]): string | null {
+    const [premier, second] = classement;
+    const parts: string[] = [];
+    if (second) {
+        const avance = premier.total - second.total;
+        parts.push(avance > 0
+            ? `👑 ${premier.nom} mène avec ${pluriel(avance, "vente")} d'avance`
+            : `👑 ${premier.nom} et ${second.nom} sont à égalité en tête`);
+    }
+    const quatrieme = classement[3];
+    if (quatrieme) {
+        const ecart = classement[2].total - quatrieme.total + 1;
+        parts.push(`🚀 ${quatrieme.nom} (#4) est à ${pluriel(ecart, "vente")} du podium`);
+    }
+    return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 export default function PodiumTopPerformers({ classement, conseillerId, periode }: Props) {
     const top3 = classement.slice(0, 3);
-    if (top3.length < 3) return null;
+    if (top3.length < 2) return null;
 
     const podiumVide = top3[0].total === 0;
-    const parRang: Record<number, Participant> = { 1: top3[0], 2: top3[1], 3: top3[2] };
-    const message = podiumVide ? null : messageMotivation(classement, conseillerId);
+    const parRang: Record<number, Participant | undefined> = { 1: top3[0], 2: top3[1], 3: top3[2] };
+    const message = podiumVide
+        ? null
+        : conseillerId ? messageMotivation(classement, conseillerId) : messageEquipe(classement);
 
     return (
         <section className="relative overflow-hidden rounded-[28px] bg-[radial-gradient(ellipse_at_top,#4a1d06_0%,#1c1917_45%,#0c0a09_100%)] shadow-[0_20px_60px_rgba(124,45,18,.35)]">
@@ -140,8 +161,9 @@ export default function PodiumTopPerformers({ classement, conseillerId, periode 
                     <div className="mt-12 flex items-end justify-center gap-2 sm:mt-14 sm:gap-5">
                         {PLACES.map((place) => {
                             const c = parRang[place.rang];
+                            if (!c) return null;
                             const first = place.rang === 1;
-                            const isMoi = c.id === conseillerId;
+                            const isMoi = !!conseillerId && c.id === conseillerId;
                             return (
                                 <div key={c.id} className="flex min-w-0 flex-1 flex-col items-center sm:max-w-[200px]">
                                     {/* Avatar en feu + aura */}
