@@ -6,11 +6,6 @@ export type ObjectifInput = {
   realise: number;
   joursTravailles: number;
   joursRestants: number;
-  /** Jours restants "génériques" (calendaire, indépendant du planning individuel) utilisés pour
-   *  l'objectif du jour — pour que le même objectif mensuel donne le même objectif jour partout
-   *  dans l'app (classement, dashboard...). Par défaut égal à `joursRestants` si absent. La
-   *  projection fin de mois continue d'utiliser `joursRestants` (planning réel). */
-  joursRestantsObjectif?: number;
 };
 
 export type ObjectifResultat = {
@@ -28,10 +23,9 @@ export type ObjectifResultat = {
 export function calculerObjectif(input: ObjectifInput): ObjectifResultat {
   const resteAFaire = Math.max(input.objectifMensuel - input.realise, 0);
 
-  const joursPourObjectif = input.joursRestantsObjectif ?? input.joursRestants;
   const objectifJour =
-    joursPourObjectif > 0
-      ? Math.ceil(resteAFaire / joursPourObjectif)
+    input.joursRestants > 0
+      ? Math.ceil(resteAFaire / input.joursRestants)
       : resteAFaire;
 
   const progression =

@@ -3,8 +3,10 @@
 import { Fragment, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PRODUITS_CLASSEMENT } from "@/utils/produits";
-import { Periode, PERIODE_LABELS, joursPeriode, workingDaysRemaining } from "@/utils/periodes";
+import { Periode, PERIODE_LABELS, joursPeriode, periodeSemaineEffective } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
+import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
+import { getJoursTravailPlageTous } from "@/services/planningService";
 import type { ProduitCode } from "@/utils/produits";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
@@ -21,6 +23,9 @@ export default function ClassementPage() {
     const [periode, setPeriode]                   = useState<Periode>("jour");
     const [classement, setClassement]             = useState<ConseillerStats[]>([]);
     const [moisMap, setMoisMap]                   = useState(new Map<string, ConseillerStats>());
+    const [semaineMap, setSemaineMap]             = useState(new Map<string, ConseillerStats>());
+    const [objSemaine, setObjSemaine]             = useState<Record<string, Record<ProduitCode, number>>>({});
+    const [joursRestantsSemaine, setJoursRestantsSemaine] = useState<Record<string, number>>({});
     const [photos, setPhotos]                     = useState<Record<string, string | null>>({});
     const [loading, setLoading]                   = useState(true);
     const [heure, setHeure]                       = useState("");
@@ -29,7 +34,7 @@ export default function ClassementPage() {
     const [confirmation, setConfirmation]         = useState<string | null>(null);
     const [groupe, setGroupe]                     = useState<GroupeId>("core");
     const [comboPeriode, setComboPeriode]         = useState<Record<string, RealiseVentesCombo>>({});
-    const [comboMois, setComboMois]               = useState<Record<string, RealiseVentesCombo>>({});
+    const [comboSemaine, setComboSemaine]         = useState<Record<string, RealiseVentesCombo>>({});
     const [comboObjectifs, setComboObjectifs]     = useState<Record<string, RealiseVentesCombo>>({});
 
     useEffect(() => {
@@ -40,29 +45,47 @@ export default function ClassementPage() {
         if (!opts?.silencieux) setLoading(true);
         setConseillerOuvert(null);
 
-        const periodePromise = construireClassementPeriode(periode);
-        const moisPromise = periode === "mois" ? Promise.resolve([] as ConseillerStats[]) : construireClassementPeriode("mois");
+        const fetches = periode === "mois"
+            ? [construireClassementPeriode("mois"), Promise.resolve([] as ConseillerStats[])]
+            : [construireClassementPeriode(periode), construireClassementPeriode("mois")];
 
         const { debut: pDebut, fin: pFin } = joursPeriode(periode);
-        const { debut: mDebut, fin: mFin } = joursPeriode("mois");
 
         try {
-            const [data, moisData, comboP, comboM, comboObj] = await Promise.all([
-                periodePromise,
-                moisPromise,
+            const [data, moisData, comboP, comboObj] = await Promise.all([
+                ...fetches,
                 getRealiseVentesComboParConseiller(pDebut, pFin),
-                getRealiseVentesComboParConseiller(mDebut, mFin),
                 getObjectifsComboParConseiller(),
-            ]);
+            ]) as [ConseillerStats[], ConseillerStats[], Record<string, RealiseVentesCombo>, Record<string, RealiseVentesCombo>];
             setClassement(data);
-            const map = new Map((periode === "mois" ? data : moisData).map(c => [c.id, c]));
-            setMoisMap(map);
+            setMoisMap(new Map((periode === "mois" ? data : moisData).map(c => [c.id, c])));
             setComboPeriode(comboP);
-            setComboMois(comboM);
             setComboObjectifs(comboObj);
             const ids = data.map(c => c.id);
             const avs = await getPhotosByIds(ids).catch(() => ({}));
             setPhotos(avs);
+
+            // "semaine" et "jour" ont tous les deux besoin de l'objectif semaine figé (le jour s'y recale)
+            if (periode === "semaine" || periode === "jour") {
+                const { debut, fin } = periodeSemaineEffective();
+                const figes = await getObjectifsSemaineFiges(ids, debut, fin).catch(() => ({}));
+                setObjSemaine(figes);
+            }
+
+            // "jour" a en plus besoin du cumul de la semaine (avant aujourd'hui) et des jours
+            // planifiés restants de la semaine, selon le planning réel de chaque conseiller
+            if (periode === "jour") {
+                const { fin } = periodeSemaineEffective();
+                const { debut: semDebutStr, fin: semFinStr } = joursPeriode("semaine");
+                const [semaineData, joursRestants, comboSem] = await Promise.all([
+                    construireClassementPeriode("semaine").catch(() => [] as ConseillerStats[]),
+                    getJoursTravailPlageTous(ids, new Date(), fin).catch(() => ({})),
+                    getRealiseVentesComboParConseiller(semDebutStr, semFinStr).catch(() => ({} as Record<string, RealiseVentesCombo>)),
+                ]);
+                setSemaineMap(new Map(semaineData.map(c => [c.id, c])));
+                setJoursRestantsSemaine(joursRestants);
+                setComboSemaine(comboSem);
+            }
         } catch {}
         finally { if (!opts?.silencieux) setLoading(false); }
     }
@@ -84,33 +107,45 @@ export default function ClassementPage() {
         return () => { supabase.removeChannel(channel); clearInterval(interval); };
     }, [periode]);
 
-    // Objectif dynamique par conseiller × produit
+    // Objectif par conseiller × produit :
+    // - "mois"    : fixé par le manager
+    // - "semaine" : figé au premier calcul de la semaine (reste à faire du mois ÷ jours planifiés
+    //               restants du mois × jours planifiés de la semaine), ne change plus ensuite
+    // - "jour"    : dynamique, recalé sur l'objectif SEMAINE figé (jamais sur le mois) — reste à
+    //               faire de la semaine ÷ jours planifiés restants de la semaine
     function getObjDynamic(c: ConseillerStats, key: ProduitCode): number {
         const objMois   = c.objectifs[key] ?? 0;
         if (periode === "mois") return objMois;
-        const moisStats = moisMap.get(c.id);
-        const monthVal  = moisStats?.produits[key] ?? 0;
-        const periodVal = c.produits[key] ?? 0;
-        const doneBeforePeriod = Math.max(monthVal - periodVal, 0);
-        const remaining        = Math.max(objMois - doneBeforePeriod, 0);
-        const daysLeft         = workingDaysRemaining();
-        if (periode === "jour") return Math.ceil(remaining / daysLeft);
-        // semaine : taux journalier × 6 jours ouvrés par semaine
-        return Math.ceil(remaining / daysLeft * 6);
+        if (periode === "semaine") return objSemaine[c.id]?.[key] ?? 0;
+
+        const objSemaineFixe = objSemaine[c.id]?.[key] ?? 0;
+        const semaineStats   = semaineMap.get(c.id);
+        const realiseSemaine = semaineStats?.produits[key] ?? 0;
+        const realiseAujourdhui = c.produits[key] ?? 0;
+        const realiseAvantAujourdhui = Math.max(realiseSemaine - realiseAujourdhui, 0);
+        const reste = Math.max(objSemaineFixe - realiseAvantAujourdhui, 0);
+        const joursRestants = joursRestantsSemaine[c.id] ?? 0;
+        return joursRestants > 0 ? Math.ceil(reste / joursRestants) : reste;
     }
 
-    // Même cascade que getObjDynamic, pour les 3 items "ventes combo" (McAfee Mobile,
-    // Assurance essentielle, Canal+) dont le réalisé/objectif vient de variable_actes_jour.
+    // Même cascade que getObjDynamic, pour les 3 items "ventes combo" (McAfee Mobile, Assurance
+    // essentielle, Canal+) dont le réalisé/objectif vient de variable_actes_jour.
+    function objSemaineCombo(conseillerId: string, code: ComboCode): number {
+        const figes = objSemaine[conseillerId] as unknown as Record<string, number> | undefined;
+        return figes?.[code] ?? 0;
+    }
+
     function getObjDynamicCombo(conseillerId: string, code: ComboCode): number {
-        const objMois = comboObjectifs[conseillerId]?.[code] ?? 0;
-        if (periode === "mois") return objMois;
-        const monthVal  = comboMois[conseillerId]?.[code] ?? 0;
-        const periodVal = comboPeriode[conseillerId]?.[code] ?? 0;
-        const doneBeforePeriod = Math.max(monthVal - periodVal, 0);
-        const remaining        = Math.max(objMois - doneBeforePeriod, 0);
-        const daysLeft          = workingDaysRemaining();
-        if (periode === "jour") return Math.ceil(remaining / daysLeft);
-        return Math.ceil(remaining / daysLeft * 6);
+        if (periode === "mois") return comboObjectifs[conseillerId]?.[code] ?? 0;
+        if (periode === "semaine") return objSemaineCombo(conseillerId, code);
+
+        const objSemaineFixe = objSemaineCombo(conseillerId, code);
+        const realiseSemaine = comboSemaine[conseillerId]?.[code] ?? 0;
+        const realiseAujourdhui = comboPeriode[conseillerId]?.[code] ?? 0;
+        const realiseAvantAujourdhui = Math.max(realiseSemaine - realiseAujourdhui, 0);
+        const reste = Math.max(objSemaineFixe - realiseAvantAujourdhui, 0);
+        const joursRestants = joursRestantsSemaine[conseillerId] ?? 0;
+        return joursRestants > 0 ? Math.ceil(reste / joursRestants) : reste;
     }
 
     async function handleFeliciter(prenom: string, conseillerNom: string, message: string) {

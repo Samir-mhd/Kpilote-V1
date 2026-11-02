@@ -3,9 +3,11 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { PRODUITS_CLASSEMENT, PRODUITS_HORS_TOTAL_CLASSEMENT } from "@/utils/produits";
-import { Periode, PERIODE_LABELS, couleurTaux, joursPeriode, workingDaysRemaining } from "@/utils/periodes";
+import { Periode, PERIODE_LABELS, couleurTaux, periodeSemaineEffective, joursPeriode } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 import { construireClassementTrophees, ConseillerTrophees } from "@/services/badgesManagerService";
+import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
+import { getJoursTravailPlageTous } from "@/services/planningService";
 import type { ProduitCode } from "@/utils/produits";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
@@ -15,7 +17,6 @@ import { GROUPES, GroupeId, COMBO_META, ComboCode } from "@/utils/classementGrou
 
 const medals = ["🥇", "🥈", "🥉"];
 const COMBO_VIDE: RealiseVentesCombo = { mcafee_mobile: 0, assurance_essentielle: 0, canal_plus: 0 };
-
 const ONGLETS: { id: Periode | "trophees"; label: string }[] = [
     { id: "jour", label: PERIODE_LABELS.jour },
     { id: "semaine", label: PERIODE_LABELS.semaine },
@@ -30,6 +31,9 @@ function ClassementInner() {
     const [periode, setPeriode]             = useState<Periode>("mois");
     const [classement, setClassement]       = useState<ConseillerStats[]>([]);
     const [moisMap, setMoisMap]             = useState(new Map<string, ConseillerStats>());
+    const [semaineMap, setSemaineMap]       = useState(new Map<string, ConseillerStats>());
+    const [objSemaine, setObjSemaine]       = useState<Record<string, Record<ProduitCode, number>>>({});
+    const [joursRestantsSemaine, setJoursRestantsSemaine] = useState<Record<string, number>>({});
     const [photos, setPhotos]               = useState<Record<string, string | null>>({});
     const [loading, setLoading]             = useState(true);
     const [maj, setMaj]                     = useState("");
@@ -41,34 +45,52 @@ function ClassementInner() {
 
     const [groupe, setGroupe]                     = useState<GroupeId>("core");
     const [comboPeriode, setComboPeriode]         = useState<Record<string, RealiseVentesCombo>>({});
-    const [comboMois, setComboMois]               = useState<Record<string, RealiseVentesCombo>>({});
+    const [comboSemaine, setComboSemaine]         = useState<Record<string, RealiseVentesCombo>>({});
     const [comboObjectifsMensuels, setComboObjectifsMensuels] = useState<Record<string, RealiseVentesCombo>>({});
 
     async function charger(p: Periode, opts?: { silencieux?: boolean }) {
         if (!opts?.silencieux) setLoading(true);
         try {
-            const periodePromise = construireClassementPeriode(p);
-            const moisPromise = p === "mois" ? Promise.resolve([] as ConseillerStats[]) : construireClassementPeriode("mois");
+            const fetches = p === "mois"
+                ? [construireClassementPeriode("mois"), Promise.resolve([] as ConseillerStats[])]
+                : [construireClassementPeriode(p), construireClassementPeriode("mois")];
 
             const { debut: pDebut, fin: pFin } = joursPeriode(p);
-            const { debut: mDebut, fin: mFin } = joursPeriode("mois");
-
-            const [data, moisData, comboP, comboM, comboObj] = await Promise.all([
-                periodePromise,
-                moisPromise,
+            const [data, moisData, comboP, comboObj] = await Promise.all([
+                ...fetches,
                 getRealiseVentesComboParConseiller(pDebut, pFin),
-                getRealiseVentesComboParConseiller(mDebut, mFin),
                 getObjectifsComboParConseiller(),
-            ]);
+            ]) as [ConseillerStats[], ConseillerStats[], Record<string, RealiseVentesCombo>, Record<string, RealiseVentesCombo>];
             setClassement(data);
             setMoisMap(new Map((p === "mois" ? data : moisData).map(c => [c.id, c])));
             setComboPeriode(comboP);
-            setComboMois(comboM);
             setComboObjectifsMensuels(comboObj);
             setMaj(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
             const ids = data.map(c => c.id);
             const avs = await getPhotosByIds(ids).catch(() => ({}));
             setPhotos(avs);
+
+            // "semaine" et "jour" ont tous les deux besoin de l'objectif semaine figé (le jour s'y recale)
+            if (p === "semaine" || p === "jour") {
+                const { debut, fin } = periodeSemaineEffective();
+                const figes = await getObjectifsSemaineFiges(ids, debut, fin).catch(() => ({}));
+                setObjSemaine(figes);
+            }
+
+            // "jour" a en plus besoin du cumul de la semaine (avant aujourd'hui) et des jours
+            // planifiés restants de la semaine, selon le planning réel de chaque conseiller
+            if (p === "jour") {
+                const { fin } = periodeSemaineEffective();
+                const { debut: semDebutStr, fin: semFinStr } = joursPeriode("semaine");
+                const [semaineData, joursRestants, comboSem] = await Promise.all([
+                    construireClassementPeriode("semaine").catch(() => [] as ConseillerStats[]),
+                    getJoursTravailPlageTous(ids, new Date(), fin).catch(() => ({})),
+                    getRealiseVentesComboParConseiller(semDebutStr, semFinStr).catch(() => ({} as Record<string, RealiseVentesCombo>)),
+                ]);
+                setSemaineMap(new Map(semaineData.map(c => [c.id, c])));
+                setJoursRestantsSemaine(joursRestants);
+                setComboSemaine(comboSem);
+            }
         } catch {}
         finally { if (!opts?.silencieux) setLoading(false); }
     }
@@ -117,34 +139,45 @@ function ClassementInner() {
         return () => { supabase.removeChannel(channel); };
     }, []);
 
-    // Objectif dynamique par conseiller × produit — même calcul que la vue manager, pour que les
-    // deux classements affichent toujours le même chiffre.
+    // Objectif par conseiller × produit :
+    // - "mois"    : fixé par le manager
+    // - "semaine" : figé au premier calcul de la semaine (reste à faire du mois ÷ jours planifiés
+    //               restants du mois × jours planifiés de la semaine), ne change plus ensuite
+    // - "jour"    : dynamique, recalé sur l'objectif SEMAINE figé (jamais sur le mois) — reste à
+    //               faire de la semaine ÷ jours planifiés restants de la semaine
     function getObjDynamic(c: ConseillerStats, key: ProduitCode): number {
         const objMois   = c.objectifs[key] ?? 0;
         if (periode === "mois") return objMois;
-        const moisStats = moisMap.get(c.id);
-        const monthVal  = moisStats?.produits[key] ?? 0;
-        const periodVal = c.produits[key] ?? 0;
-        const doneBeforePeriod = Math.max(monthVal - periodVal, 0);
-        const remaining        = Math.max(objMois - doneBeforePeriod, 0);
-        const daysLeft         = workingDaysRemaining();
-        if (periode === "jour") return Math.ceil(remaining / daysLeft);
-        // semaine : taux journalier × 6 jours ouvrés par semaine
-        return Math.ceil(remaining / daysLeft * 6);
+        if (periode === "semaine") return objSemaine[c.id]?.[key] ?? 0;
+
+        const objSemaineFixe = objSemaine[c.id]?.[key] ?? 0;
+        const semaineStats   = semaineMap.get(c.id);
+        const realiseSemaine = semaineStats?.produits[key] ?? 0;
+        const realiseAujourdhui = c.produits[key] ?? 0;
+        const realiseAvantAujourdhui = Math.max(realiseSemaine - realiseAujourdhui, 0);
+        const reste = Math.max(objSemaineFixe - realiseAvantAujourdhui, 0);
+        const joursRestants = joursRestantsSemaine[c.id] ?? 0;
+        return joursRestants > 0 ? Math.ceil(reste / joursRestants) : reste;
     }
 
     // Même cascade que getObjDynamic, pour les 3 items "ventes combo" (McAfee Mobile, Assurance
     // essentielle, Canal+) dont le réalisé/objectif vient de variable_actes_jour.
+    function objSemaineCombo(conseillerId: string, code: ComboCode): number {
+        const figes = objSemaine[conseillerId] as unknown as Record<string, number> | undefined;
+        return figes?.[code] ?? 0;
+    }
+
     function getObjDynamicCombo(conseillerId: string, code: ComboCode): number {
-        const objMois = comboObjectifsMensuels[conseillerId]?.[code] ?? 0;
-        if (periode === "mois") return objMois;
-        const monthVal  = comboMois[conseillerId]?.[code] ?? 0;
-        const periodVal = comboPeriode[conseillerId]?.[code] ?? 0;
-        const doneBeforePeriod = Math.max(monthVal - periodVal, 0);
-        const remaining        = Math.max(objMois - doneBeforePeriod, 0);
-        const daysLeft          = workingDaysRemaining();
-        if (periode === "jour") return Math.ceil(remaining / daysLeft);
-        return Math.ceil(remaining / daysLeft * 6);
+        if (periode === "mois") return comboObjectifsMensuels[conseillerId]?.[code] ?? 0;
+        if (periode === "semaine") return objSemaineCombo(conseillerId, code);
+
+        const objSemaineFixe = objSemaineCombo(conseillerId, code);
+        const realiseSemaine = comboSemaine[conseillerId]?.[code] ?? 0;
+        const realiseAujourdhui = comboPeriode[conseillerId]?.[code] ?? 0;
+        const realiseAvantAujourdhui = Math.max(realiseSemaine - realiseAujourdhui, 0);
+        const reste = Math.max(objSemaineFixe - realiseAvantAujourdhui, 0);
+        const joursRestants = joursRestantsSemaine[conseillerId] ?? 0;
+        return joursRestants > 0 ? Math.ceil(reste / joursRestants) : reste;
     }
 
     const monRang = classement.findIndex(c => c.id === conseillerId) + 1;
@@ -461,9 +494,9 @@ function ClassementInner() {
                         </div>
                         <div className="px-7 pb-5 pt-2 text-xs text-slate-300">
                             {periode === "jour"
-                                ? "Objectif du jour : reste à faire du mois ÷ jours ouvrés restants"
+                                ? "Objectif du jour en rythme dynamique — recalé sur l'objectif de la semaine figé"
                                 : periode === "semaine"
-                                ? "Objectif de la semaine : reste à faire du mois ÷ jours ouvrés restants × 6"
+                                ? "Objectif de la semaine figé depuis lundi — ne change pas selon l'avancement"
                                 : "Objectif mensuel fixé par le manager"}
                         </div>
                     </div>
