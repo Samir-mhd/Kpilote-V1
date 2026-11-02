@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { PRODUITS_CLASSEMENT, PRODUITS_HORS_TOTAL_CLASSEMENT } from "@/utils/produits";
-import { Periode, PERIODE_LABELS, couleurTaux, joursPeriode } from "@/utils/periodes";
+import { Periode, PERIODE_LABELS, couleurTaux, joursPeriode, workingDaysRemaining } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 import { construireClassementTrophees, ConseillerTrophees } from "@/services/badgesManagerService";
 import type { ProduitCode } from "@/utils/produits";
@@ -16,16 +16,6 @@ import { GROUPES, GroupeId, COMBO_META, ComboCode } from "@/utils/classementGrou
 const medals = ["🥇", "🥈", "🥉"];
 const COMBO_VIDE: RealiseVentesCombo = { mcafee_mobile: 0, assurance_essentielle: 0, canal_plus: 0 };
 
-// Jours restants dans le mois (aujourd'hui inclus, dimanches exclus) — même calcul que la vue manager
-function workingDaysRemaining(): number {
-    const now = new Date();
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    let count = 0;
-    for (const d = new Date(now); d <= end; d.setDate(d.getDate() + 1)) {
-        if (d.getDay() !== 0) count++;
-    }
-    return Math.max(count, 1);
-}
 const ONGLETS: { id: Periode | "trophees"; label: string }[] = [
     { id: "jour", label: PERIODE_LABELS.jour },
     { id: "semaine", label: PERIODE_LABELS.semaine },

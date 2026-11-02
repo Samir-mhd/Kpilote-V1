@@ -1,12 +1,11 @@
 import { getObjectifsMensuels } from "@/services/objectifs";
-import { getVentesDuJour, getVentesDuMois, getVentesDepuisLundi } from "@/services/stats";
+import { getVentesDuJour, getVentesDuMois } from "@/services/stats";
 import { getJoursTravail, getJoursTravailPlage } from "@/services/planningService";
-import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import { getCoeffRecapCommercial } from "@/services/recapCommercialConfig";
 import { getRealiseVentesComboMoisCourant, getRealiseVentesCombo, RealiseVentesCombo } from "@/services/variableConseiller";
 import { calculerObjectifs, EtatObjectif } from "@/engine/objectifEngine";
-import { periodeSemaineEffective } from "@/utils/periodes";
-import { PRODUITS_ORDRE, type ProduitCode } from "@/utils/produits";
+import { periodeSemaineEffective, workingDaysRemaining } from "@/utils/periodes";
+import { PRODUITS_ORDRE } from "@/utils/produits";
 import { supabase } from "@/lib/supabase";
 
 /** McAfee Mobile, Assurance essentielle, Canal+ : pas de ligne dans `ventes` (déclarés via les
@@ -118,7 +117,7 @@ async function calcul(
             : produitCode === "recap_commercial" ? coeffRecap * (joursTravailles + joursRestants)
             : objectif.objectif;
 
-        return { produit: produitNom, objectifMensuel, realise, joursTravailles, joursRestants };
+        return { produit: produitNom, objectifMensuel, realise, joursTravailles, joursRestants, joursRestantsObjectif: workingDaysRemaining() };
     });
 
     return calculerObjectifs(inputs);
@@ -128,25 +127,22 @@ async function calcul(
 
 /**
  * Vue simplifiée (dashboard principal) :
- * - objectif = objectif du jour, dynamique, recalé sur l'objectif SEMAINE figé (jamais sur le
- *   mois) : (objectif semaine − réalisé de la semaine avant aujourd'hui) ÷ jours planifiés
- *   restants de la semaine. Spiderhome garde son propre calcul auto (hors de cette cascade).
+ * - objectif = objectif du jour, même calcul que le classement : reste à faire du mois ÷ jours
+ *   ouvrés restants du mois (générique, pas le planning individuel) — garantit le même chiffre
+ *   partout dans l'app pour un même conseiller/produit.
  * - realise = ventes d'AUJOURD'HUI uniquement → repart à 0 chaque matin
  */
 export async function getMissionsReelles(conseillerId: string) {
     const now   = new Date();
     const annee = now.getFullYear();
     const mois  = now.getMonth() + 1;
-    // Semaine tronquée aux bornes du mois : ne chevauche jamais un changement de mois.
-    const { debut, fin } = periodeSemaineEffective(now);
+    const { fin } = periodeSemaineEffective(now);
 
-    const [resultats, ventesJour, objSemaineParConseiller, ventesSemaine, joursRestantsSemaine] = await Promise.all([
+    const [resultats, ventesJour, joursRestantsSemaine] = await Promise.all([
         // McAfee Mobile / Assurance essentielle / Canal+ : visibles uniquement sur la vue Objectifs, jamais sur l'Accueil.
         calcul(conseillerId, annee, mois, getVentesDuMois, CODES_VENTES_COMBO),
         getVentesDuJour(conseillerId),
-        getObjectifsSemaineFiges([conseillerId], debut, fin),
-        getVentesDepuisLundi(conseillerId, debut),
-        getJoursTravailPlage(conseillerId, now, fin), // jours planifiés restants de la semaine, aujourd'hui inclus
+        getJoursTravailPlage(conseillerId, now, fin), // jours planifiés restants de la semaine, aujourd'hui inclus — pour le badge "dernier jour" uniquement
     ]);
 
     // Index des ventes d'aujourd'hui par code produit
@@ -156,43 +152,16 @@ export async function getMissionsReelles(conseillerId: string) {
         if (p?.code) realiseJour[p.code] = (realiseJour[p.code] ?? 0) + (v.quantite ?? 1);
     });
 
-    // Index des ventes depuis lundi par code produit (inclut aujourd'hui)
-    const realiseSemaine: Record<string, number> = {};
-    (ventesSemaine as any[]).forEach((v) => {
-        const p = Array.isArray(v.produits) ? v.produits[0] : v.produits;
-        if (p?.code) realiseSemaine[p.code] = (realiseSemaine[p.code] ?? 0) + (v.quantite ?? 1);
-    });
-
-    const objSemaine = objSemaineParConseiller[conseillerId] ?? {};
-
     return resultats.map((m) => {
         const code = codeDepuisNom(m.produit);
         const realiseAujourdhui = realiseJour[code] ?? 0;
 
-        if (code === "spiderhome" || code === "recap_commercial") {
-            return {
-                produit:  m.produit,
-                objectif: m.objectifJour, // Hors cascade semaine, calcul auto mensuel (coeff × jours) inchangé
-                realise:  realiseAujourdhui,
-                couleur:  couleurProduit(m.produit),
-                message:  m.message,
-                dernierJourSemaine: false,
-            };
-        }
-
-        const objectifSemaineFixe   = objSemaine[code as ProduitCode] ?? 0;
-        const realiseAvantAujourdhui = Math.max((realiseSemaine[code] ?? 0) - realiseAujourdhui, 0);
-        const resteSemaine          = Math.max(objectifSemaineFixe - realiseAvantAujourdhui, 0);
-        const objectifJour          = joursRestantsSemaine > 0 ? Math.ceil(resteSemaine / joursRestantsSemaine) : resteSemaine;
-
         return {
             produit:  m.produit,
-            objectif: objectifJour,
+            objectif: m.objectifJour,
             realise:  realiseAujourdhui, // ventes d'aujourd'hui = 0 au début de chaque journée
             couleur:  couleurProduit(m.produit),
             message:  m.message,
-            // Reste de la semaine figée entièrement compressé sur aujourd'hui — le jour suivant
-            // appartient à une autre semaine figée (recalcul indépendant), pas de lissage possible.
             dernierJourSemaine: joursRestantsSemaine === 1,
         };
     });

@@ -5,7 +5,7 @@ import { useManagerDashboard } from "@/hooks/useManagerDashboard";
 import { PRODUITS_CLASSEMENT } from "@/utils/produits";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 import { getObjectifsEquipeMois } from "@/services/objectifsEquipe";
-import { periodeSemaineEffective } from "@/utils/periodes";
+import { periodeSemaineEffective, workingDaysRemaining } from "@/utils/periodes";
 import { getRealiseVentesCombo } from "@/services/variableConseiller";
 import { chargerDefisActifsManager, DefiActifManager } from "@/services/challengeRepository";
 import { cloturerChallengesExpires } from "@/services/defisService";
@@ -15,16 +15,6 @@ import LancerDefiCard from "@/components/manager/LancerDefiCard";
 import CarteDefiActif from "@/components/manager/CarteDefiActif";
 import AvanceeSection, { AvanceeProduit } from "@/components/manager/AvanceeSection";
 
-// Jours restants dans le mois, aujourd'hui inclus, dimanches exclus
-function workingDaysRemaining(): number {
-    const now = new Date();
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    let count = 0;
-    for (const d = new Date(now); d <= end; d.setDate(d.getDate() + 1)) {
-        if (d.getDay() !== 0) count++;
-    }
-    return Math.max(count, 1);
-}
 
 function jourStr(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

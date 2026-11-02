@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PRODUITS_CLASSEMENT } from "@/utils/produits";
-import { Periode, PERIODE_LABELS, joursPeriode } from "@/utils/periodes";
+import { Periode, PERIODE_LABELS, joursPeriode, workingDaysRemaining } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 import type { ProduitCode } from "@/utils/produits";
 import { getPhotosByIds } from "@/services/photoService";
@@ -16,17 +16,6 @@ import { GROUPES, GroupeId, COMBO_META, ComboCode } from "@/utils/classementGrou
 const MANAGER_ID = "manager";
 const medals = ["🥇", "🥈", "🥉"];
 const COMBO_VIDE: RealiseVentesCombo = { mcafee_mobile: 0, assurance_essentielle: 0, canal_plus: 0 };
-
-// Jours restants dans le mois (aujourd'hui inclus, dimanches exclus)
-function workingDaysRemaining(): number {
-    const now = new Date();
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    let count = 0;
-    for (const d = new Date(now); d <= end; d.setDate(d.getDate() + 1)) {
-        if (d.getDay() !== 0) count++;
-    }
-    return Math.max(count, 1);
-}
 
 export default function ClassementPage() {
     const [periode, setPeriode]                   = useState<Periode>("jour");

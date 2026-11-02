@@ -63,6 +63,20 @@ export function periodeSemaineEffective(reference: Date = new Date()): { debut: 
     };
 }
 
+/** Jours restants dans le mois (aujourd'hui inclus, dimanches exclus) — rythme journalier
+ *  générique utilisé pour dériver un objectif jour/semaine à partir de l'objectif mensuel.
+ *  Volontairement indépendant du planning individuel de chaque conseiller, pour que le même
+ *  objectif mensuel donne toujours le même objectif jour/semaine partout dans l'app (classement,
+ *  dashboard manager, Accueil conseiller, page Résultats...). */
+export function workingDaysRemaining(reference: Date = new Date()): number {
+    const end = new Date(reference.getFullYear(), reference.getMonth() + 1, 0);
+    let count = 0;
+    for (const d = new Date(reference); d <= end; d.setDate(d.getDate() + 1)) {
+        if (d.getDay() !== 0) count++;
+    }
+    return Math.max(count, 1);
+}
+
 /** Couleur CSS selon le taux d'avancement. */
 export function couleurTaux(realise: number, objectif: number): {
     text: string; bg: string; bar: string; border: string;
