@@ -3,7 +3,7 @@ import { ItemLieConfig, MatriceConfig, ConseillerMatriceInput, ItemPrincipal, Pr
 
 /** Item de la matrice -> code produit dans `produits`/`objectifs_mensuels`. Fixe (les items liés
  *  ne sont pas renommables en UI), "Téléphone" (matrice, singulier) -> "telephones" (produit). */
-const ITEM_VERS_CODE_PRODUIT: Record<string, string> = {
+export const ITEM_VERS_CODE_PRODUIT: Record<string, string> = {
     "Box": "box",
     "Forfaits": "forfaits",
     "Téléphone": "telephones",

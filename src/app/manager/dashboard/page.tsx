@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useManagerDashboard } from "@/hooks/useManagerDashboard";
-import { PRODUITS_ORDRE, PRODUITS_CLASSEMENT } from "@/utils/produits";
+import { PRODUITS_CLASSEMENT } from "@/utils/produits";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
-import { getObjectifsBoutique } from "@/services/objectifs";
-import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
+import { getObjectifsEquipeMois } from "@/services/objectifsEquipe";
 import { periodeSemaineEffective } from "@/utils/periodes";
 import { getRealiseVentesCombo } from "@/services/variableConseiller";
 import { chargerDefisActifsManager, DefiActifManager } from "@/services/challengeRepository";
@@ -15,10 +14,6 @@ import TeamFeed from "@/components/dashboard/TeamFeed";
 import LancerDefiCard from "@/components/manager/LancerDefiCard";
 import CarteDefiActif from "@/components/manager/CarteDefiActif";
 import AvanceeSection, { AvanceeProduit } from "@/components/manager/AvanceeSection";
-
-function dateAujourdhui() {
-    return new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
-}
 
 // Jours restants dans le mois, aujourd'hui inclus, dimanches exclus
 function workingDaysRemaining(): number {
@@ -36,7 +31,7 @@ function jourStr(d: Date): string {
 }
 
 // McAfee Mobile / Assurance essentielle / Canal+ : ventes combo, pas de ligne dans `ventes`
-// (voir services/variableConseiller.ts getRealiseVentesCombo) — traités à part des PRODUITS_ORDRE.
+// (voir services/variableConseiller.ts getRealiseVentesCombo) — traités à part de PRODUITS_CLASSEMENT.
 const ITEMS_COMBO = [
     { code: "mcafee_mobile", label: "McAfee Mobile", emoji: "📶" },
     { code: "assurance_essentielle", label: "Assurance Essentielle", emoji: "🧩" },
@@ -59,7 +54,6 @@ export default function ManagerDashboard() {
     const [kpiDataMois,    setKpiDataMois]    = useState<ConseillerStats[]>([]);
     const [kpiLoad, setKpiLoad]               = useState(false);
     const [objMensuels, setObjMensuels]       = useState<Record<string, number>>({});
-    const [objSemaineMap, setObjSemaineMap]   = useState<Record<string, number>>({});
 
     // Ventes combo équipe (McAfee Mobile / Assurance essentielle / Canal+), jour / semaine / mois
     const [comboJour, setComboJour]       = useState<Record<string, number>>({});
@@ -71,16 +65,7 @@ export default function ManagerDashboard() {
     const [defisLoading, setDefisLoading] = useState(true);
 
     useEffect(() => {
-        getObjectifsBoutique()
-            .then(rows => {
-                const map: Record<string, number> = {};
-                rows.forEach((r: any) => {
-                    const code = r.produits?.code;
-                    if (code) map[code] = r.objectif ?? 0;
-                });
-                setObjMensuels(map);
-            })
-            .catch(() => {});
+        getObjectifsEquipeMois().then(setObjMensuels).catch(() => {});
     }, []);
 
     useEffect(() => {
@@ -125,24 +110,6 @@ export default function ManagerDashboard() {
         return () => clearInterval(id);
     }, []);
 
-    // Objectifs semaine figés, pour tous les produits affichés (core + combo)
-    useEffect(() => {
-        if (!dashboard) return;
-        const ids = dashboard.classement.map((c) => c.id);
-        if (ids.length === 0) return;
-        const { debut, fin } = periodeSemaineEffective();
-        getObjectifsSemaineFiges(ids, debut, fin)
-            .then((figes) => {
-                const codes = [...PRODUITS_CLASSEMENT.map(p => p.code), ...ITEMS_COMBO.map(i => i.code)];
-                const map: Record<string, number> = {};
-                codes.forEach((code) => {
-                    map[code] = ids.reduce((t: number, id: string) => t + ((figes as any)[id]?.[code] ?? 0), 0);
-                });
-                setObjSemaineMap(map);
-            })
-            .catch(() => {});
-    }, [dashboard]);
-
     async function chargerDefis() {
         try {
             await cloturerChallengesExpires().catch(() => {});
@@ -161,87 +128,35 @@ export default function ManagerDashboard() {
     // ── Race bars (jour) : produits principaux + items combo ──────────────────
     const daysLeft = workingDaysRemaining();
 
-    const raceBarsCore = PRODUITS_ORDRE.map(p => {
-        const venteJour    = kpiDataJour.reduce((t, c) => t + c.produits[p.key], 0);
-        const venteSemaine = kpiDataSemaine.reduce((t, c) => t + c.produits[p.key], 0);
-        const venteMois    = kpiDataMois.reduce((t, c) => t + c.produits[p.key], 0);
-        const objMois      = objMensuels[p.code] ?? 0;
+    // Rythme dynamique : reste à faire (obj mensuel - déjà fait avant la période) / jours
+    // restants du mois, × 6 pour la semaine — même formule que le classement (jour/semaine/mois
+    // toujours cohérents entre eux et avec la vue classement).
+    function cible(objMois: number, venteJour: number, venteSemaine: number, venteMois: number) {
+        const dailyTarget  = Math.ceil(Math.max(objMois - Math.max(venteMois - venteJour, 0), 0) / daysLeft);
+        const weeklyTarget = Math.ceil(Math.max(objMois - Math.max(venteMois - venteSemaine, 0), 0) / daysLeft * 6);
+        return { dailyTarget, weeklyTarget };
+    }
 
-        // Rythme dynamique jour : (obj restant avant aujourd'hui) / jours restants
-        const doneAvantAujourdhui = Math.max(venteMois - venteJour, 0);
-        const remaining           = Math.max(objMois - doneAvantAujourdhui, 0);
-        const dailyTarget         = Math.ceil(remaining / daysLeft);
-
-        // Rythme dynamique semaine : taux journalier × 6 jours ouvrés/semaine
-        const doneAvantCetteSemaine = Math.max(venteMois - venteSemaine, 0);
-        const remainingSemaine      = Math.max(objMois - doneAvantCetteSemaine, 0);
-        const weeklyTarget          = Math.ceil(remainingSemaine / daysLeft * 6);
-
-        const pct     = dailyTarget > 0 ? Math.min((venteJour / dailyTarget) * 100, 100) : venteJour > 0 ? 100 : 0;
-        const isAhead = dailyTarget > 0 && venteJour >= dailyTarget;
-        const bonus   = isAhead ? venteJour - dailyTarget : 0;
-
-        return { code: p.code, label: p.label, emoji: p.emoji, venteJour, venteSemaine, venteMois, objMois, weeklyTarget, dailyTarget, pct: Math.round(pct), isAhead, bonus };
-    });
-
-    const raceBarsCombo = ITEMS_COMBO.map(p => {
-        const venteJour    = comboJour[p.code] ?? 0;
-        const venteSemaine = comboSemaine[p.code] ?? 0;
-        const venteMois    = comboMois[p.code] ?? 0;
-        const objMois      = objMensuels[p.code] ?? 0;
-
-        const doneAvantAujourdhui = Math.max(venteMois - venteJour, 0);
-        const remaining           = Math.max(objMois - doneAvantAujourdhui, 0);
-        const dailyTarget         = Math.ceil(remaining / daysLeft);
-
-        const doneAvantCetteSemaine = Math.max(venteMois - venteSemaine, 0);
-        const remainingSemaine      = Math.max(objMois - doneAvantCetteSemaine, 0);
-        const weeklyTarget          = Math.ceil(remainingSemaine / daysLeft * 6);
-
-        const pct     = dailyTarget > 0 ? Math.min((venteJour / dailyTarget) * 100, 100) : venteJour > 0 ? 100 : 0;
-        const isAhead = dailyTarget > 0 && venteJour >= dailyTarget;
-        const bonus   = isAhead ? venteJour - dailyTarget : 0;
-
-        return { code: p.code, label: p.label, emoji: p.emoji, venteJour, venteSemaine, venteMois, objMois, weeklyTarget, dailyTarget, pct: Math.round(pct), isAhead, bonus };
-    });
-
-    const raceBars = [...raceBarsCore, ...raceBarsCombo];
-
-    const totalJour      = raceBars.reduce((t, p) => t + p.venteJour, 0);
-    const totalTarget    = raceBars.reduce((t, p) => t + p.dailyTarget, 0);
-    const totalSemaine   = raceBars.reduce((t, p) => t + p.venteSemaine, 0);
-    const totalObjSem    = raceBars.reduce((t, p) => t + p.weeklyTarget, 0);
-    const totalMois      = raceBars.reduce((t, p) => t + p.venteMois, 0);
-    const totalObjM      = raceBars.reduce((t, p) => t + p.objMois, 0);
-    const tauxJour       = totalTarget  > 0 ? Math.min(Math.round((totalJour    / totalTarget) * 100), 100) : 0;
-    const tauxSemaine    = totalObjSem  > 0 ? Math.min(Math.round((totalSemaine / totalObjSem) * 100), 100) : 0;
-    const tauxMois       = totalObjM    > 0 ? Math.min(Math.round((totalMois    / totalObjM)   * 100), 100) : 0;
-
-    // ── Avancée semaine / mois (produits principaux + combo) ──────────────────
-    const semaineAvancee: AvanceeProduit[] = [
-        ...PRODUITS_CLASSEMENT.map(p => ({
-            code: p.code, label: p.label, emoji: p.emoji,
-            realise: kpiDataSemaine.reduce((t, c) => t + (c.produits[p.key] ?? 0), 0),
-            objectif: objSemaineMap[p.code] ?? 0,
-        })),
-        ...ITEMS_COMBO.map(p => ({
-            code: p.code, label: p.label, emoji: p.emoji,
-            realise: comboSemaine[p.code] ?? 0,
-            objectif: objSemaineMap[p.code] ?? 0,
-        })),
+    const produitsAvancee = [
+        ...PRODUITS_CLASSEMENT.map(p => {
+            const venteJour    = kpiDataJour.reduce((t, c) => t + c.produits[p.key], 0);
+            const venteSemaine = kpiDataSemaine.reduce((t, c) => t + c.produits[p.key], 0);
+            const venteMois    = kpiDataMois.reduce((t, c) => t + c.produits[p.key], 0);
+            const objMois      = objMensuels[p.code] ?? 0;
+            return { code: p.code, label: p.label, emoji: p.emoji, venteJour, venteSemaine, venteMois, objMois, ...cible(objMois, venteJour, venteSemaine, venteMois) };
+        }),
+        ...ITEMS_COMBO.map(p => {
+            const venteJour    = comboJour[p.code] ?? 0;
+            const venteSemaine = comboSemaine[p.code] ?? 0;
+            const venteMois    = comboMois[p.code] ?? 0;
+            const objMois      = objMensuels[p.code] ?? 0;
+            return { code: p.code, label: p.label, emoji: p.emoji, venteJour, venteSemaine, venteMois, objMois, ...cible(objMois, venteJour, venteSemaine, venteMois) };
+        }),
     ];
-    const moisAvancee: AvanceeProduit[] = [
-        ...PRODUITS_CLASSEMENT.map(p => ({
-            code: p.code, label: p.label, emoji: p.emoji,
-            realise: kpiDataMois.reduce((t, c) => t + (c.produits[p.key] ?? 0), 0),
-            objectif: objMensuels[p.code] ?? 0,
-        })),
-        ...ITEMS_COMBO.map(p => ({
-            code: p.code, label: p.label, emoji: p.emoji,
-            realise: comboMois[p.code] ?? 0,
-            objectif: objMensuels[p.code] ?? 0,
-        })),
-    ];
+
+    const jourAvancee: AvanceeProduit[]    = produitsAvancee.map(p => ({ code: p.code, label: p.label, emoji: p.emoji, realise: p.venteJour, objectif: p.dailyTarget }));
+    const semaineAvancee: AvanceeProduit[] = produitsAvancee.map(p => ({ code: p.code, label: p.label, emoji: p.emoji, realise: p.venteSemaine, objectif: p.weeklyTarget }));
+    const moisAvancee: AvanceeProduit[]    = produitsAvancee.map(p => ({ code: p.code, label: p.label, emoji: p.emoji, realise: p.venteMois, objectif: p.objMois }));
 
     if (loading || !dashboard) {
         return (
@@ -286,137 +201,19 @@ export default function ManagerDashboard() {
 
             {/* ── Onglet Objectifs ─────────────────────────────────────────── */}
             {tab === "objectifs" && (
-                <>
-                    <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-[0_20px_64px_rgba(15,23,42,.40)]">
-
-                        <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-violet-600/15 blur-3xl" />
-                        <div className="pointer-events-none absolute bottom-0 left-0 h-56 w-56 rounded-full bg-fuchsia-600/10 blur-3xl" />
-
-                        <div className="relative p-8">
-
-                            <div className="mb-8">
-                                <p className="text-xs font-black uppercase tracking-[0.4em] text-violet-400">Objectifs du jour</p>
-                                <p className="mt-1 text-sm font-medium capitalize text-white/40">{dateAujourdhui()}</p>
-                            </div>
-
-                            {kpiLoad ? (
-                                <div className="flex h-48 items-center justify-center">
-                                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-400 border-t-transparent" />
-                                </div>
-                            ) : (
-                                <div className="space-y-5">
-                                    {raceBars.map(p => {
-                                        const barColor = p.isAhead
-                                            ? "bg-emerald-400"
-                                            : p.pct >= 60 ? "bg-amber-400" : "bg-red-400";
-                                        const glowColor = p.isAhead
-                                            ? "shadow-[0_0_12px_rgba(52,211,153,.4)]"
-                                            : p.pct >= 60 ? "shadow-[0_0_12px_rgba(251,191,36,.3)]" : "";
-                                        const pctColor = p.isAhead
-                                            ? "text-emerald-300"
-                                            : p.pct >= 60 ? "text-amber-300" : "text-red-400";
-
-                                        return (
-                                            <div key={p.code}>
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <div className="flex items-center gap-2.5">
-                                                        <span className="text-xl">{p.emoji}</span>
-                                                        <span className="text-sm font-bold text-white/70">{p.label}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        {p.bonus > 0 && (
-                                                            <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black text-emerald-300">
-                                                                +{p.bonus} bonus
-                                                            </span>
-                                                        )}
-                                                        <span className="text-2xl font-black text-white tabular-nums">{p.venteJour}</span>
-                                                        <span className="text-sm text-white/30">/ {p.dailyTarget} obj</span>
-                                                        <span className={`w-10 text-right text-xs font-black ${pctColor}`}>{p.pct}%</span>
-                                                    </div>
-                                                </div>
-                                                <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
-                                                    <div
-                                                        className={`h-full rounded-full transition-all duration-700 ${barColor} ${glowColor}`}
-                                                        style={{ width: `${p.pct}%` }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-
-                            {!kpiLoad && (
-                                <div className="mt-7 grid grid-cols-3 gap-4">
-
-                                    <div className="rounded-2xl bg-white/6 px-5 py-4">
-                                        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/30 mb-1">
-                                            Aujourd&apos;hui
-                                        </p>
-                                        <div className="flex items-end gap-2">
-                                            <p className="text-3xl font-black text-white">{totalJour}</p>
-                                            <p className="mb-0.5 text-sm text-white/30">/ {totalTarget} cible</p>
-                                            <p className={`mb-0.5 ml-auto text-sm font-black ${tauxJour >= 100 ? "text-emerald-300" : tauxJour >= 60 ? "text-amber-300" : "text-red-400"}`}>
-                                                {tauxJour}%
-                                            </p>
-                                        </div>
-                                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                                            <div
-                                                className={`h-full rounded-full transition-all duration-700 ${tauxJour >= 100 ? "bg-emerald-400" : tauxJour >= 60 ? "bg-amber-400" : "bg-red-400"}`}
-                                                style={{ width: `${tauxJour}%` }}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="rounded-2xl bg-white/6 px-5 py-4">
-                                        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/30 mb-1">
-                                            Semaine
-                                        </p>
-                                        <div className="flex items-end gap-2">
-                                            <p className="text-3xl font-black text-white">{totalSemaine}</p>
-                                            <p className="mb-0.5 text-sm text-white/30">/ {totalObjSem} obj</p>
-                                            <p className={`mb-0.5 ml-auto text-sm font-black ${tauxSemaine >= 100 ? "text-emerald-300" : tauxSemaine >= 60 ? "text-amber-300" : "text-red-400"}`}>
-                                                {tauxSemaine}%
-                                            </p>
-                                        </div>
-                                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                                            <div
-                                                className={`h-full rounded-full transition-all duration-700 ${tauxSemaine >= 100 ? "bg-emerald-400" : tauxSemaine >= 60 ? "bg-amber-400" : "bg-red-400"}`}
-                                                style={{ width: `${tauxSemaine}%` }}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="rounded-2xl bg-white/6 px-5 py-4">
-                                        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/30 mb-1">
-                                            Mois en cours
-                                        </p>
-                                        <div className="flex items-end gap-2">
-                                            <p className="text-3xl font-black text-white">{totalMois}</p>
-                                            <p className="mb-0.5 text-sm text-white/30">/ {totalObjM} obj</p>
-                                            <p className={`mb-0.5 ml-auto text-sm font-black ${tauxMois >= 100 ? "text-emerald-300" : tauxMois >= 60 ? "text-amber-300" : "text-red-400"}`}>
-                                                {tauxMois}%
-                                            </p>
-                                        </div>
-                                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                                            <div
-                                                className={`h-full rounded-full transition-all duration-700 ${tauxMois >= 100 ? "bg-emerald-400" : tauxMois >= 60 ? "bg-amber-400" : "bg-red-400"}`}
-                                                style={{ width: `${tauxMois}%` }}
-                                            />
-                                        </div>
-                                    </div>
-
-                                </div>
-                            )}
-
+                <div className="space-y-6">
+                    {kpiLoad ? (
+                        <div className="flex h-48 items-center justify-center rounded-[24px] bg-white shadow-[0_4px_24px_rgba(15,23,42,.07)]">
+                            <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-600 border-t-transparent" />
                         </div>
-                    </div>
-
-                    <div className="mt-7 space-y-6">
-                        <AvanceeSection titre="Avancée de la semaine" badge="Semaine en cours" produits={semaineAvancee} />
-                        <AvanceeSection titre="Avancée du mois" badge="Mois en cours" produits={moisAvancee} />
-                    </div>
-                </>
+                    ) : (
+                        <>
+                            <AvanceeSection titre="Avancée du jour" badge="Aujourd'hui" produits={jourAvancee} />
+                            <AvanceeSection titre="Avancée de la semaine" badge="Semaine en cours" produits={semaineAvancee} />
+                            <AvanceeSection titre="Avancée du mois" badge="Mois en cours" produits={moisAvancee} />
+                        </>
+                    )}
+                </div>
             )}
 
             {/* ── Onglet Activité équipe ───────────────────────────────────── */}

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { getObjectifsBoutique } from "@/services/objectifs";
+import { getProduits } from "@/services/objectifs";
+import { getObjectifsEquipeMois } from "@/services/objectifsEquipe";
 import { ajusterCheckCerebroManager } from "@/services/resetService";
 import { PRODUITS_ORDRE } from "@/utils/produits";
 
@@ -48,8 +49,9 @@ export default function ManagerMorningCheck({ onValidated }: { onValidated: () =
                 const debut = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
                 const fin   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
 
-                const [objRows, ventesRes] = await Promise.all([
-                    getObjectifsBoutique(),
+                const [produits, objectifByCode, ventesRes] = await Promise.all([
+                    getProduits(),
+                    getObjectifsEquipeMois(),
                     supabase
                         .from("ventes")
                         .select("produit_id, quantite")
@@ -63,21 +65,14 @@ export default function ManagerMorningCheck({ onValidated }: { onValidated: () =
                     totalByProduitId[v.produit_id] = (totalByProduitId[v.produit_id] ?? 0) + (v.quantite ?? 1);
                 }
 
-                // produit_id → code via objectifs
+                // produit_id → code
                 const produitIdToCode: Record<string, string> = {};
-                for (const o of objRows) {
-                    if (o.produits?.code) produitIdToCode[o.produit_id] = o.produits.code;
-                }
+                for (const p of produits) produitIdToCode[p.id] = p.code;
 
                 const totalByCode: Record<string, number> = {};
                 for (const [pid, qty] of Object.entries(totalByProduitId)) {
                     const code = produitIdToCode[pid];
                     if (code) totalByCode[code] = (totalByCode[code] ?? 0) + qty;
-                }
-
-                const objectifByCode: Record<string, number> = {};
-                for (const o of objRows) {
-                    if (o.produits?.code) objectifByCode[o.produits.code] = o.objectif ?? 0;
                 }
 
                 const built = PRODUITS_ORDRE
@@ -188,7 +183,7 @@ export default function ManagerMorningCheck({ onValidated }: { onValidated: () =
                     ) : items.length === 0 ? (
                         <div className="rounded-2xl border border-white/8 bg-white/4 p-8 text-center">
                             <p className="text-white/40 text-sm">Aucun objectif boutique configuré.</p>
-                            <p className="mt-1 text-xs text-white/20">Configurer dans Manager → Objectifs.</p>
+                            <p className="mt-1 text-xs text-white/20">Configurer dans Manager → Matrice objectifs.</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
