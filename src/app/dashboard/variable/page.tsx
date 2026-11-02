@@ -58,6 +58,12 @@ function VariableInner() {
         const d = new Date(y, m - 1 - 2, 1);
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
     }, [mois]);
+    // Assurance (Nouveau Mobile + Essentielle) : payée à M+1 — vente+1 = mois affiché.
+    const moisVenteAssurance = useMemo(() => {
+        const [y, m] = mois.split("-").map(Number);
+        const d = new Date(y, m - 1 - 1, 1);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+    }, [mois]);
     const boxVerrouille = useMemo(() => new Date() >= VERROUILLAGE_BOX, []);
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const chargeInitiale = useRef(true);
@@ -96,7 +102,7 @@ function VariableInner() {
         getContributionForfait4PMoisPaiement(conseillerId, mois).then(setContributionForfait4P).catch(() => {});
     }, [conseillerId, mois, onglet]);
 
-    // Assurance : même principe M+2, mais calculée automatiquement (pas de table figée comme la
+    // Assurance : payée à M+1, calculée automatiquement (pas de table figée comme la
     // box — le barème du mois courant s'applique, donc dépend du vrai barème chargé).
     useEffect(() => {
         if (!conseillerId) return;
@@ -361,11 +367,11 @@ function VariableInner() {
                                     montant: montant4PTotal,
                                 },
                                 {
-                                    label: `Assurance Nouveau Mobile (${nomMois(moisVenteBoxPayee)})${(contributionAssurance?.nbNouveauMobile ?? 0) > 0 ? ` — ${contributionAssurance!.nbNouveauMobile}` : ""}`,
+                                    label: `Assurance Nouveau Mobile (${nomMois(moisVenteAssurance)})${(contributionAssurance?.nbNouveauMobile ?? 0) > 0 ? ` — ${contributionAssurance!.nbNouveauMobile}` : ""}`,
                                     montant: contributionAssurance?.montantNouveauMobile ?? 0,
                                 },
                                 {
-                                    label: `Assurance Essentielle (${nomMois(moisVenteBoxPayee)})${(contributionAssurance?.nbEssentielle ?? 0) > 0 ? ` — ${contributionAssurance!.nbEssentielle}` : ""}`,
+                                    label: `Assurance Essentielle (${nomMois(moisVenteAssurance)})${(contributionAssurance?.nbEssentielle ?? 0) > 0 ? ` — ${contributionAssurance!.nbEssentielle}` : ""}`,
                                     montant: contributionAssurance?.montantEssentielle ?? 0,
                                 },
                             ];

@@ -793,6 +793,11 @@ export default function Dashboard() {
             }
         }
 
+        if (s.mcafeeMobileId) {
+            const b = bonusManuels.find((x) => x.id === s.mcafeeMobileId);
+            if (b) await ajouterActeVariable({ label: b.label, montant: b.montant, bonusManuelId: b.id });
+        }
+
         if (s.assurance === "nouveau_mobile") {
             await handleSale("Assurance");
             await ajouterActeVariable(ASSURANCE_ACTE);

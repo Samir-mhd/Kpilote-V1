@@ -458,8 +458,8 @@ export async function sauvegarderVentesConseillerMois(
 const CHAMPS_NON_SYNCHRONISES = new Set<string>([
     "box_ultra", "box_pop", "box_pop_s_revolution_5g",
     "mcafee_499", "mcafee_699",
-    "assurance_nouveau_mobile", // M+2 : le clic Accueil ne crédite plus ce champ manuel — voir getContributionAssuranceMoisAffiche, calcul automatique.
-    "assurance_essentielle", // M+2, même principe.
+    "assurance_nouveau_mobile", // M+1 : le clic Accueil ne crédite plus ce champ manuel — voir getContributionAssuranceMoisAffiche, calcul automatique.
+    "assurance_essentielle", // M+1, même principe.
 ]);
 
 function moisPlusLocal(mois: string, delta: number): string {
@@ -476,7 +476,7 @@ export type ContributionAssurance = {
 };
 
 /**
- * Assurance (Nouveau Mobile + Essentielle) : même principe que Box/4P — vente+2 = mois affiché,
+ * Assurance (Nouveau Mobile + Essentielle) : payée à M+1 — vente+1 = mois affiché,
  * calculé AUTOMATIQUEMENT à partir des vrais actes enregistrés (clic Accueil ->
  * `variable_actes_jour`), aucune saisie manuelle requise. Barème du mois courant appliqué (pas
  * de figeage, contrairement à Box).
@@ -486,7 +486,7 @@ export async function getContributionAssuranceMoisAffiche(
     moisAffiche: string,
     bareme: BaremeVariable
 ): Promise<ContributionAssurance> {
-    const moisVente = moisPlusLocal(moisAffiche, -2);
+    const moisVente = moisPlusLocal(moisAffiche, -1);
     const [y, m] = moisVente.split("-").map(Number);
     const debut = moisVente;
     const fin = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;

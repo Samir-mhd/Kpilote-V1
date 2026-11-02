@@ -11,12 +11,13 @@ export type ComboSelection = {
     telephone: boolean;
     boostConstructeurId: string | null;
     mcafee: "mcafee_499" | "mcafee_699" | null;
+    mcafeeMobileId: string | null;
     assurance: "nouveau_mobile" | "essentielle" | null;
 };
 
 const SELECTION_VIDE: ComboSelection = {
     box: null, canal: null, forfait: null, quatreP: false,
-    telephone: false, boostConstructeurId: null, mcafee: null, assurance: null,
+    telephone: false, boostConstructeurId: null, mcafee: null, mcafeeMobileId: null, assurance: null,
 };
 
 function fmtEuro(n: number) {
@@ -58,6 +59,9 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
     const [enCours, setEnCours] = useState(false);
 
     const bonusConstructeur = bonusManuels.filter((b) => !b.categorie || b.categorie === "destockage");
+    const bonusMcafeeMobile = bonusManuels.filter(
+        (b) => b.categorie === "autres_primes" && b.label.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes("mcafee")
+    );
 
     const boxOptions: { cle: ComboSelection["box"]; label: string; montant: number }[] = [
         { cle: "box_ultra", label: "Ultra / Ultra Essentiel", montant: bareme.box_ultra },
@@ -86,9 +90,10 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
         (s.telephone ? bareme.smartphone : 0) +
         (s.telephone ? (bonusConstructeur.find((b) => b.id === s.boostConstructeurId)?.montant ?? 0) : 0) +
         (mcafeeOptions.find((o) => o.cle === s.mcafee)?.montant ?? 0) +
+        (bonusMcafeeMobile.find((b) => b.id === s.mcafeeMobileId)?.montant ?? 0) +
         (s.assurance === "nouveau_mobile" ? bareme.assurance_nouveau_mobile : s.assurance === "essentielle" ? bareme.assurance_essentielle : 0);
 
-    const rienSelectionne = !s.box && !s.forfait && !s.quatreP && !s.telephone && !s.mcafee && !s.assurance;
+    const rienSelectionne = !s.box && !s.forfait && !s.quatreP && !s.telephone && !s.mcafee && !s.mcafeeMobileId && !s.assurance;
 
     async function valider() {
         if (rienSelectionne || enCours) return;
@@ -171,6 +176,16 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
                             </Puce>
                         ))}
                     </Groupe>
+
+                    {bonusMcafeeMobile.length > 0 && (
+                        <Groupe titre="📶 McAfee Mobile">
+                            {bonusMcafeeMobile.map((b) => (
+                                <Puce key={b.id} actif={s.mcafeeMobileId === b.id} onClick={() => setS((p) => ({ ...p, mcafeeMobileId: p.mcafeeMobileId === b.id ? null : b.id }))}>
+                                    {b.label}
+                                </Puce>
+                            ))}
+                        </Groupe>
+                    )}
 
                     <Groupe titre="✅ Assurance">
                         <Puce actif={s.assurance === "nouveau_mobile"} onClick={() => setS((p) => ({ ...p, assurance: p.assurance === "nouveau_mobile" ? null : "nouveau_mobile" }))}>
