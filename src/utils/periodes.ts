@@ -18,6 +18,25 @@ export function dateDebutPeriode(periode: Periode): string {
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 }
 
+function jourLocal(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Bornes (format jour "YYYY-MM-DD", pour `variable_actes_jour.jour`) de la période active. */
+export function joursPeriode(periode: Periode, reference: Date = new Date()): { debut: string; fin: string } {
+    if (periode === "jour") {
+        const s = jourLocal(reference);
+        return { debut: s, fin: s };
+    }
+    if (periode === "semaine") {
+        const { debut, fin } = periodeSemaineEffective(reference);
+        return { debut: jourLocal(debut), fin: jourLocal(fin) };
+    }
+    const debut = new Date(reference.getFullYear(), reference.getMonth(), 1);
+    const fin   = new Date(reference.getFullYear(), reference.getMonth() + 1, 0);
+    return { debut: jourLocal(debut), fin: jourLocal(fin) };
+}
+
 /** Lundi de la semaine ISO contenant `reference` (minuit local). */
 export function lundiCourant(reference: Date = new Date()): Date {
     const dow = reference.getDay();

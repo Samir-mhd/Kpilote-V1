@@ -579,6 +579,66 @@ export async function getRealiseVentesComboMoisCourant(conseillerId: string): Pr
     return getRealiseVentesCombo(conseillerId, debut, fin);
 }
 
+/** Comme getRealiseVentesCombo, mais regroupé par conseiller (vue classement : jour/semaine/mois). */
+export async function getRealiseVentesComboParConseiller(
+    debut: string,
+    fin: string
+): Promise<Record<string, RealiseVentesCombo>> {
+    const [{ data: bonusMcafee }, { data: actes }] = await Promise.all([
+        supabase
+            .from("variable_bonus_manuels")
+            .select("id, label, categorie")
+            .eq("categorie", "autres_primes"),
+        supabase
+            .from("variable_actes_jour")
+            .select("conseiller_id, champ, label, bonus_manuel_id, quantite")
+            .gte("jour", debut)
+            .lte("jour", fin),
+    ]);
+
+    const idsMcafeeMobile = new Set(
+        (bonusMcafee ?? [])
+            .filter((b: { label: string }) => b.label.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes("mcafee"))
+            .map((b: { id: string }) => b.id)
+    );
+
+    const lignes = (actes ?? []) as { conseiller_id: string; champ: string | null; label: string; bonus_manuel_id: string | null; quantite: number | null }[];
+
+    const result: Record<string, RealiseVentesCombo> = {};
+    function ligneDe(conseillerId: string): RealiseVentesCombo {
+        if (!result[conseillerId]) result[conseillerId] = { mcafee_mobile: 0, assurance_essentielle: 0, canal_plus: 0 };
+        return result[conseillerId];
+    }
+
+    lignes.forEach((l) => {
+        const qte = l.quantite ?? 1;
+        if (l.champ === "assurance_essentielle") ligneDe(l.conseiller_id).assurance_essentielle += qte;
+        if (l.bonus_manuel_id && idsMcafeeMobile.has(l.bonus_manuel_id)) ligneDe(l.conseiller_id).mcafee_mobile += qte;
+        if (l.label === "Canal+ Option 2" || l.label === "Canal+ Option 3") ligneDe(l.conseiller_id).canal_plus += qte;
+    });
+
+    return result;
+}
+
+/** Objectifs mensuels des 3 items combo, regroupés par conseiller (vue classement). */
+export async function getObjectifsComboParConseiller(): Promise<Record<string, RealiseVentesCombo>> {
+    const { data, error } = await supabase
+        .from("objectifs_mensuels")
+        .select("conseiller_id, objectif, produits(code)");
+    if (error) throw error;
+
+    type Row = { conseiller_id: string; objectif: number | null; produits: { code: string } | { code: string }[] | null };
+    const result: Record<string, RealiseVentesCombo> = {};
+    (data as Row[] ?? []).forEach((row) => {
+        const produit = Array.isArray(row.produits) ? row.produits[0] : row.produits;
+        const code = produit?.code;
+        if (code !== "mcafee_mobile" && code !== "assurance_essentielle" && code !== "canal_plus") return;
+        if (!result[row.conseiller_id]) result[row.conseiller_id] = { mcafee_mobile: 0, assurance_essentielle: 0, canal_plus: 0 };
+        result[row.conseiller_id][code] += row.objectif ?? 0;
+    });
+    return result;
+}
+
 /** Un bonus manuel "McAfee Mobile" (catégorie "autres_primes", libellé contenant "mcafee") est
  *  payé à M+2 comme le McAfee standalone : jamais synchronisé automatiquement, le conseiller le
  *  déclare lui-même chaque mois sur /dashboard/variable. Les bonus manuels sont une liste libre

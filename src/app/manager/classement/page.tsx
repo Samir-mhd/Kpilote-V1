@@ -3,16 +3,19 @@
 import { Fragment, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PRODUITS_CLASSEMENT } from "@/utils/produits";
-import { Periode, PERIODE_LABELS } from "@/utils/periodes";
+import { Periode, PERIODE_LABELS, joursPeriode } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 import type { ProduitCode } from "@/utils/produits";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import FelicitationCard from "@/components/manager/FelicitationCard";
 import { feliciterConseiller } from "@/services/congratulationService";
+import { getRealiseVentesComboParConseiller, getObjectifsComboParConseiller, RealiseVentesCombo } from "@/services/variableConseiller";
+import { GROUPES, GroupeId, COMBO_META, ComboCode } from "@/utils/classementGroupes";
 
 const MANAGER_ID = "manager";
 const medals = ["🥇", "🥈", "🥉"];
+const COMBO_VIDE: RealiseVentesCombo = { mcafee_mobile: 0, assurance_essentielle: 0, canal_plus: 0 };
 
 // Jours restants dans le mois (aujourd'hui inclus, dimanches exclus)
 function workingDaysRemaining(): number {
@@ -35,6 +38,10 @@ export default function ClassementPage() {
     const [conseillerOuvert, setConseillerOuvert] = useState<string | null>(null);
     const [envoiEnCours, setEnvoiEnCours]         = useState(false);
     const [confirmation, setConfirmation]         = useState<string | null>(null);
+    const [groupe, setGroupe]                     = useState<GroupeId>("core");
+    const [comboPeriode, setComboPeriode]         = useState<Record<string, RealiseVentesCombo>>({});
+    const [comboMois, setComboMois]               = useState<Record<string, RealiseVentesCombo>>({});
+    const [comboObjectifs, setComboObjectifs]     = useState<Record<string, RealiseVentesCombo>>({});
 
     useEffect(() => {
         setHeure(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
@@ -44,15 +51,26 @@ export default function ClassementPage() {
         if (!opts?.silencieux) setLoading(true);
         setConseillerOuvert(null);
 
-        const fetches = periode === "mois"
-            ? [construireClassementPeriode("mois"), Promise.resolve([] as ConseillerStats[])]
-            : [construireClassementPeriode(periode), construireClassementPeriode("mois")];
+        const periodePromise = construireClassementPeriode(periode);
+        const moisPromise = periode === "mois" ? Promise.resolve([] as ConseillerStats[]) : construireClassementPeriode("mois");
+
+        const { debut: pDebut, fin: pFin } = joursPeriode(periode);
+        const { debut: mDebut, fin: mFin } = joursPeriode("mois");
 
         try {
-            const [data, moisData] = await Promise.all(fetches);
+            const [data, moisData, comboP, comboM, comboObj] = await Promise.all([
+                periodePromise,
+                moisPromise,
+                getRealiseVentesComboParConseiller(pDebut, pFin),
+                getRealiseVentesComboParConseiller(mDebut, mFin),
+                getObjectifsComboParConseiller(),
+            ]);
             setClassement(data);
             const map = new Map((periode === "mois" ? data : moisData).map(c => [c.id, c]));
             setMoisMap(map);
+            setComboPeriode(comboP);
+            setComboMois(comboM);
+            setComboObjectifs(comboObj);
             const ids = data.map(c => c.id);
             const avs = await getPhotosByIds(ids).catch(() => ({}));
             setPhotos(avs);
@@ -92,6 +110,20 @@ export default function ClassementPage() {
         return Math.ceil(remaining / daysLeft * 6);
     }
 
+    // Même cascade que getObjDynamic, pour les 3 items "ventes combo" (McAfee Mobile,
+    // Assurance essentielle, Canal+) dont le réalisé/objectif vient de variable_actes_jour.
+    function getObjDynamicCombo(conseillerId: string, code: ComboCode): number {
+        const objMois = comboObjectifs[conseillerId]?.[code] ?? 0;
+        if (periode === "mois") return objMois;
+        const monthVal  = comboMois[conseillerId]?.[code] ?? 0;
+        const periodVal = comboPeriode[conseillerId]?.[code] ?? 0;
+        const doneBeforePeriod = Math.max(monthVal - periodVal, 0);
+        const remaining        = Math.max(objMois - doneBeforePeriod, 0);
+        const daysLeft          = workingDaysRemaining();
+        if (periode === "jour") return Math.ceil(remaining / daysLeft);
+        return Math.ceil(remaining / daysLeft * 6);
+    }
+
     async function handleFeliciter(prenom: string, conseillerNom: string, message: string) {
         setEnvoiEnCours(true);
         try {
@@ -105,6 +137,16 @@ export default function ClassementPage() {
     }
 
     const [premier, deuxieme, troisieme] = classement;
+
+    const groupeActif = GROUPES.find((g) => g.id === groupe) ?? GROUPES[0];
+    const produitsGroupeCourant = PRODUITS_CLASSEMENT.filter((p) => groupeActif.codesCore.includes(p.code));
+    const comboGroupeCourant = groupeActif.codesCombo;
+
+    function sousTotalGroupe(c: ConseillerStats): number {
+        const combo = comboPeriode[c.id] ?? COMBO_VIDE;
+        return produitsGroupeCourant.reduce((t, p) => t + (c.produits[p.key] ?? 0), 0)
+            + comboGroupeCourant.reduce((t, code) => t + (combo[code] ?? 0), 0);
+    }
 
     return (
         <main className="space-y-8">
@@ -131,21 +173,36 @@ export default function ClassementPage() {
                 </div>
             </div>
 
-            {/* Toggle période */}
-            <div className="flex gap-2">
-                {(["jour", "semaine", "mois"] as Periode[]).map((p) => (
-                    <button
-                        key={p}
-                        onClick={() => setPeriode(p)}
-                        className={`rounded-2xl px-5 py-2.5 text-sm font-bold transition-all ${
-                            periode === p
-                                ? "bg-slate-900 text-white shadow-lg"
-                                : "bg-white text-slate-500 shadow-sm hover:bg-slate-50"
-                        }`}
-                    >
-                        {PERIODE_LABELS[p]}
-                    </button>
-                ))}
+            {/* Toggle période + groupe de produits */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex gap-2">
+                    {(["jour", "semaine", "mois"] as Periode[]).map((p) => (
+                        <button
+                            key={p}
+                            onClick={() => setPeriode(p)}
+                            className={`rounded-2xl px-5 py-2.5 text-sm font-bold transition-all ${
+                                periode === p
+                                    ? "bg-slate-900 text-white shadow-lg"
+                                    : "bg-white text-slate-500 shadow-sm hover:bg-slate-50"
+                            }`}
+                        >
+                            {PERIODE_LABELS[p]}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex gap-1.5 rounded-2xl bg-white p-1.5 shadow-sm">
+                    {GROUPES.map((g) => (
+                        <button
+                            key={g.id}
+                            onClick={() => setGroupe(g.id)}
+                            className={`rounded-xl px-4 py-2 text-xs font-black transition-all ${
+                                groupe === g.id ? "bg-violet-600 text-white shadow" : "text-slate-400 hover:bg-slate-50"
+                            }`}
+                        >
+                            {g.label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Confirmation félicitation */}
@@ -233,13 +290,19 @@ export default function ClassementPage() {
                                     <tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-300">
                                         <th className="w-8 px-3 pb-2">#</th>
                                         <th className="px-3 pb-2">Conseiller</th>
-                                        {PRODUITS_CLASSEMENT.map((p) => (
+                                        {produitsGroupeCourant.map((p) => (
                                             <th key={p.key} className="px-2 pb-2 text-center">
                                                 {p.emoji} {p.label}
                                             </th>
                                         ))}
+                                        {comboGroupeCourant.map((code) => (
+                                            <th key={code} className="px-2 pb-2 text-center">
+                                                {COMBO_META[code].emoji} {COMBO_META[code].label}
+                                            </th>
+                                        ))}
+                                        <th className="px-2 pb-2 text-center" title={`Somme des colonnes "${groupeActif.label}"`}>Sous-total</th>
                                         <th className="px-2 pb-2 text-center" title="Nombre d'articles par vente">NAP</th>
-                                        <th className="px-3 pb-2 text-right">Total</th>
+                                        <th className="px-3 pb-2 text-right">Total général</th>
                                         <th className="px-3 pb-2" />
                                     </tr>
                                 </thead>
@@ -270,7 +333,7 @@ export default function ClassementPage() {
                                                     </td>
 
                                                     {/* Par produit */}
-                                                    {PRODUITS_CLASSEMENT.map((p) => {
+                                                    {produitsGroupeCourant.map((p) => {
                                                         const realise  = c.produits[p.key] ?? 0;
                                                         const objectif = getObjDynamic(c, p.key);
                                                         const taux     = objectif > 0
@@ -315,6 +378,41 @@ export default function ClassementPage() {
                                                         );
                                                     })}
 
+                                                    {/* Ventes combo (McAfee Mobile / Assurance ess. / Canal+) */}
+                                                    {comboGroupeCourant.map((code) => {
+                                                        const combo    = comboPeriode[c.id] ?? COMBO_VIDE;
+                                                        const realise  = combo[code] ?? 0;
+                                                        const objectif = getObjDynamicCombo(c.id, code);
+                                                        const taux     = objectif > 0
+                                                            ? Math.round((realise / objectif) * 100)
+                                                            : realise > 0 ? 100 : 0;
+                                                        const barColor = taux >= 100
+                                                            ? "bg-emerald-500"
+                                                            : taux >= 50 ? "bg-amber-400" : "bg-red-400";
+                                                        return (
+                                                            <td key={code} className="px-2 py-3 text-center">
+                                                                <p className="text-sm font-black text-slate-800">
+                                                                    {realise}
+                                                                    {objectif > 0 && (
+                                                                        <span className="text-xs font-normal text-slate-300"> /{objectif}</span>
+                                                                    )}
+                                                                </p>
+                                                                <div className="mx-auto mt-1 h-1 w-12 overflow-hidden rounded-full bg-slate-200">
+                                                                    <div
+                                                                        className={`h-full rounded-full ${barColor} transition-all duration-500`}
+                                                                        style={{ width: `${Math.min(taux, 100)}%` }}
+                                                                    />
+                                                                </div>
+                                                                <p className="mt-0.5 text-[10px] text-slate-400">{taux}%</p>
+                                                            </td>
+                                                        );
+                                                    })}
+
+                                                    {/* Sous-total du groupe actif */}
+                                                    <td className="px-2 py-3 text-center">
+                                                        <span className="text-sm font-black text-violet-600">{sousTotalGroupe(c)}</span>
+                                                    </td>
+
                                                     {/* Articles / vente */}
                                                     <td className="px-2 py-3 text-center">
                                                         <span className="text-sm font-black text-teal-600">{c.moyenneArticles.toFixed(2)}</span>
@@ -339,7 +437,7 @@ export default function ClassementPage() {
                                                 {/* Félicitation inline */}
                                                 {ouvert && (
                                                     <tr>
-                                                        <td colSpan={PRODUITS_CLASSEMENT.length + 5} className="px-3 pb-3">
+                                                        <td colSpan={produitsGroupeCourant.length + comboGroupeCourant.length + 6} className="px-3 pb-3">
                                                             <FelicitationCard
                                                                 conseillerId={c.id}
                                                                 conseiller={prenom}

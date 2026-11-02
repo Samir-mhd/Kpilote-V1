@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { PRODUITS_CLASSEMENT, PRODUITS_HORS_TOTAL_CLASSEMENT } from "@/utils/produits";
-import { Periode, PERIODE_LABELS, couleurTaux, periodeSemaineEffective } from "@/utils/periodes";
+import { Periode, PERIODE_LABELS, couleurTaux, periodeSemaineEffective, joursPeriode } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 import { construireClassementTrophees, ConseillerTrophees } from "@/services/badgesManagerService";
 import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
@@ -12,8 +12,11 @@ import type { ProduitCode } from "@/utils/produits";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { supabase } from "@/lib/supabase";
+import { getRealiseVentesComboParConseiller, getObjectifsComboParConseiller, RealiseVentesCombo } from "@/services/variableConseiller";
+import { GROUPES, GroupeId, COMBO_META, ComboCode } from "@/utils/classementGroupes";
 
 const medals = ["🥇", "🥈", "🥉"];
+const COMBO_VIDE: RealiseVentesCombo = { mcafee_mobile: 0, assurance_essentielle: 0, canal_plus: 0 };
 const ONGLETS: { id: Periode | "trophees"; label: string }[] = [
     { id: "jour", label: PERIODE_LABELS.jour },
     { id: "semaine", label: PERIODE_LABELS.semaine },
@@ -40,6 +43,11 @@ function ClassementInner() {
     const [photosTrophees, setPhotosTrophees] = useState<Record<string, string | null>>({});
     const [loadingTrophees, setLoadingTrophees] = useState(true);
 
+    const [groupe, setGroupe]                     = useState<GroupeId>("core");
+    const [comboPeriode, setComboPeriode]         = useState<Record<string, RealiseVentesCombo>>({});
+    const [comboSemaine, setComboSemaine]         = useState<Record<string, RealiseVentesCombo>>({});
+    const [comboObjectifsMensuels, setComboObjectifsMensuels] = useState<Record<string, RealiseVentesCombo>>({});
+
     async function charger(p: Periode, opts?: { silencieux?: boolean }) {
         if (!opts?.silencieux) setLoading(true);
         try {
@@ -47,9 +55,16 @@ function ClassementInner() {
                 ? [construireClassementPeriode("mois"), Promise.resolve([] as ConseillerStats[])]
                 : [construireClassementPeriode(p), construireClassementPeriode("mois")];
 
-            const [data, moisData] = await Promise.all(fetches);
+            const { debut: pDebut, fin: pFin } = joursPeriode(p);
+            const [data, moisData, comboP, comboObj] = await Promise.all([
+                ...fetches,
+                getRealiseVentesComboParConseiller(pDebut, pFin),
+                getObjectifsComboParConseiller(),
+            ]) as [ConseillerStats[], ConseillerStats[], Record<string, RealiseVentesCombo>, Record<string, RealiseVentesCombo>];
             setClassement(data);
             setMoisMap(new Map((p === "mois" ? data : moisData).map(c => [c.id, c])));
+            setComboPeriode(comboP);
+            setComboObjectifsMensuels(comboObj);
             setMaj(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
             const ids = data.map(c => c.id);
             const avs = await getPhotosByIds(ids).catch(() => ({}));
@@ -66,12 +81,15 @@ function ClassementInner() {
             // planifiés restants de la semaine, selon le planning réel de chaque conseiller
             if (p === "jour") {
                 const { fin } = periodeSemaineEffective();
-                const [semaineData, joursRestants] = await Promise.all([
+                const { debut: semDebutStr, fin: semFinStr } = joursPeriode("semaine");
+                const [semaineData, joursRestants, comboSem] = await Promise.all([
                     construireClassementPeriode("semaine").catch(() => [] as ConseillerStats[]),
                     getJoursTravailPlageTous(ids, new Date(), fin).catch(() => ({})),
+                    getRealiseVentesComboParConseiller(semDebutStr, semFinStr).catch(() => ({} as Record<string, RealiseVentesCombo>)),
                 ]);
                 setSemaineMap(new Map(semaineData.map(c => [c.id, c])));
                 setJoursRestantsSemaine(joursRestants);
+                setComboSemaine(comboSem);
             }
         } catch {}
         finally { if (!opts?.silencieux) setLoading(false); }
@@ -142,6 +160,26 @@ function ClassementInner() {
         return joursRestants > 0 ? Math.ceil(reste / joursRestants) : reste;
     }
 
+    // Même cascade que getObjDynamic, pour les 3 items "ventes combo" (McAfee Mobile, Assurance
+    // essentielle, Canal+) dont le réalisé/objectif vient de variable_actes_jour.
+    function objSemaineCombo(conseillerId: string, code: ComboCode): number {
+        const figes = objSemaine[conseillerId] as unknown as Record<string, number> | undefined;
+        return figes?.[code] ?? 0;
+    }
+
+    function getObjDynamicCombo(conseillerId: string, code: ComboCode): number {
+        if (periode === "mois") return comboObjectifsMensuels[conseillerId]?.[code] ?? 0;
+        if (periode === "semaine") return objSemaineCombo(conseillerId, code);
+
+        const objSemaineFixe = objSemaineCombo(conseillerId, code);
+        const realiseSemaine = comboSemaine[conseillerId]?.[code] ?? 0;
+        const realiseAujourdhui = comboPeriode[conseillerId]?.[code] ?? 0;
+        const realiseAvantAujourdhui = Math.max(realiseSemaine - realiseAujourdhui, 0);
+        const reste = Math.max(objSemaineFixe - realiseAvantAujourdhui, 0);
+        const joursRestants = joursRestantsSemaine[conseillerId] ?? 0;
+        return joursRestants > 0 ? Math.ceil(reste / joursRestants) : reste;
+    }
+
     const monRang = classement.findIndex(c => c.id === conseillerId) + 1;
     const monRangTrophees = trophees.findIndex(c => c.id === conseillerId) + 1;
     const top3    = classement.slice(0, 3);
@@ -149,6 +187,16 @@ function ClassementInner() {
     const podiumRangs = [2, 1, 3];
     const podiumH     = ["h-20", "h-28", "h-16"];
     const podiumSizes = [56, 72, 56];
+
+    const groupeActif = GROUPES.find((g) => g.id === groupe) ?? GROUPES[0];
+    const produitsGroupeCourant = PRODUITS_CLASSEMENT.filter((p) => groupeActif.codesCore.includes(p.code));
+    const comboGroupeCourant = groupeActif.codesCombo;
+
+    function sousTotalGroupe(c: ConseillerStats): number {
+        const combo = comboPeriode[c.id] ?? COMBO_VIDE;
+        return produitsGroupeCourant.reduce((t, p) => t + (c.produits[p.key] ?? 0), 0)
+            + comboGroupeCourant.reduce((t, code) => t + (combo[code] ?? 0), 0);
+    }
 
     return (
         <div className="space-y-8">
@@ -180,27 +228,44 @@ function ClassementInner() {
                     )}
             </div>
 
-            {/* Onglets */}
-            <div className="flex flex-wrap gap-2">
-                {ONGLETS.map(o => {
-                    const actif = o.id === "trophees" ? ongletTrophees : (!ongletTrophees && periode === o.id);
-                    return (
-                        <button
-                            key={o.id}
-                            onClick={() => {
-                                if (o.id === "trophees") setOngletTrophees(true);
-                                else { setOngletTrophees(false); setPeriode(o.id); }
-                            }}
-                            className={`rounded-2xl px-5 py-2.5 text-sm font-bold transition-all ${
-                                actif
-                                    ? o.id === "trophees" ? "bg-amber-500 text-white" : "bg-slate-900 text-white"
-                                    : "bg-white text-slate-500 shadow-sm hover:bg-slate-50"
-                            }`}
-                        >
-                            {o.label}
-                        </button>
-                    );
-                })}
+            {/* Onglets + groupe de produits */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-2">
+                    {ONGLETS.map(o => {
+                        const actif = o.id === "trophees" ? ongletTrophees : (!ongletTrophees && periode === o.id);
+                        return (
+                            <button
+                                key={o.id}
+                                onClick={() => {
+                                    if (o.id === "trophees") setOngletTrophees(true);
+                                    else { setOngletTrophees(false); setPeriode(o.id); }
+                                }}
+                                className={`rounded-2xl px-5 py-2.5 text-sm font-bold transition-all ${
+                                    actif
+                                        ? o.id === "trophees" ? "bg-amber-500 text-white" : "bg-slate-900 text-white"
+                                        : "bg-white text-slate-500 shadow-sm hover:bg-slate-50"
+                                }`}
+                            >
+                                {o.label}
+                            </button>
+                        );
+                    })}
+                </div>
+                {!ongletTrophees && (
+                    <div className="flex gap-1.5 rounded-2xl bg-white p-1.5 shadow-sm">
+                        {GROUPES.map((g) => (
+                            <button
+                                key={g.id}
+                                onClick={() => setGroupe(g.id)}
+                                className={`rounded-xl px-4 py-2 text-xs font-black transition-all ${
+                                    groupe === g.id ? "bg-green-600 text-white shadow" : "text-slate-400 hover:bg-slate-50"
+                                }`}
+                            >
+                                {g.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {ongletTrophees ? (
@@ -301,11 +366,15 @@ function ClassementInner() {
                                     <tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-300">
                                         <th className="px-4 pb-2">#</th>
                                         <th className="px-4 pb-2">Conseiller</th>
-                                        {PRODUITS_CLASSEMENT.map(p => (
+                                        {produitsGroupeCourant.map(p => (
                                             <th key={p.code} className="px-2 pb-2 text-center">{p.emoji} {p.label}</th>
                                         ))}
+                                        {comboGroupeCourant.map(code => (
+                                            <th key={code} className="px-2 pb-2 text-center">{COMBO_META[code].emoji} {COMBO_META[code].label}</th>
+                                        ))}
+                                        <th className="px-2 pb-2 text-center" title={`Somme des colonnes "${groupeActif.label}"`}>Sous-total</th>
                                         <th className="px-2 pb-2 text-center" title="Nombre d'articles par vente">NAP</th>
-                                        <th className="px-4 pb-2 text-right">Total</th>
+                                        <th className="px-4 pb-2 text-right">Total général</th>
                                         <th className="px-5 pb-2 text-right">Taux</th>
                                     </tr>
                                 </thead>
@@ -333,7 +402,7 @@ function ClassementInner() {
                                                         </span>
                                                     </div>
                                                 </td>
-                                                {PRODUITS_CLASSEMENT.map(p => {
+                                                {produitsGroupeCourant.map(p => {
                                                     const val = c.produits[p.key];
                                                     const obj = getObjDynamic(c, p.key);
                                                     const col = couleurTaux(val, obj);
@@ -373,6 +442,32 @@ function ClassementInner() {
                                                         </td>
                                                     );
                                                 })}
+                                                {comboGroupeCourant.map(code => {
+                                                    const combo = comboPeriode[c.id] ?? COMBO_VIDE;
+                                                    const val = combo[code] ?? 0;
+                                                    const obj = getObjDynamicCombo(c.id, code);
+                                                    const col = couleurTaux(val, obj);
+                                                    return (
+                                                        <td key={code} className="px-2 py-3 text-center">
+                                                            <div>
+                                                                <div className={`mx-auto inline-flex h-8 min-w-[40px] items-center justify-center rounded-xl px-2 text-sm font-black ${col.bg} ${col.text} border ${col.border}`}>
+                                                                    {val}
+                                                                </div>
+                                                                {obj > 0 && (
+                                                                    <>
+                                                                        <div className="mx-auto mt-1 h-1 w-12 overflow-hidden rounded-full bg-slate-200">
+                                                                            <div className={`h-full rounded-full ${col.bar}`} style={{ width: `${Math.min(val / obj * 100, 100)}%` }} />
+                                                                        </div>
+                                                                        <p className={`text-[10px] ${col.text} opacity-70`}>{obj}</p>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                })}
+                                                <td className="px-2 py-3 text-center">
+                                                    <span className="text-sm font-black text-violet-600">{sousTotalGroupe(c)}</span>
+                                                </td>
                                                 <td className="px-2 py-3 text-center">
                                                     <span className="text-sm font-black text-teal-600">{c.moyenneArticles.toFixed(2)}</span>
                                                 </td>
