@@ -301,7 +301,9 @@ export default function ClassementPage() {
                                             </th>
                                         ))}
                                         <th className="px-2 pb-2 text-center" title={`Somme des colonnes "${groupeActif.label}"`}>Sous-total</th>
-                                        <th className="px-2 pb-2 text-center" title="Nombre d'articles par vente">NAP</th>
+                                        {groupe === "core" && (
+                                            <th className="px-2 pb-2 text-center" title="Nombre d'articles par vente">NAP</th>
+                                        )}
                                         <th className="px-3 pb-2 text-right">Total général</th>
                                         <th className="px-3 pb-2" />
                                     </tr>
@@ -414,9 +416,11 @@ export default function ClassementPage() {
                                                     </td>
 
                                                     {/* Articles / vente */}
-                                                    <td className="px-2 py-3 text-center">
-                                                        <span className="text-sm font-black text-teal-600">{c.moyenneArticles.toFixed(2)}</span>
-                                                    </td>
+                                                    {groupe === "core" && (
+                                                        <td className="px-2 py-3 text-center">
+                                                            <span className="text-sm font-black text-teal-600">{c.moyenneArticles.toFixed(2)}</span>
+                                                        </td>
+                                                    )}
 
                                                     {/* Total */}
                                                     <td className="px-3 py-3 text-right">
@@ -437,7 +441,7 @@ export default function ClassementPage() {
                                                 {/* Félicitation inline */}
                                                 {ouvert && (
                                                     <tr>
-                                                        <td colSpan={produitsGroupeCourant.length + comboGroupeCourant.length + 6} className="px-3 pb-3">
+                                                        <td colSpan={produitsGroupeCourant.length + comboGroupeCourant.length + (groupe === "core" ? 6 : 5)} className="px-3 pb-3">
                                                             <FelicitationCard
                                                                 conseillerId={c.id}
                                                                 conseiller={prenom}

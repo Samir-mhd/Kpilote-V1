@@ -373,7 +373,9 @@ function ClassementInner() {
                                             <th key={code} className="px-2 pb-2 text-center">{COMBO_META[code].emoji} {COMBO_META[code].label}</th>
                                         ))}
                                         <th className="px-2 pb-2 text-center" title={`Somme des colonnes "${groupeActif.label}"`}>Sous-total</th>
-                                        <th className="px-2 pb-2 text-center" title="Nombre d'articles par vente">NAP</th>
+                                        {groupe === "core" && (
+                                            <th className="px-2 pb-2 text-center" title="Nombre d'articles par vente">NAP</th>
+                                        )}
                                         <th className="px-4 pb-2 text-right">Total général</th>
                                         <th className="px-5 pb-2 text-right">Taux</th>
                                     </tr>
@@ -468,9 +470,11 @@ function ClassementInner() {
                                                 <td className="px-2 py-3 text-center">
                                                     <span className="text-sm font-black text-violet-600">{sousTotalGroupe(c)}</span>
                                                 </td>
-                                                <td className="px-2 py-3 text-center">
-                                                    <span className="text-sm font-black text-teal-600">{c.moyenneArticles.toFixed(2)}</span>
-                                                </td>
+                                                {groupe === "core" && (
+                                                    <td className="px-2 py-3 text-center">
+                                                        <span className="text-sm font-black text-teal-600">{c.moyenneArticles.toFixed(2)}</span>
+                                                    </td>
+                                                )}
                                                 <td className="px-4 py-3 text-right">
                                                     <p className={`text-lg font-black ${isMoi ? "text-green-700" : "text-slate-800"}`}>{c.total}</p>
                                                 </td>
