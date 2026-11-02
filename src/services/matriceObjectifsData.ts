@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { invaliderObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import { ItemLieConfig, MatriceConfig, ConseillerMatriceInput, ItemPrincipal, Profil, ResultatMatrice } from "./matriceObjectifs";
 
 /** Item de la matrice -> code produit dans `produits`/`objectifs_mensuels`. Fixe (les items liés
@@ -253,6 +254,10 @@ export async function appliquerMatriceVersObjectifsConseiller(resultat: Resultat
         const { error: errInsert } = await supabase.from("objectifs_mensuels").insert(inserts);
         if (errInsert) throw errInsert;
     }
+
+    // Sinon l'objectif semaine figé (calculé avec les anciens objectifs) resterait en place
+    // jusqu'au lundi suivant.
+    await invaliderObjectifsSemaineFiges(conseillerIds);
 }
 
 export { COLONNE_TAUX };

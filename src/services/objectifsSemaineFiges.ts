@@ -9,6 +9,8 @@ import { PRODUITS_ORDRE, ProduitCode } from "@/utils/produits";
 import { getJoursTravailPlageTous, getJoursTravailSemaineTous } from "@/services/planningService";
 import { fetchToutesLesLignes } from "@/utils/supabasePaging";
 import { periodeSemaineEffective } from "@/utils/periodes";
+import { getRealiseVentesComboParConseiller } from "@/services/variableConseiller";
+import type { ComboCode } from "@/utils/classementGroupes";
 
 function dateStr(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -18,6 +20,11 @@ function dateStr(d: Date): string {
 const CODES_MANUELS = PRODUITS_ORDRE
     .filter((p) => p.code !== "spiderhome" && p.code !== "recap_commercial")
     .map((p) => p.code) as ProduitCode[];
+
+// Items "ventes combo" : même cascade semaine figée, mais leur réalisé vient de
+// variable_actes_jour (pas de la table ventes).
+const CODES_COMBO: ComboCode[] = ["mcafee_mobile", "assurance_essentielle", "canal_plus"];
+const CODES_FIGES = [...CODES_MANUELS, ...CODES_COMBO] as ProduitCode[];
 
 /**
  * Invalide l'objectif semaine figé EN COURS pour les conseillers donnés — à appeler après une
@@ -64,7 +71,7 @@ export async function getObjectifsSemaineFiges(
 
     const manquants: { conseillerId: string; produitCode: ProduitCode }[] = [];
     conseillerIds.forEach((id) => {
-        CODES_MANUELS.forEach((code) => {
+        CODES_FIGES.forEach((code) => {
             if (result[id][code] === undefined) manquants.push({ conseillerId: id, produitCode: code });
         });
     });
@@ -73,7 +80,7 @@ export async function getObjectifsSemaineFiges(
 
     const [{ data: objectifsMensuels }, { data: produits }] = await Promise.all([
         supabase.from("objectifs_mensuels").select("conseiller_id, objectif, produits(code)").in("conseiller_id", conseillerIds),
-        supabase.from("produits").select("id, code").in("code", CODES_MANUELS),
+        supabase.from("produits").select("id, code").in("code", CODES_FIGES),
     ]);
 
     const produitIdParCode: Record<string, string> = {};
@@ -104,7 +111,12 @@ export async function getObjectifsSemaineFiges(
             .range(from, to)
     );
 
+    const comboMois = await getRealiseVentesComboParConseiller(dateStr(debutMois), dateStr(new Date()));
+
     const realiseMap: Record<string, Record<string, number>> = {};
+    Object.entries(comboMois).forEach(([conseillerId, combo]) => {
+        realiseMap[conseillerId] = { ...combo };
+    });
     ventesMois.forEach((v: any) => {
         const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code;
         if (!code || code === "spiderhome") return;
