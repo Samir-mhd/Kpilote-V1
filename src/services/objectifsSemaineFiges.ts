@@ -94,10 +94,14 @@ export async function getObjectifsSemaineFiges(
         objMensuelMap[o.conseiller_id][code] = (objMensuelMap[o.conseiller_id][code] ?? 0) + (o.objectif ?? 0);
     });
 
-    // Réalisé du mois à date (maintenant) par conseiller × produit
-    const debutMois = new Date();
-    debutMois.setDate(1);
-    debutMois.setHours(0, 0, 0, 0);
+    // Réalisé du mois AVANT le début de la semaine : le figé donne le même résultat qu'il soit
+    // calculé lundi matin ou recalculé en milieu de semaine (après une invalidation). Les ventes
+    // de la semaine en cours sont déjà déduites par l'objectif jour, il ne faut pas les compter
+    // deux fois.
+    const debutMois = new Date(debut.getFullYear(), debut.getMonth(), 1);
+    const debutSemaine = new Date(debut.getFullYear(), debut.getMonth(), debut.getDate());
+    const veilleDebutSemaine = new Date(debutSemaine);
+    veilleDebutSemaine.setDate(debutSemaine.getDate() - 1);
 
     // Paginé : au-delà de 1000 lignes (plafond Supabase par défaut), les ventes de l'équipe
     // sur un mois seraient coupées silencieusement, sans tri garanti.
@@ -107,11 +111,15 @@ export async function getObjectifsSemaineFiges(
             .select("conseiller_id, quantite, produits(code)")
             .in("conseiller_id", conseillerIds)
             .gte("created_at", debutMois.toISOString())
+            .lt("created_at", debutSemaine.toISOString())
             .order("created_at", { ascending: true })
             .range(from, to)
     );
 
-    const comboMois = await getRealiseVentesComboParConseiller(dateStr(debutMois), dateStr(new Date()));
+    // Semaine qui démarre le 1er du mois : rien à déduire (veille < début du mois).
+    const comboMois = veilleDebutSemaine >= debutMois
+        ? await getRealiseVentesComboParConseiller(dateStr(debutMois), dateStr(veilleDebutSemaine))
+        : {};
 
     const realiseMap: Record<string, Record<string, number>> = {};
     Object.entries(comboMois).forEach(([conseillerId, combo]) => {
