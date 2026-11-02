@@ -35,6 +35,7 @@ function ClassementInner() {
     const [semaineMap, setSemaineMap]       = useState(new Map<string, ConseillerStats>());
     const [objSemaine, setObjSemaine]       = useState<Record<string, Record<ProduitCode, number>>>({});
     const [joursRestantsSemaine, setJoursRestantsSemaine] = useState<Record<string, number>>({});
+    const [planifieAujourdhui, setPlanifieAujourdhui] = useState<Record<string, number>>({});
     const [photos, setPhotos]               = useState<Record<string, string | null>>({});
     const [loading, setLoading]             = useState(true);
     const [maj, setMaj]                     = useState("");
@@ -83,13 +84,15 @@ function ClassementInner() {
             if (p === "jour") {
                 const { fin } = periodeSemaineEffective();
                 const { debut: semDebutStr, fin: semFinStr } = joursPeriode("semaine");
-                const [semaineData, joursRestants, comboSem] = await Promise.all([
+                const [semaineData, joursRestants, comboSem, aujourdhui] = await Promise.all([
                     construireClassementPeriode("semaine").catch(() => [] as ConseillerStats[]),
                     getJoursTravailPlageTous(ids, new Date(), fin).catch(() => ({})),
                     getRealiseVentesComboParConseiller(semDebutStr, semFinStr).catch(() => ({} as Record<string, RealiseVentesCombo>)),
+                    getJoursTravailPlageTous(ids, new Date(), new Date()).catch(() => ({} as Record<string, number>)),
                 ]);
                 setSemaineMap(new Map(semaineData.map(c => [c.id, c])));
                 setJoursRestantsSemaine(joursRestants);
+                setPlanifieAujourdhui(aujourdhui);
                 setComboSemaine(comboSem);
             }
         } catch {}
@@ -150,6 +153,9 @@ function ClassementInner() {
         const objMois   = c.objectifs[key] ?? 0;
         if (periode === "mois") return objMois;
         if (periode === "semaine") return objSemaine[c.id]?.[key] ?? 0;
+        // Pas planifié aujourd'hui (off, formation, congés...) : rien à faire aujourd'hui, le reste
+        // de la semaine se répartit sur ses prochains jours planifiés.
+        if (planifieAujourdhui[c.id] === 0) return 0;
 
         const objSemaineFixe = objSemaine[c.id]?.[key] ?? 0;
         const semaineStats   = semaineMap.get(c.id);
@@ -171,6 +177,7 @@ function ClassementInner() {
     function getObjDynamicCombo(conseillerId: string, code: ComboCode): number {
         if (periode === "mois") return comboObjectifsMensuels[conseillerId]?.[code] ?? 0;
         if (periode === "semaine") return objSemaineCombo(conseillerId, code);
+        if (planifieAujourdhui[conseillerId] === 0) return 0;
 
         const objSemaineFixe = objSemaineCombo(conseillerId, code);
         const realiseSemaine = comboSemaine[conseillerId]?.[code] ?? 0;

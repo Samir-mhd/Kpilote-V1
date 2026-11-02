@@ -143,14 +143,17 @@ export async function getMissionsReelles(conseillerId: string) {
     // Semaine tronquée aux bornes du mois : ne chevauche jamais un changement de mois.
     const { debut, fin } = periodeSemaineEffective(now);
 
-    const [resultats, ventesJour, objSemaineParConseiller, ventesSemaine, joursRestantsSemaine] = await Promise.all([
+    const [resultats, ventesJour, objSemaineParConseiller, ventesSemaine, joursRestantsSemaine, planifieAujourdhui] = await Promise.all([
         // McAfee Mobile / Assurance essentielle / Canal+ : visibles uniquement sur la vue Objectifs, jamais sur l'Accueil.
         calcul(conseillerId, annee, mois, getVentesDuMois, CODES_VENTES_COMBO),
         getVentesDuJour(conseillerId),
         getObjectifsSemaineFiges([conseillerId], debut, fin),
         getVentesDepuisLundi(conseillerId, debut),
         getJoursTravailPlage(conseillerId, now, fin), // jours planifiés restants de la semaine, aujourd'hui inclus
+        getJoursTravailPlage(conseillerId, now, now), // 0 si off / formation / congés aujourd'hui
     ]);
+    // Pas planifié aujourd'hui : aucun objectif du jour, le reste se répartit sur les prochains jours planifiés.
+    const travailleAujourdhui = planifieAujourdhui > 0;
 
     // Index des ventes d'aujourd'hui par code produit
     const realiseJour: Record<string, number> = {};
@@ -175,7 +178,7 @@ export async function getMissionsReelles(conseillerId: string) {
         if (code === "spiderhome" || code === "recap_commercial") {
             return {
                 produit:  m.produit,
-                objectif: m.objectifJour, // Hors cascade semaine, calcul auto mensuel (coeff × jours) inchangé
+                objectif: travailleAujourdhui ? m.objectifJour : 0, // Hors cascade semaine, calcul auto mensuel (coeff × jours) inchangé
                 realise:  realiseAujourdhui,
                 couleur:  couleurProduit(m.produit),
                 message:  m.message,
@@ -190,7 +193,7 @@ export async function getMissionsReelles(conseillerId: string) {
 
         return {
             produit:  m.produit,
-            objectif: objectifJour,
+            objectif: travailleAujourdhui ? objectifJour : 0,
             realise:  realiseAujourdhui, // ventes d'aujourd'hui = 0 au début de chaque journée
             couleur:  couleurProduit(m.produit),
             message:  m.message,
