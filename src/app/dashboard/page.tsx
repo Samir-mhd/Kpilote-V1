@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import HeroHeader from "@/components/dashboard/HeroHeader";
+import HeroCompact from "@/components/dashboard/HeroCompact";
 import StatsBar from "@/components/dashboard/StatsBar";
 import MorningCheck from "@/components/dashboard/MorningCheck";
 import MissionCard, { QuestionCrossSell } from "@/components/MissionCard";
@@ -91,6 +92,8 @@ export default function Dashboard() {
     const searchParams = useSearchParams();
     const nom = searchParams.get("nom") || "Conseiller";
     const conseillerId = searchParams.get("id") || "";
+    // Variante de mise en page en test (comparaison) : /dashboard?...&layout=v2
+    const layoutV2 = searchParams.get("layout") === "v2";
 
     // checkLoading : true pendant la vérification DB (évite un flash du check avant la réponse)
     const [checkLoading,          setCheckLoading]          = useState(!!conseillerId);
@@ -824,8 +827,39 @@ export default function Dashboard() {
         setCoachMessage("🎁 Vente combo enregistrée — bien joué !");
     }
 
+    // Cartes objectifs — partagées par les deux mises en page (seul l'affichage change en compact).
+    function cartesMissions(compact: boolean) {
+        return ordonnerAccueil(missions).map((mission) => (
+            <MissionCard
+                key={mission.produit}
+                compact={compact}
+                titre={mission.produit}
+                realise={mission.realise}
+                objectif={mission.objectif}
+                couleur={mission.couleur}
+                onSale={handleSale}
+                sousChoix={variableActivee ? sousChoixPour(mission.produit) : undefined}
+                acteDirect={variableActivee ? acteDirectPour(mission.produit) : undefined}
+                onChoixVariable={variableActivee ? ajouterActeVariable : undefined}
+                demanderCrossSell4P={variableActivee ? demanderCrossSell4PPour(mission.produit) : false}
+                montantCrossSell4P={bareme.cross_sell_4p}
+                onCrossSell4P={variableActivee ? async () => {
+                    await ajouterActeVariable(VENTE_4P_ACTE);
+                    // Le forfait lui-même reste sur le mois en cours ; seul son bonus 4P
+                    // est différé à M+2 (le 4P sur box est déjà géré via le raccordement).
+                    if (normaliser(mission.produit) === "forfaits" && conseillerId) {
+                        creerForfait4PDiffere(conseillerId, bareme.cross_sell_4p).catch(() => {});
+                    }
+                } : undefined}
+                questionsCrossSellPour={variableActivee ? (choix) => calculerQuestionsCrossSell(mission.produit, choix) : undefined}
+                onBoostReady={afficherBoostToast}
+                dernierJourSemaine={mission.dernierJourSemaine}
+            />
+        ));
+    }
+
     return (
-        <div className="space-y-8">
+        <div className={layoutV2 ? "space-y-6" : "space-y-8"}>
 
             {/* ── Overlay résultat challenge (gagné / perdu) ────────────── */}
             {challengeResult && (
@@ -1008,14 +1042,28 @@ export default function Dashboard() {
                 </div>
             )}
 
-            <HeroHeader
-                nom={nom}
-                message={heroMessage}
-                coachMessage={coachMessage}
-                progression={tauxGlobal}
-                rang={rang}
-                avatarEtat={avatarEtat}
-            />
+            {layoutV2 ? (
+                <HeroCompact
+                    nom={nom}
+                    avatarEtat={avatarEtat}
+                    rang={rang}
+                    realise={realiseGlobal}
+                    objectif={objectifGlobal}
+                    taux={tauxGlobal}
+                    cagnotte={variableActivee ? { total: cagnotteTotal, hier: cagnotteHier, flash: cagnotteFlash } : null}
+                    prochainBadge={prochainBadge}
+                    badgeHref={`/dashboard/badges?id=${conseillerId}&nom=${encodeURIComponent(nom)}`}
+                />
+            ) : (
+                <HeroHeader
+                    nom={nom}
+                    message={heroMessage}
+                    coachMessage={coachMessage}
+                    progression={tauxGlobal}
+                    rang={rang}
+                    avatarEtat={avatarEtat}
+                />
+            )}
 
             {/* ── Invitations défi reçues ──────────────────────────────── */}
             {invitations.map((inv) => (
@@ -1139,6 +1187,38 @@ export default function Dashboard() {
                 </div>
             )}
 
+            {layoutV2 ? (
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                    <section className="xl:col-span-2">
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <h2 className="text-xl font-black text-slate-900">Tes objectifs du jour</h2>
+                                {missions.some((m) => m.dernierJourSemaine) && (
+                                    <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                                        📅 Dernier jour de ta semaine : le reste de tes objectifs se joue aujourd&apos;hui
+                                    </p>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => (variableActivee ? setComboOuvert(true) : setComboSansVarianteOuvert(true))}
+                                className="flex items-center gap-2 rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50 px-4 py-2.5 text-sm font-black text-amber-700 shadow-[0_4px_16px_rgba(217,119,6,.12)] transition-all hover:border-amber-400 hover:shadow-[0_8px_24px_rgba(217,119,6,.22)] active:scale-[0.97]"
+                            >
+                                <span className="text-lg leading-none">🎁</span>
+                                Vente combo
+                                <span className="hidden text-xs font-semibold text-amber-600 sm:inline">· box + forfait + assurance…</span>
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-4">
+                            {cartesMissions(true)}
+                        </div>
+                    </section>
+
+                    <aside className="xl:sticky xl:top-6 xl:self-start">
+                        <TeamFeed conseillerId={conseillerId} />
+                    </aside>
+                </div>
+            ) : (
+            <>
             {variableActivee ? (
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
                     <div className="lg:col-span-2">
@@ -1210,34 +1290,11 @@ export default function Dashboard() {
                 </button>
 
                 <div className="grid gap-5 sm:grid-cols-2">
-                    {ordonnerAccueil(missions).map((mission) => (
-                        <MissionCard
-                            key={mission.produit}
-                            titre={mission.produit}
-                            realise={mission.realise}
-                            objectif={mission.objectif}
-                            couleur={mission.couleur}
-                            onSale={handleSale}
-                            sousChoix={variableActivee ? sousChoixPour(mission.produit) : undefined}
-                            acteDirect={variableActivee ? acteDirectPour(mission.produit) : undefined}
-                            onChoixVariable={variableActivee ? ajouterActeVariable : undefined}
-                            demanderCrossSell4P={variableActivee ? demanderCrossSell4PPour(mission.produit) : false}
-                            montantCrossSell4P={bareme.cross_sell_4p}
-                            onCrossSell4P={variableActivee ? async () => {
-                                await ajouterActeVariable(VENTE_4P_ACTE);
-                                // Le forfait lui-même reste sur le mois en cours ; seul son bonus 4P
-                                // est différé à M+2 (le 4P sur box est déjà géré via le raccordement).
-                                if (normaliser(mission.produit) === "forfaits" && conseillerId) {
-                                    creerForfait4PDiffere(conseillerId, bareme.cross_sell_4p).catch(() => {});
-                                }
-                            } : undefined}
-                            questionsCrossSellPour={variableActivee ? (choix) => calculerQuestionsCrossSell(mission.produit, choix) : undefined}
-                            onBoostReady={afficherBoostToast}
-                            dernierJourSemaine={mission.dernierJourSemaine}
-                        />
-                    ))}
+                    {cartesMissions(false)}
                 </div>
             </section>
+            </>
+            )}
 
             {comboOuvert && (
                 <ComboVenteModal

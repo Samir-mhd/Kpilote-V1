@@ -13,7 +13,7 @@ type Props = {
     avatarEtat?: AvatarEtat;
 };
 
-const AVATAR_PHRASES: Record<AvatarEtat, string[]> = {
+export const AVATAR_PHRASES: Record<AvatarEtat, string[]> = {
     souriant_main: [
         "Bonjour {nom} 👋",
         "Belle journée en vue, {nom} ! Prêt à cartonner ?",

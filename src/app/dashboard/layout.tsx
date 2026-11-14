@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import {
-    Home, BarChart3, Swords, Trophy, User, LineChart, Euro, Award,
+    Home, BarChart3, Swords, Trophy, User, LineChart, Euro, Award, Menu, X,
 } from "lucide-react";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { getPhotoUrl } from "@/services/photoService";
@@ -28,7 +28,17 @@ function SidebarInner() {
     const params = useSearchParams();
     const id = params.get("id") ?? "";
     const nom = params.get("nom") ?? "Conseiller";
-    const qs = id ? `?id=${id}&nom=${encodeURIComponent(nom)}` : "";
+    // Variante en test (layout=v2) : menu replié derrière un bouton, conservé d'une page à l'autre.
+    const repliable = params.get("layout") === "v2";
+    const qs = id ? `?id=${id}&nom=${encodeURIComponent(nom)}${repliable ? "&layout=v2" : ""}` : "";
+    const [ouvert, setOuvert] = useState(false);
+    useEffect(() => { setOuvert(false); }, [pathname]);
+    useEffect(() => {
+        if (!ouvert) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOuvert(false); };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [ouvert]);
 
     const [photoUrl, setPhotoUrl] = useState<string | null>(null);
     useEffect(() => {
@@ -54,8 +64,37 @@ function SidebarInner() {
     const menusBase = profilActif ? menus : menus.filter((m) => HREFS_RESTREINT.includes(m.href));
     const menusAffiches = variableActivee ? menusBase : menusBase.filter((m) => m.href !== "/dashboard/variable");
 
+    const classeAside = repliable
+        ? `fixed inset-y-0 left-0 z-50 flex h-screen w-[260px] flex-col bg-slate-950 px-5 py-7 text-white transition-transform duration-300 ${ouvert ? "translate-x-0 shadow-[8px_0_40px_rgba(0,0,0,.35)]" : "-translate-x-full"}`
+        : "sticky top-0 flex h-screen w-[245px] flex-col bg-slate-950 px-5 py-7 text-white";
+
     return (
-        <aside className="sticky top-0 flex h-screen w-[245px] flex-col bg-slate-950 px-5 py-7 text-white">
+        <>
+        {repliable && (
+            <>
+                <button
+                    onClick={() => setOuvert(true)}
+                    aria-label="Ouvrir le menu"
+                    className="fixed left-4 top-4 z-40 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-[0_8px_24px_rgba(15,23,42,.35)] transition-transform hover:scale-105 active:scale-95"
+                >
+                    <Menu size={20} />
+                </button>
+                <div
+                    onClick={() => setOuvert(false)}
+                    className={`fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-[2px] transition-opacity duration-300 ${ouvert ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                />
+            </>
+        )}
+        <aside className={classeAside} aria-hidden={repliable && !ouvert}>
+            {repliable && (
+                <button
+                    onClick={() => setOuvert(false)}
+                    aria-label="Fermer le menu"
+                    className="absolute right-4 top-7 flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-white/10 hover:text-white"
+                >
+                    <X size={18} />
+                </button>
+            )}
 
             <Link href="/" className="mb-10 flex items-center gap-3 opacity-90 hover:opacity-100 transition-opacity">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 font-black">
@@ -99,6 +138,7 @@ function SidebarInner() {
             </div>
 
         </aside>
+        </>
     );
 }
 
@@ -108,6 +148,12 @@ function SidebarFallback() {
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+    // Lu depuis l'URL côté navigateur (le layout n'est pas sous Suspense pour useSearchParams).
+    const pathname = usePathname();
+    const [repliable, setRepliable] = useState(false);
+    useEffect(() => {
+        setRepliable(new URLSearchParams(window.location.search).get("layout") === "v2");
+    }, [pathname]);
     useEffect(() => {
         const id = new URLSearchParams(window.location.search).get("id") ?? "";
         applyTheme(readTheme(id));
@@ -124,7 +170,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <SidebarInner />
             </Suspense>
             <main className="flex-1 overflow-y-auto">
-                <div className="mx-auto max-w-6xl px-6 py-7">
+                <div className={`mx-auto py-7 ${repliable ? "max-w-7xl pl-20 pr-6" : "max-w-6xl px-6"}`}>
                     <Suspense fallback={
                         <div className="flex h-64 items-center justify-center">
                             <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-600 border-t-transparent" />

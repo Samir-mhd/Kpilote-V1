@@ -38,6 +38,8 @@ type Props = {
      *  se concentre alors entièrement sur aujourd'hui (pas de lissage avec le jour suivant,
      *  qui appartient à une semaine figée différente). */
     dernierJourSemaine?: boolean;
+    /** Carte réduite (variante Accueil "layout=v2") : même parcours de vente, affichage dense. */
+    compact?: boolean;
 };
 
 // Mapping couleur Tailwind → hex (pour le SVG arc) + gradient (pour la barre/bouton)
@@ -119,6 +121,7 @@ function genParticles(): Particle[] {
 export default function MissionCard({
     titre, realise, objectif, couleur, onSale, sousChoix, acteDirect, onChoixVariable,
     demanderCrossSell4P, montantCrossSell4P, onCrossSell4P, questionsCrossSellPour, onBoostReady, dernierJourSemaine,
+    compact = false,
 }: Props) {
     const [celebrating, setCelebrating] = useState(false);
     const [celebEmoji, setCelebEmoji] = useState("🎉");
@@ -145,6 +148,17 @@ export default function MissionCard({
     // Simples clics d'enregistrement (pas une vente) : pas de célébration, juste le compteur qui bouge.
     const sansAnimation = isHistorisation || isAvisGoogle || isRecapCo;
     const status = getStatus(pct, realise, objectif, isHistorisation, isAvisGoogle, isRecapCo);
+
+    // Mode compact : info actionnable plutôt qu'encouragement générique. Sans objectif du jour
+    // (objectif 0), chaque vente est de l'avance : la jauge est pleine, pas à 0 %.
+    const atteint = objectif > 0 ? realise >= objectif : realise > 0;
+    const pctCompact = objectif > 0 ? pct : realise > 0 ? 100 : 0;
+    const statutCompact =
+        objectif === 0 && realise === 0 ? "Pas d'objectif aujourd'hui"
+        : objectif === 0 ? `+${realise} d'avance`
+        : realise >= objectif ? (realise > objectif ? `✓ Objectif atteint · +${realise - objectif}` : "✓ Objectif atteint")
+        : `Encore ${objectif - realise}`;
+    const libelleCompact = isHistorisation ? "historisation" : isAvisGoogle ? "avis" : isRecapCo ? "Récap Co" : "vente";
 
     // La vente doit être committée avant le choix variable : le boost auto compte le volume
     // réel du mois, il a donc besoin que CETTE vente soit déjà en base au moment du comptage.
@@ -273,7 +287,7 @@ export default function MissionCard({
 
     return (
         <section
-            className="relative overflow-hidden rounded-[28px] border border-white/6 bg-slate-900 transition-all duration-300 hover:-translate-y-1"
+            className={`relative overflow-hidden border border-white/6 bg-slate-900 transition-all duration-300 ${compact ? "rounded-[20px]" : "rounded-[28px] hover:-translate-y-1"}`}
             style={{
                 boxShadow: celebrating && !sansAnimation
                     ? `0 20px 60px ${pal.glow}, 0 0 0 1px ${pal.hex}40`
@@ -319,6 +333,45 @@ export default function MissionCard({
                 />
             ))}
 
+            {compact ? (
+            <div className={`relative p-4 transition-opacity ${atteint ? "opacity-80" : ""}`}>
+                <div className="flex items-center justify-between gap-2">
+                    <h2 className="truncate text-base font-black text-white">{displayTitre}</h2>
+                    <span
+                        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black tabular-nums"
+                        style={{ background: `${pal.hex}26`, color: pal.arcStroke }}
+                    >
+                        {pctCompact}%
+                    </span>
+                </div>
+
+                <div className="mt-3 flex items-end gap-1.5">
+                    <span className="text-4xl font-black leading-none text-white tabular-nums">{realise}</span>
+                    <span className="mb-0.5 text-sm font-semibold text-white/35">/ {objectif}</span>
+                </div>
+
+                <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/8">
+                    <div
+                        className={`h-full rounded-full bg-gradient-to-r ${pal.gradient} transition-all duration-700`}
+                        style={{ width: `${pctCompact}%` }}
+                    />
+                </div>
+
+                <p className={`mt-2 text-xs font-bold ${atteint ? "text-emerald-300" : "text-white/55"}`}>
+                    {statutCompact}
+                </p>
+
+                <button
+                    onClick={handleSale}
+                    disabled={celebrating}
+                    className={`mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r ${pal.gradient} px-3 py-3 text-sm font-black text-white transition-all duration-200 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50`}
+                    style={{ boxShadow: `0 4px 16px ${pal.glow}` }}
+                >
+                    <span className="text-base leading-none">+1</span>
+                    <span className="truncate">{libelleCompact}</span>
+                </button>
+            </div>
+            ) : (
             <div className="relative p-7">
 
                 {/* ── Ligne haute : nom + arc ─── */}
@@ -410,6 +463,7 @@ export default function MissionCard({
                 </button>
 
             </div>
+            )}
 
             {modalOuverte && sousChoix && (
                 <ChoixActeModal
