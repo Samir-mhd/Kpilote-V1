@@ -1190,23 +1190,35 @@ export default function Dashboard() {
             {layoutV2 ? (
                 <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
                     <section className="xl:col-span-2">
-                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <h2 className="text-xl font-black text-slate-900">Tes objectifs du jour</h2>
-                                {missions.some((m) => m.dernierJourSemaine) && (
-                                    <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
-                                        📅 Dernier jour de ta semaine : le reste de tes objectifs se joue aujourd&apos;hui
-                                    </p>
-                                )}
-                            </div>
-                            <button
-                                onClick={() => (variableActivee ? setComboOuvert(true) : setComboSansVarianteOuvert(true))}
-                                className="flex items-center gap-2 rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50 px-4 py-2.5 text-sm font-black text-amber-700 shadow-[0_4px_16px_rgba(217,119,6,.12)] transition-all hover:border-amber-400 hover:shadow-[0_8px_24px_rgba(217,119,6,.22)] active:scale-[0.97]"
-                            >
-                                <span className="text-lg leading-none">🎁</span>
-                                Vente combo
-                                <span className="hidden text-xs font-semibold text-amber-600 sm:inline">· box + forfait + assurance…</span>
-                            </button>
+                        {/* Vente combo mise en avant : le moyen le plus rapide de tout déclarer */}
+                        <button
+                            onClick={() => (variableActivee ? setComboOuvert(true) : setComboSansVarianteOuvert(true))}
+                            className="group relative mb-5 flex w-full items-center gap-4 overflow-hidden rounded-[24px] bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 p-4 text-left text-white shadow-[0_14px_40px_rgba(234,88,12,.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_50px_rgba(234,88,12,.45)] active:scale-[0.99] sm:p-5"
+                        >
+                            <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(110deg,transparent_30%,rgba(255,255,255,.35)_45%,transparent_60%)] motion-safe:animate-[podium-reflet_3.5s_ease-in-out_infinite]" />
+                            <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-3xl ring-1 ring-white/40 sm:h-16 sm:w-16 sm:text-4xl">
+                                🎁
+                            </span>
+                            <span className="relative min-w-0 flex-1">
+                                <span className="block text-xl font-black leading-tight sm:text-2xl">Vente combo</span>
+                                <span className="mt-0.5 block text-sm font-semibold text-white/90">
+                                    Box + forfait + téléphone + assurance : tout déclarer en une fois
+                                </span>
+                                <span className="mt-1.5 hidden text-lg leading-none tracking-wide sm:block">📦 📱 📲 🛡️ ✅</span>
+                            </span>
+                            <span className="relative flex shrink-0 items-center gap-1.5 rounded-2xl bg-white px-4 py-3 text-sm font-black text-orange-600 shadow-lg transition-transform group-hover:translate-x-0.5">
+                                Déclarer
+                                <span aria-hidden="true">→</span>
+                            </span>
+                        </button>
+
+                        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                            <h2 className="text-xl font-black text-slate-900">Tes objectifs du jour</h2>
+                            {missions.some((m) => m.dernierJourSemaine) && (
+                                <p className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                                    📅 Dernier jour de ta semaine : le reste de tes objectifs se joue aujourd&apos;hui
+                                </p>
+                            )}
                         </div>
                         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-4">
                             {cartesMissions(true)}
@@ -1214,7 +1226,7 @@ export default function Dashboard() {
                     </section>
 
                     <aside className="xl:sticky xl:top-6 xl:self-start">
-                        <TeamFeed conseillerId={conseillerId} />
+                        <TeamFeed conseillerId={conseillerId} condense />
                     </aside>
                 </div>
             ) : (

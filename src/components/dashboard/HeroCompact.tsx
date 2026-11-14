@@ -105,31 +105,6 @@ export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, 
 
                 {/* Chiffres clés */}
                 <div className={`grid shrink-0 gap-2.5 ${cagnotte ? "grid-cols-3" : "grid-cols-2"} xl:w-[440px]`}>
-                    <div className="rounded-2xl bg-white/[0.08] p-3.5 ring-1 ring-white/10">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">Actes</p>
-                        <p className="mt-1 leading-none">
-                            <span className="text-3xl font-black tabular-nums">{realise}</span>
-                            <span className="ml-1 text-sm font-bold text-white/40">/ {objectif}</span>
-                        </p>
-                        <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/10">
-                            <div
-                                className={`h-full rounded-full ${taux >= 100 ? "bg-emerald-400" : "bg-violet-300"} transition-all duration-700`}
-                                style={{ width: `${pctBarre}%` }}
-                            />
-                        </div>
-                        <p className={`mt-1.5 text-[11px] font-bold ${taux >= 100 ? "text-emerald-300" : "text-white/50"}`}>
-                            {taux >= 100 ? `✓ ${taux} %` : `${taux} %`}
-                        </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-white/[0.08] p-3.5 ring-1 ring-white/10">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">Classement</p>
-                        <p className="mt-1 text-3xl font-black leading-none tabular-nums">
-                            {rang > 0 ? `#${rang}` : "–"}
-                        </p>
-                        <p className="mt-3 text-[11px] font-bold text-white/50">{rang === 1 ? "👑 en tête" : "du jour"}</p>
-                    </div>
-
                     {cagnotte && (
                         <div className="relative rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 p-3.5 shadow-[0_8px_24px_rgba(192,38,211,.35)]">
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70">Cagnotte</p>
@@ -151,6 +126,32 @@ export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, 
                             )}
                         </div>
                     )}
+
+                    <div className="rounded-2xl bg-white/[0.08] p-3.5 ring-1 ring-white/10">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">Actes du jour</p>
+                        <p className="mt-1 leading-none">
+                            <span className="text-3xl font-black tabular-nums">{realise}</span>
+                            <span className="ml-1 text-sm font-bold text-white/40">/ {objectif}</span>
+                        </p>
+                        <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+                            <div
+                                className={`h-full rounded-full ${taux >= 100 ? "bg-emerald-400" : "bg-violet-300"} transition-all duration-700`}
+                                style={{ width: `${pctBarre}%` }}
+                            />
+                        </div>
+                        <p className={`mt-1.5 text-[11px] font-bold ${taux >= 100 ? "text-emerald-300" : "text-white/50"}`}>
+                            {taux >= 100 ? `✓ ${taux} %` : `${taux} %`}
+                        </p>
+                    </div>
+
+                    <div className="rounded-2xl bg-white/[0.08] p-3.5 ring-1 ring-white/10">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">Classement jour</p>
+                        <p className="mt-1 text-3xl font-black leading-none tabular-nums">
+                            {rang > 0 ? `#${rang}` : "–"}
+                        </p>
+                        <p className="mt-3 text-[11px] font-bold text-white/50">{rang === 1 ? "👑 en tête" : "aujourd'hui"}</p>
+                    </div>
+
                 </div>
             </div>
 

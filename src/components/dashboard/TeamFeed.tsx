@@ -14,6 +14,11 @@ type Entry = {
     created_at: string;
     isNew: boolean;
     message: string;
+    quantite: number;
+    countToday: number;   // ventes du conseiller aujourd'hui, celle-ci incluse
+    rankBefore: number;
+    rankAfter: number;
+    reset: boolean;       // correction du jour (pas une vente)
 };
 
 type Counts = Record<string, { total: number }>;
@@ -171,7 +176,7 @@ function extractProduit(v: any): { produitNom: string; produitCode: string } {
     return { produitNom: p.nom ?? p.code ?? "Produit", produitCode: p.code ?? "" };
 }
 
-export default function TeamFeed({ conseillerId, grand = false }: { conseillerId: string; grand?: boolean }) {
+export default function TeamFeed({ conseillerId, grand = false, condense = false }: { conseillerId: string; grand?: boolean; condense?: boolean }) {
     const [entries, setEntries] = useState<Entry[]>([]);
     const [dbError, setDbError] = useState<string | null>(null);
     const namesRef    = useRef<Record<string, string>>({});
@@ -248,6 +253,7 @@ export default function TeamFeed({ conseillerId, grand = false }: { conseillerId
                         produitCode,
                         created_at: v.created_at,
                         isNew: false,
+                        quantite: v.quantite ?? 1, countToday: 0, rankBefore: 0, rankAfter: 0, reset: true,
                         message: `${nom.split(" ")[0]} vient de réajuster ses ventes sur ${produitLabel(produitCode, produitNom)} - ${netTotaux[netKey]} au total`,
                     });
                     return;
@@ -270,6 +276,11 @@ export default function TeamFeed({ conseillerId, grand = false }: { conseillerId
                     produitCode,
                     created_at: v.created_at,
                     isNew: false,
+                    quantite: v.quantite ?? 1,
+                    countToday: tempCounts[cid].total,
+                    rankBefore,
+                    rankAfter,
+                    reset: false,
                     message: buildMessage(
                         nom.split(" ")[0],
                         produitCode,
@@ -284,7 +295,7 @@ export default function TeamFeed({ conseillerId, grand = false }: { conseillerId
             countsRef.current = tempCounts;
             ranksRef.current = computeRanks(tempCounts);
 
-            setEntries(built.reverse().slice(0, 15));
+            setEntries(built.reverse().slice(0, 50));
         })();
     }, []);
 
@@ -320,9 +331,10 @@ export default function TeamFeed({ conseillerId, grand = false }: { conseillerId
                         produitCode,
                         created_at: v.created_at,
                         isNew: true,
+                        quantite: v.quantite ?? 1, countToday: 0, rankBefore: 0, rankAfter: 0, reset: true,
                         message: `${nom.split(" ")[0]} vient de réajuster ses ventes sur ${produitLabel(produitCode, produit?.nom ?? "")} - ${total} au total`,
                     };
-                    setEntries(prev => [entry, ...prev].slice(0, 15));
+                    setEntries(prev => [entry, ...prev].slice(0, 50));
                     return;
                 }
 
@@ -330,8 +342,8 @@ export default function TeamFeed({ conseillerId, grand = false }: { conseillerId
                 const rankBefore = ranksRef.current[cid] ?? nbTotal;
 
                 // Le Realtime ne retourne pas les jointures — on utilise produit_id comme code de secours
-                const produitCode = v.produit_code ?? "";
-                const produitNom = v.produit_nom ?? produitCode;
+                const produitCode = produitsRef.current[v.produit_id] ?? v.produit_code ?? "";
+                const produitNom = produitLabel(produitCode, v.produit_nom ?? produitCode);
 
                 if (!countsRef.current[cid]) countsRef.current[cid] = { total: 0 };
                 countsRef.current[cid].total++;
@@ -347,6 +359,11 @@ export default function TeamFeed({ conseillerId, grand = false }: { conseillerId
                     produitCode,
                     created_at: v.created_at,
                     isNew: true,
+                    quantite: v.quantite ?? 1,
+                    countToday: countsRef.current[cid].total,
+                    rankBefore,
+                    rankAfter,
+                    reset: false,
                     message: buildMessage(
                         nom.split(" ")[0],
                         produitCode,
@@ -356,7 +373,7 @@ export default function TeamFeed({ conseillerId, grand = false }: { conseillerId
                         rankBefore,
                     ),
                 };
-                setEntries(prev => [entry, ...prev].slice(0, 15));
+                setEntries(prev => [entry, ...prev].slice(0, 50));
             })
             .on("postgres_changes", { event: "DELETE", schema: "public", table: "ventes" }, (payload: any) => {
                 const oldId = payload.old?.id;
@@ -366,6 +383,8 @@ export default function TeamFeed({ conseillerId, grand = false }: { conseillerId
             .subscribe();
         return () => { supabase.removeChannel(channel); };
     }, []);
+
+    if (condense) return <FeedCondense entries={entries} conseillerId={conseillerId} dbError={dbError} />;
 
     const visibleRows = grand ? 10 : 5;
     const rowHeight = grand ? 78 : 62;
@@ -423,6 +442,150 @@ export default function TeamFeed({ conseillerId, grand = false }: { conseillerId
                         </p>
                     )}
                 </>
+            )}
+
+            <style>{`
+                @keyframes feedIn {
+                    from { opacity: 0; transform: translateY(-12px) scale(.96); }
+                    to   { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                .animate-feedIn { animation: feedIn .4s cubic-bezier(.34,1.56,.64,1); }
+            `}</style>
+        </div>
+    );
+}
+
+// ─── Mode condensé (variante Accueil layout=v2) ───────────────────────────────
+// Les ventes rapprochées d'un même conseiller sont regroupées en une seule ligne, et seuls les
+// vrais moments ressortent : 1re vente du jour, passage en tête, paliers 5 / 10 / 15...
+
+const FENETRE_GROUPE_MS = 30 * 60 * 1000;
+const PALIERS = [5, 10, 15, 20, 25, 30];
+
+type Groupe = {
+    id: string;
+    conseiller_id: string;
+    nom: string;
+    codes: string[];          // produits vendus dans le groupe (ordre chronologique)
+    total: number;            // ventes du groupe
+    countToday: number;       // ventes du jour à la fin du groupe
+    debut: string;            // plus ancienne vente du groupe
+    fin: string;              // plus récente
+    passeEnTete: boolean;
+    palier: number | null;
+    premiere: boolean;
+    reset: Entry | null;
+    isNew: boolean;
+};
+
+function grouper(entries: Entry[]): Groupe[] {
+    const groupes: Groupe[] = [];
+    // entries : plus récente en premier
+    for (const e of entries) {
+        if (e.reset) {
+            groupes.push({
+                id: e.id, conseiller_id: e.conseiller_id, nom: e.nom, codes: [e.produitCode], total: 0,
+                countToday: 0, debut: e.created_at, fin: e.created_at, passeEnTete: false, palier: null,
+                premiere: false, reset: e, isNew: e.isNew,
+            });
+            continue;
+        }
+        const g = groupes[groupes.length - 1];
+        const memeSerie = g && !g.reset && g.conseiller_id === e.conseiller_id
+            && new Date(g.debut).getTime() - new Date(e.created_at).getTime() <= FENETRE_GROUPE_MS;
+        const palierAtteint = PALIERS.filter((p) => e.countToday >= p && e.countToday - e.quantite < p).pop() ?? null;
+        if (memeSerie) {
+            g.codes.unshift(e.produitCode);
+            g.total += e.quantite;
+            g.debut = e.created_at;
+            g.passeEnTete ||= e.rankAfter === 1 && e.rankBefore > 1;
+            g.palier = Math.max(g.palier ?? 0, palierAtteint ?? 0) || null;
+            g.premiere ||= e.countToday === 1;
+            g.isNew ||= e.isNew;
+        } else {
+            groupes.push({
+                id: e.id, conseiller_id: e.conseiller_id, nom: e.nom, codes: [e.produitCode], total: e.quantite,
+                countToday: e.countToday, debut: e.created_at, fin: e.created_at,
+                passeEnTete: e.rankAfter === 1 && e.rankBefore > 1, palier: palierAtteint,
+                premiere: e.countToday === 1, reset: null, isNew: e.isNew,
+            });
+        }
+    }
+    return groupes;
+}
+
+function messageGroupe(g: Groupe): { texte: string; temps_fort: boolean } {
+    const p = g.nom.split(" ")[0];
+    if (g.reset) return { texte: g.reset.message, temps_fort: false };
+    if (g.passeEnTete) return { texte: `${p} passe en tête du classement 👑`, temps_fort: true };
+    if (g.palier) return { texte: `${p} atteint ${g.palier} ventes aujourd'hui 🔥`, temps_fort: true };
+    if (g.premiere) {
+        return g.total > 1
+            ? { texte: `${p} démarre fort : ${g.total} ventes d'entrée`, temps_fort: false }
+            : { texte: `${p} ouvre son compteur du jour`, temps_fort: false };
+    }
+    if (g.total > 1) return { texte: `${p} enchaîne ${g.total} ventes`, temps_fort: false };
+    const code = g.codes[0];
+    const singulier: Record<string, string> = { "Téléphones": "Téléphone", "Forfaits": "Forfait" };
+    const label = produitLabel(code, code);
+    return { texte: `${p} signe : ${singulier[label] ?? label}`, temps_fort: false };
+}
+
+function FeedCondense({ entries, conseillerId, dbError }: { entries: Entry[]; conseillerId: string; dbError: string | null }) {
+    const groupes = grouper(entries);
+    const nbVentes = entries.filter((e) => !e.reset).reduce((t, e) => t + e.quantite, 0);
+
+    return (
+        <div className="rounded-[24px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
+            <div className="mb-4 flex items-center gap-2.5">
+                <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-green-500" />
+                <p className="flex-1 text-sm font-black text-slate-900">En direct de l&apos;équipe</p>
+                {nbVentes > 0 && (
+                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-500">
+                        {nbVentes} vente{nbVentes > 1 ? "s" : ""} récentes
+                    </span>
+                )}
+            </div>
+
+            {dbError ? (
+                <p className="rounded-xl bg-red-50 px-4 py-4 font-mono text-xs break-all text-red-500">{dbError}</p>
+            ) : groupes.length === 0 ? (
+                <p className="py-6 text-center text-sm text-slate-300">Pas encore de vente aujourd&apos;hui — à toi d&apos;ouvrir le bal ! 🚀</p>
+            ) : (
+                <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
+                    {groupes.map((g) => {
+                        const isMoi = g.conseiller_id === conseillerId;
+                        const { texte, temps_fort } = messageGroupe(g);
+                        return (
+                            <div
+                                key={g.id}
+                                className={`flex items-start gap-3 rounded-2xl px-3.5 py-3 ${
+                                    temps_fort ? "bg-gradient-to-r from-amber-50 to-orange-50 ring-1 ring-amber-200"
+                                    : isMoi ? "bg-violet-50 ring-1 ring-violet-100"
+                                    : "bg-slate-50"
+                                } ${g.isNew ? "animate-feedIn" : ""}`}
+                            >
+                                <CartoonAvatar prenom={g.nom} etat={temps_fort ? "en_feu" : "souriant_main"} size={36} />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-bold leading-snug text-slate-900">
+                                        {texte}
+                                        {isMoi && <span className="ml-1.5 text-[10px] font-bold text-violet-500">(toi)</span>}
+                                    </p>
+                                    {!g.reset && (
+                                        <p className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-slate-400">
+                                            <span className="tracking-tight">{g.codes.map((c) => feedEmoji(c)).join(" ")}</span>
+                                            <span>· {g.countToday} aujourd&apos;hui</span>
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="shrink-0 text-right">
+                                    {!g.reset && <p className="text-xs font-black text-green-600">+{g.total}</p>}
+                                    <p className="text-[10px] text-slate-300">{timeAgo(g.fin)}</p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             )}
 
             <style>{`
