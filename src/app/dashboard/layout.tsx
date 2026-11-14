@@ -28,9 +28,10 @@ function SidebarInner() {
     const params = useSearchParams();
     const id = params.get("id") ?? "";
     const nom = params.get("nom") ?? "Conseiller";
-    // Variante en test (layout=v2) : menu replié derrière un bouton, conservé d'une page à l'autre.
-    const repliable = params.get("layout") === "v2";
-    const qs = id ? `?id=${id}&nom=${encodeURIComponent(nom)}${repliable ? "&layout=v2" : ""}` : "";
+    // Menu replié derrière un bouton par défaut ; l'ancien menu fixe reste accessible quelque
+    // temps avec &layout=v1 (conservé d'une page à l'autre).
+    const repliable = params.get("layout") !== "v1";
+    const qs = id ? `?id=${id}&nom=${encodeURIComponent(nom)}${repliable ? "" : "&layout=v1"}` : "";
     const [ouvert, setOuvert] = useState(false);
     useEffect(() => { setOuvert(false); }, [pathname]);
     useEffect(() => {
@@ -144,15 +145,15 @@ function SidebarInner() {
 
 // Fallback sidebar pendant le chargement (évite le layout shift)
 function SidebarFallback() {
-    return <aside className="sticky top-0 h-screen w-[245px] flex-shrink-0 bg-slate-950" />;
+    return null;
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     // Lu depuis l'URL côté navigateur (le layout n'est pas sous Suspense pour useSearchParams).
     const pathname = usePathname();
-    const [repliable, setRepliable] = useState(false);
+    const [repliable, setRepliable] = useState(true);
     useEffect(() => {
-        setRepliable(new URLSearchParams(window.location.search).get("layout") === "v2");
+        setRepliable(new URLSearchParams(window.location.search).get("layout") !== "v1");
     }, [pathname]);
     useEffect(() => {
         const id = new URLSearchParams(window.location.search).get("id") ?? "";

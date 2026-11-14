@@ -95,8 +95,8 @@ export default function Dashboard() {
     const searchParams = useSearchParams();
     const nom = searchParams.get("nom") || "Conseiller";
     const conseillerId = searchParams.get("id") || "";
-    // Variante de mise en page en test (comparaison) : /dashboard?...&layout=v2
-    const layoutV2 = searchParams.get("layout") === "v2";
+    // Nouvelle mise en page par défaut ; l'ancienne reste accessible quelque temps avec &layout=v1.
+    const layoutV2 = searchParams.get("layout") !== "v1";
 
     // checkLoading : true pendant la vérification DB (évite un flash du check avant la réponse)
     const [checkLoading,          setCheckLoading]          = useState(!!conseillerId);
@@ -211,16 +211,6 @@ export default function Dashboard() {
     const boostTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [ordrePersonnalise, setOrdrePersonnalise] = useState<string[] | null>(null);
-    // Variante v2 : cartes "à faire" en premier, ordre calculé au chargement puis figé pendant la
-    // session (les boutons ne bougent pas sous le doigt quand un objectif est atteint).
-    const [ordreFigeV2, setOrdreFigeV2] = useState<string[] | null>(null);
-    const missionsChargees = missions.length > 0;
-    useEffect(() => {
-        if (!layoutV2 || !missionsChargees) return;
-        const resteAFaire = (m: MissionDashboard) => (m.objectif > m.realise ? 0 : 1);
-        setOrdreFigeV2([...ordonnerAccueil(missions)].sort((a, b) => resteAFaire(a) - resteAFaire(b)).map((m) => m.produit));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [layoutV2, missionsChargees, ordrePersonnalise]);
     const [prochainBadge, setProchainBadge] = useState<ProchainBadge | null>(null);
     const [comboOuvert, setComboOuvert] = useState(false);
     const [comboSansVarianteOuvert, setComboSansVarianteOuvert] = useState(false);
@@ -841,14 +831,7 @@ export default function Dashboard() {
 
     // Cartes objectifs — partagées par les deux mises en page (seul l'affichage change en compact).
     function cartesMissions(compact: boolean) {
-        const liste = compact && ordreFigeV2
-            ? [...missions].sort((a, b) => {
-                const ia = ordreFigeV2.indexOf(a.produit);
-                const ib = ordreFigeV2.indexOf(b.produit);
-                return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-            })
-            : ordonnerAccueil(missions);
-        return liste.map((mission) => (
+        return ordonnerAccueil(missions).map((mission) => (
             <MissionCard
                 key={mission.produit}
                 compact={compact}
