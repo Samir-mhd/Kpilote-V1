@@ -20,7 +20,7 @@ export const CODES_VENTES_COMBO = ["mcafee_mobile", "assurance_essentielle", "ca
 
 /** Nom affiché → code produit. Priorité au mapping canonique (le nom affiché peut diverger
  *  du code réel en base, ex. "Récap Co" affiché mais code resté "recap_commercial"). */
-function codeDepuisNom(nom: string): string {
+export function codeDepuisNom(nom: string): string {
     const connu = PRODUITS_ORDRE.find((p) => p.label === nom)?.code;
     if (connu) return connu;
     return nom.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\+/g, " plus").replace(/ /g, "_");
