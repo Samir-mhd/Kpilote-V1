@@ -32,22 +32,50 @@ const PHRASES_EN_TETE = [
     "N°1 du jour ! Garde la couronne. 👑",
 ];
 
+// Boutique ouverte de 10h à 20h : hors de ces horaires, pas de relance d'inactivité.
+const OUVERTURE_H = 10;
+const FERMETURE_H = 20;
+const PHRASES_AVANT_OUVERTURE = [
+    "Bonjour {nom} 👋 Ouverture à 10h, prêt à cartonner ?",
+    "Salut {nom} ! Plus que quelques minutes avant l'ouverture.",
+];
+const PHRASES_APRES_FERMETURE_VENTES = [
+    "Journée bouclée, {nom} ! Bravo pour tes ventes. 👏",
+    "La boutique est fermée — beau travail aujourd'hui, {nom} !",
+];
+const PHRASES_APRES_FERMETURE_SANS_VENTE = [
+    "La boutique est fermée. Repose-toi bien, {nom}, demain c'est une nouvelle journée !",
+];
+
 function fmtEuro(n: number) {
     return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 
-/** Ordre de priorité : série en feu > journée complète > en tête > état avatar habituel. */
-function situation(avatarEtat: AvatarEtat, taux: number, rang: number, realise: number): { etat: AvatarEtat; phrases: string[] } {
+/** Ordre de priorité : série en feu > journée complète > hors horaires d'ouverture > en tête >
+ *  état avatar habituel (dont les relances glaçon / endormi, donc seulement de 10h à 20h). */
+function situation(avatarEtat: AvatarEtat, taux: number, rang: number, realise: number, heure: number): { etat: AvatarEtat; phrases: string[] } {
     const inactif = avatarEtat === "glacon" || avatarEtat === "endormi";
     if (avatarEtat === "en_feu") return { etat: "en_feu", phrases: AVATAR_PHRASES.en_feu };
     if (taux >= 100 && realise > 0) return { etat: inactif ? "heureux_gagne" : avatarEtat, phrases: PHRASES_JOURNEE_COMPLETE };
+    if (heure < OUVERTURE_H) return { etat: "souriant_main", phrases: PHRASES_AVANT_OUVERTURE };
+    if (heure >= FERMETURE_H) {
+        return realise > 0
+            ? { etat: "souriant_main", phrases: PHRASES_APRES_FERMETURE_VENTES }
+            : { etat: "souriant_main", phrases: PHRASES_APRES_FERMETURE_SANS_VENTE };
+    }
     if (rang === 1 && realise > 0 && inactif) return { etat: "souriant_main", phrases: PHRASES_EN_TETE };
     return { etat: avatarEtat, phrases: AVATAR_PHRASES[avatarEtat] };
 }
 
 export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, taux, cagnotte, prochainBadge, badgeHref }: Props) {
     const prenom = nom.split(" ")[0];
-    const { etat, phrases } = situation(avatarEtat, taux, rang, realise);
+    // Heure relue chaque minute pour basculer à l'ouverture / la fermeture sans recharger.
+    const [heure, setHeure] = useState(() => new Date().getHours());
+    useEffect(() => {
+        const id = setInterval(() => setHeure(new Date().getHours()), 60_000);
+        return () => clearInterval(id);
+    }, []);
+    const { etat, phrases } = situation(avatarEtat, taux, rang, realise, heure);
 
     // Phrase stable pour la journée (pas de Math.random → même rendu serveur et navigateur),
     // qui varie d'un jour et d'un conseiller à l'autre.
