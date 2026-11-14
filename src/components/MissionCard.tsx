@@ -152,7 +152,9 @@ export default function MissionCard({
     // Mode compact : info actionnable plutôt qu'encouragement générique. Sans objectif du jour
     // (objectif 0), chaque vente est de l'avance : la jauge est pleine, pas à 0 %.
     const atteint = objectif > 0 ? realise >= objectif : realise > 0;
+    // Barre plafonnée à 100 %, mais le badge affiche le vrai taux d'atteinte (5/4 → 125 %).
     const pctCompact = objectif > 0 ? pct : realise > 0 ? 100 : 0;
+    const tauxAtteinte = objectif > 0 ? Math.round((realise / objectif) * 100) : 0;
     const statutCompact =
         objectif === 0 && realise === 0 ? "Pas d'objectif aujourd'hui"
         : objectif === 0 ? `+${realise} d'avance`
@@ -337,12 +339,15 @@ export default function MissionCard({
             <div className={`relative p-4 transition-opacity ${atteint ? "opacity-80" : ""}`}>
                 <div className="flex items-center justify-between gap-2">
                     <h2 className="truncate text-base font-black text-white">{displayTitre}</h2>
-                    <span
-                        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black tabular-nums"
-                        style={{ background: `${pal.hex}26`, color: pal.arcStroke }}
-                    >
-                        {pctCompact}%
-                    </span>
+                    {/* Taux d'atteinte réel (5/4 = 125 %) ; sans objectif du jour, pas de % (voir statut). */}
+                    {objectif > 0 && (
+                        <span
+                            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black tabular-nums"
+                            style={{ background: `${pal.hex}26`, color: pal.arcStroke }}
+                        >
+                            {tauxAtteinte}%
+                        </span>
+                    )}
                 </div>
 
                 <div className="mt-3 flex items-end gap-1.5">
