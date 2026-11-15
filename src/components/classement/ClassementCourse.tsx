@@ -1,20 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import PodiumTopPerformers from "@/components/dashboard/PodiumTopPerformers";
 import { construireClassementPeriode } from "@/services/classementService";
 import { getJoursTravailPlageTous } from "@/services/planningService";
 import { getRealiseVentesComboParConseiller } from "@/services/variableConseiller";
+import { getCoeffRecapCommercial } from "@/services/recapCommercialConfig";
 import { Periode, periodeSemaineEffective, joursPeriode } from "@/utils/periodes";
 import { PRODUITS_ORDRE } from "@/utils/produits";
 import { GROUPES, GroupeId, COMBO_META, ComboCode } from "@/utils/classementGroupes";
 
 /**
- * Classement en "course" (variante &classement=v2) : une barre par conseiller proportionnelle à ses
- * ventes du groupe choisi, écart avec celui devant, mouvement depuis hier soir, rythme à date.
- * Le groupe (Core / Upsell / Quali) classe vraiment : ordre, podium et totaux le suivent.
+ * Classement en "course" (variante &classement=v2). Le groupe (Core / Upsell / Quali) classe
+ * vraiment : ordre, podium et totaux le suivent. Pas de jauge sur le total (un produit en
+ * surperformance ne doit pas masquer un objectif raté) : chaque objectif a sa pastille, colorée
+ * selon son propre rythme, et la ligne résume combien sont atteints.
  */
 
 export type LigneCourse = {
@@ -32,31 +33,37 @@ type Props = {
     photos: Record<string, string | null>;
 };
 
-type Statut = "atteint" | "avance" | "juste" | "retard" | "neutre";
-const STYLE: Record<Statut, { barre: string; pastille: string }> = {
-    atteint: { barre: "bg-violet-500", pastille: "bg-violet-100 text-violet-700" },
-    avance: { barre: "bg-emerald-500", pastille: "bg-emerald-100 text-emerald-700" },
-    juste: { barre: "bg-amber-400", pastille: "bg-amber-100 text-amber-800" },
-    retard: { barre: "bg-rose-500", pastille: "bg-rose-100 text-rose-700" },
-    neutre: { barre: "bg-indigo-400", pastille: "bg-slate-100 text-slate-600" },
+type Statut = "atteint" | "avance" | "juste" | "retard" | "encours" | "bonus";
+const PASTILLE: Record<Statut, string> = {
+    atteint: "bg-violet-100 text-violet-800 ring-violet-200",
+    avance: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+    juste: "bg-amber-50 text-amber-800 ring-amber-200",
+    retard: "bg-rose-50 text-rose-700 ring-rose-200",
+    encours: "bg-slate-50 text-slate-600 ring-slate-200",
+    bonus: "bg-sky-50 text-sky-700 ring-sky-200",
 };
+
+// Quali (Avis Google, Récap Co) : pas des ventes → pas d'unité.
+function uniteDuGroupe(groupe: GroupeId): string | null {
+    return groupe === "quali" ? null : "vente";
+}
+function avecUnite(n: number, unite: string | null) {
+    return unite ? `${n} ${unite}${n > 1 ? "s" : ""}` : `${n}`;
+}
 
 function codesDuGroupe(groupe: GroupeId): string[] {
     const g = GROUPES.find((x) => x.id === groupe) ?? GROUPES[0];
     return [...g.codesCore, ...g.codesCombo];
 }
-
 function emojiDe(code: string) {
     return PRODUITS_ORDRE.find((p) => p.code === code)?.emoji ?? COMBO_META[code as ComboCode]?.emoji ?? "•";
 }
 function labelDe(code: string) {
     return PRODUITS_ORDRE.find((p) => p.code === code)?.label ?? COMBO_META[code as ComboCode]?.label ?? code;
 }
-
 function dateStr(d: Date) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
 function bornes(periode: Periode): { debut: Date; fin: Date } {
     const now = new Date();
     if (periode === "semaine") return periodeSemaineEffective(now);
@@ -65,21 +72,26 @@ function bornes(periode: Periode): { debut: Date; fin: Date } {
     return { debut: j, fin: j };
 }
 
+type Objectif = { code: string; realise: number; objectif: number; statut: Statut; tenue: number };
+
 export default function ClassementCourse({ lignes, periode, groupe, conseillerId, photos }: Props) {
-    const [mode, setMode] = useState<"volume" | "rythme">("volume");
-    const [ouvert, setOuvert] = useState<string | null>(null);
+    const [mode, setMode] = useState<"volume" | "regularite">("volume");
     const [jours, setJours] = useState<Record<string, { ecoules: number; total: number }>>({});
     const [avant, setAvant] = useState<Record<string, Record<string, number>> | null>(null);
+    const [coeffRecap, setCoeffRecap] = useState(0);
+
+    useEffect(() => { getCoeffRecapCommercial().then(setCoeffRecap).catch(() => setCoeffRecap(0)); }, []);
 
     const idsCle = lignes.map((l) => l.id).sort().join(",");
+    const unite = uniteDuGroupe(groupe);
 
     // Jours planifiés écoulés / total de la période (rythme attendu à date, selon le planning de chacun).
     useEffect(() => {
         const ids = idsCle ? idsCle.split(",") : [];
-        if (ids.length === 0 || periode === "jour") { setJours({}); return; }
+        if (ids.length === 0) { setJours({}); return; }
         const { debut, fin } = bornes(periode);
         Promise.all([
-            getJoursTravailPlageTous(ids, debut, new Date()),
+            getJoursTravailPlageTous(ids, debut, periode === "jour" ? fin : new Date()),
             getJoursTravailPlageTous(ids, debut, fin),
         ]).then(([ecoules, total]) => {
             const r: Record<string, { ecoules: number; total: number }> = {};
@@ -111,25 +123,44 @@ export default function ClassementCourse({ lignes, periode, groupe, conseillerId
     const somme = (rec: Record<string, number> | undefined) => codes.reduce((t, c) => t + (rec?.[c] ?? 0), 0);
 
     const lignesCalculees = lignes.map((l) => {
-        const score = somme(l.realise);
-        const objectif = somme(l.objectif);
         const j = jours[l.id];
-        const attendu = periode === "jour" ? objectif : j && j.total > 0 ? (objectif * j.ecoules) / j.total : objectif;
-        const ratio = attendu > 0 ? score / attendu : score > 0 ? 2 : 1;
-        let statut: Statut;
-        if (objectif > 0 && score >= objectif) statut = "atteint";
-        else if (periode === "jour") statut = "neutre";
-        else if (ratio >= 1) statut = "avance";
-        else if (ratio >= 0.85) statut = "juste";
-        else statut = "retard";
-        return { ...l, score, objTotal: objectif, attendu, ratio, statut };
+        const part = periode === "jour" ? 1 : j && j.total > 0 ? j.ecoules / j.total : 1;
+
+        // Un produit sans objectif et sans vente ne concerne pas ce conseiller (ex. pas de profil Téléphone).
+        // Récap Co : objectif auto (coeff × jours planifiés de la période), pas dans les objectifs stockés.
+        const objectifDe = (code: string) => code === "recap_commercial" && !(l.objectif[code] > 0)
+            ? Math.round(coeffRecap * (j?.total ?? 0))
+            : l.objectif[code] ?? 0;
+        const objectifs: Objectif[] = codes
+            .map((code) => ({ code, realise: l.realise[code] ?? 0, objectif: objectifDe(code) }))
+            .filter((o) => o.objectif > 0 || o.realise > 0)
+            .map((o) => {
+                if (o.objectif === 0) return { ...o, statut: "bonus" as Statut, tenue: 1 };
+                const attendu = o.objectif * part;
+                // Tenue plafonnée à 1 : un produit en surperformance ne compense pas les autres.
+                const tenue = attendu > 0 ? Math.min(o.realise / attendu, 1) : 1;
+                let statut: Statut;
+                if (o.realise >= o.objectif) statut = "atteint";
+                else if (periode === "jour") statut = "encours";
+                else if (o.realise >= attendu) statut = "avance";
+                else if (o.realise >= attendu * 0.85) statut = "juste";
+                else statut = "retard";
+                return { ...o, statut, tenue };
+            });
+
+        const avecObjectif = objectifs.filter((o) => o.objectif > 0);
+        const atteints = avecObjectif.filter((o) => o.statut === "atteint").length;
+        const auRythme = avecObjectif.filter((o) => o.statut === "atteint" || o.statut === "avance").length;
+        const regularite = avecObjectif.length > 0
+            ? auRythme / avecObjectif.length + avecObjectif.reduce((t, o) => t + o.tenue, 0) / avecObjectif.length / 100
+            : -1;
+        return { ...l, score: somme(l.realise), objectifs, nbObjectifs: avecObjectif.length, atteints, auRythme, regularite };
     });
 
     const parVolume = [...lignesCalculees].sort((a, b) => b.score - a.score);
-    const liste = mode === "volume" ? parVolume : [...lignesCalculees].sort((a, b) => b.ratio - a.ratio || b.score - a.score);
-    const max = Math.max(...lignesCalculees.map((l) => l.score), 1);
+    const liste = mode === "volume" ? parVolume : [...lignesCalculees].sort((a, b) => b.regularite - a.regularite || b.score - a.score);
 
-    // Rang d'hier soir (volume uniquement) — masqué si personne n'avait encore vendu.
+    // Rang d'hier soir (volume uniquement) — masqué si personne n'avait encore rien fait.
     const rangAvant: Record<string, number> = {};
     if (avant && mode === "volume" && Object.values(avant).some((r) => somme(r) > 0)) {
         [...lignes].sort((a, b) => somme(avant[b.id]) - somme(avant[a.id])).forEach((l, i) => { rangAvant[l.id] = i + 1; });
@@ -142,30 +173,30 @@ export default function ClassementCourse({ lignes, periode, groupe, conseillerId
                 classement={parVolume.map((l) => ({ id: l.id, nom: l.nom, total: l.score }))}
                 conseillerId={conseillerId}
                 periode={periode}
+                unite={unite}
             />
 
             <section className="rounded-[24px] bg-white p-4 shadow-[0_4px_24px_rgba(15,23,42,.07)] sm:p-6">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <h2 className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">
-                        {GROUPES.find((g) => g.id === groupe)?.label} · la course
+                        {GROUPES.find((g) => g.id === groupe)?.label} · classement
                     </h2>
-                    {periode !== "jour" && (
-                        <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-black">
-                            {(["volume", "rythme"] as const).map((m) => (
-                                <button
-                                    key={m}
-                                    onClick={() => setMode(m)}
-                                    className={`rounded-lg px-3 py-1.5 transition-all ${mode === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
-                                >
-                                    {m === "volume" ? "Volume" : "À mon rythme"}
-                                </button>
-                            ))}
-                        </div>
-                    )}
+                    <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-black">
+                        {(["volume", "regularite"] as const).map((m) => (
+                            <button
+                                key={m}
+                                onClick={() => setMode(m)}
+                                className={`rounded-lg px-3 py-1.5 transition-all ${mode === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                            >
+                                {m === "volume" ? "Volume" : "Régularité"}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-                {mode === "rythme" && (
+                {mode === "regularite" && (
                     <p className="-mt-2 mb-3 text-xs text-slate-500">
-                        Classé sur l&apos;avance par rapport à son propre objectif à date (selon son planning), pas sur le nombre de ventes.
+                        Classé sur le nombre d&apos;objectifs tenus{periode === "jour" ? "" : " à date (selon le planning de chacun)"}.
+                        Dépasser largement un objectif ne compense pas un autre objectif en retard.
                     </p>
                 )}
 
@@ -175,61 +206,55 @@ export default function ClassementCourse({ lignes, periode, groupe, conseillerId
                         const isMoi = l.id === conseillerId;
                         const devant = i > 0 ? liste[i - 1] : null;
                         const derriere = liste[i + 1];
-                        const st = STYLE[l.statut];
                         const mouvement = rangAvant[l.id] ? rangAvant[l.id] - rang : 0;
-                        const ecartPct = Math.round((l.ratio - 1) * 100);
-                        const estOuvert = ouvert === l.id;
+                        const prenomDevant = devant?.nom.split(" ")[0];
 
-                        const sousTitre = mode === "volume"
-                            ? devant ? (devant.score - l.score === 0 ? `à égalité avec ${devant.nom.split(" ")[0]}` : `à ${devant.score - l.score} vente${devant.score - l.score > 1 ? "s" : ""} de ${devant.nom.split(" ")[0]}`)
-                                : derriere ? `${l.score - derriere.score} d'avance` : ""
-                            : `${l.score} vente${l.score > 1 ? "s" : ""}`;
-
-                        const pastille = l.statut === "atteint" ? "🏆 objectif atteint"
-                            : periode === "jour" ? `${l.score} / ${l.objTotal} du jour`
-                            : l.attendu <= 0 ? "pas d'objectif"
-                            : ecartPct >= 0 ? `+${ecartPct} % vs rythme` : `${ecartPct} % vs rythme`;
+                        const ecart = mode === "volume"
+                            ? devant ? (devant.score === l.score ? `à égalité avec ${prenomDevant}` : `à ${avecUnite(devant.score - l.score, unite)} de ${prenomDevant}`)
+                                : derriere && l.score > derriere.score ? `${avecUnite(l.score - derriere.score, unite)} d'avance` : ""
+                            : "";
 
                         return (
-                            <li key={l.id} className={`rounded-2xl ${isMoi ? "bg-green-50 ring-1 ring-green-200" : "bg-slate-50"}`}>
-                                <button onClick={() => setOuvert(estOuvert ? null : l.id)} className="flex w-full items-center gap-3 px-3 py-3 text-left sm:px-4" aria-expanded={estOuvert}>
+                            <li key={l.id} className={`rounded-2xl px-3 py-3 sm:px-4 ${isMoi ? "bg-green-50 ring-1 ring-green-200" : "bg-slate-50"}`}>
+                                <div className="flex items-center gap-3">
                                     <span className={`w-6 shrink-0 text-center text-lg font-black tabular-nums ${rang <= 3 ? "text-amber-500" : "text-slate-400"}`}>{rang}</span>
                                     <PhotoAvatar nom={l.nom} photoUrl={photos[l.id] ?? null} size={40} />
-
                                     <div className="min-w-0 flex-1">
-                                        <div className="flex items-baseline justify-between gap-2">
-                                            <p className={`truncate font-black ${isMoi ? "text-green-800" : "text-slate-800"}`}>
-                                                {l.nom.split(" ")[0]}
-                                                {isMoi && <span className="ml-1.5 text-[11px] font-bold text-green-600">(toi)</span>}
-                                            </p>
-                                            <p className="shrink-0 text-xl font-black tabular-nums text-slate-900">{l.score}</p>
-                                        </div>
-                                        <div className="mt-1.5 h-2.5 rounded-full bg-white ring-1 ring-slate-200/70">
-                                            <div className={`h-full rounded-full ${st.barre} transition-[width] duration-700`} style={{ width: `${Math.max((l.score / max) * 100, l.score > 0 ? 3 : 0)}%` }} />
-                                        </div>
-                                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
-                                            {sousTitre && <span className="font-semibold text-slate-500">{sousTitre}</span>}
-                                            <span className={`rounded-full px-2 py-0.5 font-bold ${st.pastille}`}>{pastille}</span>
+                                        <p className={`truncate font-black ${isMoi ? "text-green-800" : "text-slate-800"}`}>
+                                            {l.nom.split(" ")[0]}
+                                            {isMoi && <span className="ml-1.5 text-[11px] font-bold text-green-600">(toi)</span>}
+                                        </p>
+                                        <p className="flex flex-wrap items-center gap-x-2 text-[11px] font-semibold text-slate-500">
+                                            {l.nbObjectifs > 0
+                                                ? <span><span className="font-black text-slate-700">{l.atteints} / {l.nbObjectifs}</span> objectif{l.nbObjectifs > 1 ? "s" : ""} atteint{l.atteints > 1 ? "s" : ""}{periode !== "jour" && l.auRythme > l.atteints ? ` · ${l.auRythme - l.atteints} dans les temps` : ""}</span>
+                                                : <span>Pas d&apos;objectif sur ce groupe</span>}
+                                            {ecart && <span>· {ecart}</span>}
                                             {mouvement !== 0 && (
                                                 <span className={`font-black ${mouvement > 0 ? "text-emerald-600" : "text-rose-600"}`}>
                                                     {mouvement > 0 ? `▲ ${mouvement}` : `▼ ${-mouvement}`} <span className="font-semibold text-slate-400">depuis hier</span>
                                                 </span>
                                             )}
-                                        </div>
+                                        </p>
                                     </div>
-                                    <ChevronDown size={16} className={`shrink-0 text-slate-300 transition-transform ${estOuvert ? "rotate-180" : ""}`} />
-                                </button>
+                                    <p className="shrink-0 text-right leading-none">
+                                        <span className="text-2xl font-black tabular-nums text-slate-900">{l.score}</span>
+                                        {unite && <span className="block text-[10px] font-bold text-slate-400">{l.score > 1 ? `${unite}s` : unite}</span>}
+                                    </p>
+                                </div>
 
-                                {estOuvert && (
-                                    <div className="grid grid-cols-2 gap-2 px-3 pb-3 sm:grid-cols-3 sm:px-4 lg:grid-cols-5">
-                                        {codes.map((code) => (
-                                            <div key={code} className="rounded-xl bg-white px-3 py-2 ring-1 ring-slate-100">
-                                                <p className="truncate text-[11px] font-bold text-slate-500">{emojiDe(code)} {labelDe(code)}</p>
-                                                <p className="text-sm font-black tabular-nums text-slate-800">
-                                                    {l.realise[code] ?? 0}
-                                                    <span className="font-semibold text-slate-400"> / {l.objectif[code] ?? 0}</span>
-                                                </p>
-                                            </div>
+                                {l.objectifs.length > 0 && (
+                                    <div className="mt-2.5 flex flex-wrap gap-1.5 pl-9 sm:pl-[88px]">
+                                        {l.objectifs.map((o) => (
+                                            <span
+                                                key={o.code}
+                                                title={`${labelDe(o.code)} : ${o.realise}${o.objectif > 0 ? ` / ${o.objectif}` : " (sans objectif)"}`}
+                                                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold tabular-nums ring-1 ${PASTILLE[o.statut]}`}
+                                            >
+                                                <span aria-hidden="true">{emojiDe(o.code)}</span>
+                                                <span className="hidden sm:inline">{labelDe(o.code)}</span>
+                                                <span>{o.objectif > 0 ? `${o.realise}/${o.objectif}` : `+${o.realise}`}</span>
+                                                {o.statut === "atteint" && <span aria-label="atteint">✓</span>}
+                                            </span>
                                         ))}
                                     </div>
                                 )}
@@ -239,13 +264,13 @@ export default function ClassementCourse({ lignes, periode, groupe, conseillerId
                 </ol>
 
                 <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-semibold text-slate-400">
-                    <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-violet-500" />objectif atteint</span>
-                    {periode !== "jour" && <>
-                        <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-500" />dans les temps</span>
+                    <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-violet-400" />objectif atteint ✓</span>
+                    {periode !== "jour" ? <>
+                        <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-400" />dans les temps</span>
                         <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-400" />un peu juste</span>
-                        <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-rose-500" />en retard</span>
-                    </>}
-                    <span>Touche une ligne pour le détail par produit.</span>
+                        <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-rose-400" />en retard</span>
+                    </> : <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-slate-300" />en cours</span>}
+                    <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-sky-400" />hors objectif</span>
                 </p>
             </section>
         </div>

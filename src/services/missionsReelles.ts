@@ -124,7 +124,9 @@ async function calcul(
         return { produit: produitNom, objectifMensuel, realise, joursTravailles, joursRestants };
     });
 
-    return calculerObjectifs(inputs);
+    // Produit sans objectif ce mois-ci (ex. pas de profil Téléphone) et rien de vendu : il ne
+    // concerne pas ce conseiller → ni carte, ni objectif. Réapparaît s'il en vend quand même.
+    return calculerObjectifs(inputs.filter((i) => i.objectifMensuel > 0 || i.realise > 0));
 }
 
 // ─── API publique ─────────────────────────────────────────────────────────────

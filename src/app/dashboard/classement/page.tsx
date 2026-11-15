@@ -13,6 +13,7 @@ import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import PodiumTopPerformers from "@/components/dashboard/PodiumTopPerformers";
 import ClassementCourse from "@/components/classement/ClassementCourse";
+import PodiumsThematiques from "@/components/classement/PodiumsThematiques";
 import { supabase } from "@/lib/supabase";
 import { getRealiseVentesComboParConseiller, getObjectifsComboParConseiller, RealiseVentesCombo } from "@/services/variableConseiller";
 import { GROUPES, GroupeId, COMBO_META, ComboCode } from "@/utils/classementGroupes";
@@ -32,7 +33,7 @@ function ClassementInner() {
     // Présentation "course" en test (comparaison) : /dashboard/classement?...&classement=v2
     const vueCourse     = searchParams.get("classement") === "v2";
 
-    const [periode, setPeriode]             = useState<Periode>("mois");
+    const [periode, setPeriode]             = useState<Periode>(() => (["jour", "semaine", "mois"].includes(searchParams.get("periode") ?? "") ? searchParams.get("periode") as Periode : "mois"));
     const [classement, setClassement]       = useState<ConseillerStats[]>([]);
     const [moisMap, setMoisMap]             = useState(new Map<string, ConseillerStats>());
     const [semaineMap, setSemaineMap]       = useState(new Map<string, ConseillerStats>());
@@ -44,11 +45,16 @@ function ClassementInner() {
     const [maj, setMaj]                     = useState("");
 
     const [ongletTrophees, setOngletTrophees] = useState(false);
+    // Onglet "Podiums" (variante &classement=v2) : plusieurs podiums thématiques.
+    const [ongletPodiums, setOngletPodiums]   = useState(() => vueCourse && searchParams.get("onglet") === "podiums");
+    const onglets: { id: Periode | "trophees" | "podiums"; label: string }[] = vueCourse
+        ? [...ONGLETS.slice(0, 3), { id: "podiums", label: "🏅 Podiums" }, ...ONGLETS.slice(3)]
+        : ONGLETS;
     const [trophees, setTrophees]             = useState<ConseillerTrophees[]>([]);
     const [photosTrophees, setPhotosTrophees] = useState<Record<string, string | null>>({});
     const [loadingTrophees, setLoadingTrophees] = useState(true);
 
-    const [groupe, setGroupe]                     = useState<GroupeId>("core");
+    const [groupe, setGroupe]                     = useState<GroupeId>(() => (["core", "upsell", "quali"].includes(searchParams.get("groupe") ?? "") ? searchParams.get("groupe") as GroupeId : "core"));
     const [comboPeriode, setComboPeriode]         = useState<Record<string, RealiseVentesCombo>>({});
     const [comboSemaine, setComboSemaine]         = useState<Record<string, RealiseVentesCombo>>({});
     const [comboObjectifsMensuels, setComboObjectifsMensuels] = useState<Record<string, RealiseVentesCombo>>({});
@@ -237,18 +243,21 @@ function ClassementInner() {
             {/* Onglets + groupe de produits */}
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap gap-2">
-                    {ONGLETS.map(o => {
-                        const actif = o.id === "trophees" ? ongletTrophees : (!ongletTrophees && periode === o.id);
+                    {onglets.map(o => {
+                        const actif = o.id === "trophees" ? ongletTrophees
+                            : o.id === "podiums" ? ongletPodiums
+                            : (!ongletTrophees && !ongletPodiums && periode === o.id);
                         return (
                             <button
                                 key={o.id}
                                 onClick={() => {
-                                    if (o.id === "trophees") setOngletTrophees(true);
-                                    else { setOngletTrophees(false); setPeriode(o.id); }
+                                    if (o.id === "trophees") { setOngletTrophees(true); setOngletPodiums(false); }
+                                    else if (o.id === "podiums") { setOngletPodiums(true); setOngletTrophees(false); }
+                                    else { setOngletTrophees(false); setOngletPodiums(false); setPeriode(o.id); }
                                 }}
                                 className={`rounded-2xl px-5 py-2.5 text-sm font-bold transition-all ${
                                     actif
-                                        ? o.id === "trophees" ? "bg-amber-500 text-white" : "bg-slate-900 text-white"
+                                        ? o.id === "trophees" || o.id === "podiums" ? "bg-amber-500 text-white" : "bg-slate-900 text-white"
                                         : "bg-white text-slate-500 shadow-sm hover:bg-slate-50"
                                 }`}
                             >
@@ -257,7 +266,7 @@ function ClassementInner() {
                         );
                     })}
                 </div>
-                {!ongletTrophees && (
+                {!ongletTrophees && !ongletPodiums && (
                     <div className="flex gap-1.5 rounded-2xl bg-white p-1.5 shadow-sm">
                         {GROUPES.map((g) => (
                             <button
@@ -274,7 +283,9 @@ function ClassementInner() {
                 )}
             </div>
 
-            {ongletTrophees ? (
+            {ongletPodiums ? (
+                <PodiumsThematiques conseillerId={conseillerId} />
+            ) : ongletTrophees ? (
                 loadingTrophees ? (
                     <div className="flex h-48 items-center justify-center">
                         <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />

@@ -9,6 +9,8 @@ type Props = {
     classement: Participant[];
     /** Conseiller connecté — absent côté manager (bandeau équipe au lieu du message perso). */
     conseillerId?: string;
+    /** Unité comptée ("vente" par défaut) ; null = pas d'unité (ex. Quali : avis, récap, pas des ventes). */
+    unite?: string | null;
     periode: Periode;
 };
 
@@ -60,12 +62,12 @@ const BRAISES = [
     { left: "91%", delay: "2.1s", duree: "3.9s", taille: 3 },
 ];
 
-function pluriel(n: number, mot: string): string {
-    return `${n} ${mot}${n > 1 ? "s" : ""}`;
+function pluriel(n: number, mot: string | null): string {
+    return mot ? `${n} ${mot}${n > 1 ? "s" : ""}` : `${n}`;
 }
 
 /** Message personnel : ce qu'il manque pour monter (ou garder sa place). */
-function messageMotivation(classement: Participant[], conseillerId: string): string | null {
+function messageMotivation(classement: Participant[], conseillerId: string, unite: string | null): string | null {
     const idx = classement.findIndex((c) => c.id === conseillerId);
     if (idx < 0) return null;
     const moi = classement[idx];
@@ -76,40 +78,40 @@ function messageMotivation(classement: Participant[], conseillerId: string): str
         if (!second) return "👑 Tu es en tête. Garde la couronne !";
         const avance = moi.total - second.total;
         return avance > 0
-            ? `👑 Tu es en tête avec ${pluriel(avance, "vente")} d'avance sur ${second.nom}. Ne lâche rien !`
-            : `👑 Tu es en tête, mais ${second.nom} est à égalité. Une vente de plus et la couronne est à toi seul·e !`;
+            ? `👑 Tu es en tête avec ${pluriel(avance, unite)} d'avance sur ${second.nom}. Ne lâche rien !`
+            : `👑 Tu es en tête, mais ${second.nom} est à égalité. ${unite ? `Une ${unite} de plus` : "Encore un"} et la couronne est à toi seul·e !`;
     }
 
     const devant = classement[idx - 1];
     const ecart = devant.total - moi.total + 1;
     if (rang <= 3) {
-        return `🔥 Tu es sur le podium ! Encore ${pluriel(ecart, "vente")} pour passer devant ${devant.nom}.`;
+        return `🔥 Tu es sur le podium ! Encore ${pluriel(ecart, unite)} pour passer devant ${devant.nom}.`;
     }
 
     const troisieme = classement[2];
     const ecartPodium = troisieme.total - moi.total + 1;
-    return `🚀 Tu es #${rang}. Plus que ${pluriel(ecartPodium, "vente")} pour monter sur le podium !`;
+    return `🚀 Tu es #${rang}. Plus que ${pluriel(ecartPodium, unite)} pour monter sur le podium !`;
 }
 
 /** Bandeau côté manager : avance du leader + qui est le plus proche d'entrer sur le podium. */
-function messageEquipe(classement: Participant[]): string | null {
+function messageEquipe(classement: Participant[], unite: string | null): string | null {
     const [premier, second] = classement;
     const parts: string[] = [];
     if (second) {
         const avance = premier.total - second.total;
         parts.push(avance > 0
-            ? `👑 ${premier.nom} mène avec ${pluriel(avance, "vente")} d'avance`
+            ? `👑 ${premier.nom} mène avec ${pluriel(avance, unite)} d'avance`
             : `👑 ${premier.nom} et ${second.nom} sont à égalité en tête`);
     }
     const quatrieme = classement[3];
     if (quatrieme) {
         const ecart = classement[2].total - quatrieme.total + 1;
-        parts.push(`🚀 ${quatrieme.nom} (#4) est à ${pluriel(ecart, "vente")} du podium`);
+        parts.push(`🚀 ${quatrieme.nom} (#4) est à ${pluriel(ecart, unite)} du podium`);
     }
     return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-export default function PodiumTopPerformers({ classement, conseillerId, periode }: Props) {
+export default function PodiumTopPerformers({ classement, conseillerId, periode, unite = "vente" }: Props) {
     const top3 = classement.slice(0, 3);
     if (top3.length < 2) return null;
 
@@ -117,7 +119,7 @@ export default function PodiumTopPerformers({ classement, conseillerId, periode 
     const parRang: Record<number, Participant | undefined> = { 1: top3[0], 2: top3[1], 3: top3[2] };
     const message = podiumVide
         ? null
-        : conseillerId ? messageMotivation(classement, conseillerId) : messageEquipe(classement);
+        : conseillerId ? messageMotivation(classement, conseillerId, unite) : messageEquipe(classement, unite);
 
     return (
         <section className="relative overflow-hidden rounded-[28px] bg-[radial-gradient(ellipse_at_top,#4a1d06_0%,#1c1917_45%,#0c0a09_100%)] shadow-[0_20px_60px_rgba(124,45,18,.35)]">
@@ -155,7 +157,7 @@ export default function PodiumTopPerformers({ classement, conseillerId, periode 
                     <div className="flex flex-col items-center py-14 text-center">
                         <span className="inline-block text-6xl motion-safe:animate-[podium-couronne_2.4s_ease-in-out_infinite]">👑</span>
                         <p className="mt-4 text-lg font-black text-white">Le podium est encore vide</p>
-                        <p className="mt-1 text-sm text-amber-200/70">La première vente prend la couronne.</p>
+                        <p className="mt-1 text-sm text-amber-200/70">{unite ? `La première ${unite} prend la couronne.` : "Le premier à se lancer prend la couronne."}</p>
                     </div>
                 ) : (
                     <div className="mt-12 flex items-end justify-center gap-2 sm:mt-14 sm:gap-5">
@@ -198,7 +200,7 @@ export default function PodiumTopPerformers({ classement, conseillerId, periode 
                                             <span className={`font-black tabular-nums text-white ${first ? "text-4xl sm:text-5xl" : "text-2xl sm:text-3xl"}`}>
                                                 {c.total}
                                             </span>
-                                            <span className="ml-1 text-xs font-bold text-white/50">{c.total > 1 ? "ventes" : "vente"}</span>
+                                            {unite && <span className="ml-1 text-xs font-bold text-white/50">{c.total > 1 ? `${unite}s` : unite}</span>}
                                         </p>
                                     </div>
 
