@@ -210,6 +210,9 @@ export default function MesStatsV2({ conseillerId }: { conseillerId: string }) {
 
     return (
         <div className="space-y-5">
+            {/* ── Articles par vente : donnée clé, en haut ─────────────── */}
+            {d.articles && <ArticlesParVenteCard stats={d.articles} />}
+
             {/* ── 1. Heatmap ─────────────────────────────────────────── */}
             <section className="rounded-[24px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)] sm:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -357,7 +360,6 @@ export default function MesStatsV2({ conseillerId }: { conseillerId: string }) {
                 </section>
             </div>
 
-            {d.articles && <ArticlesParVenteCard stats={d.articles} />}
         </div>
     );
 }
