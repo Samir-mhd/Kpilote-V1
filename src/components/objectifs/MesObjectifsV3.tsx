@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getMissionsCompletes, getMissionsReelles, getVentesParMois, codeDepuisNom, MissionComplete } from "@/services/missionsReelles";
+import { getMissionsCompletes, getVentesParMois, codeDepuisNom, MissionComplete } from "@/services/missionsReelles";
 import { getStatsTransactionsMois, StatsTransactionsMois } from "@/services/ventesTransactions";
 import { getJoursTravail } from "@/services/planningService";
 import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
@@ -13,8 +13,8 @@ import { COMBO_META, ComboCode } from "@/utils/classementGroupes";
 import ArticlesParVenteCard from "@/components/dashboard/ArticlesParVenteCard";
 
 /**
- * Variante "par horizon" de Mes objectifs (&objectifs=v3) : tout se lit en Jour / Semaine / Mois,
- * le même découpage que l'Accueil (jour) et le Classement.
+ * Variante "par horizon" de Mes objectifs (&objectifs=v3) : tout se lit en Semaine / Mois.
+ * L'objectif du jour n'y figure pas : il est déjà sur l'Accueil.
  */
 
 const MOIS_COURTS = ["", "Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
@@ -37,7 +37,6 @@ type Horizon = { realise: number; objectif: number } | null;
 type Carte = {
     code: string;
     produit: string;
-    jour: Horizon;
     semaine: Horizon;
     mois: { realise: number; objectif: number; attendu: number; projection: number; parJour: number };
     ecart: number;
@@ -56,7 +55,7 @@ function couleur(realise: number, objectif: number, repere: number): { barre: st
     return { barre: "bg-rose-500", texte: "text-rose-600", trait: "#f43f5e" };
 }
 
-// Jour / Semaine : pas de rythme à comparer → neutre tant que pas atteint, violet une fois atteint.
+// Semaine : pas de rythme à comparer → neutre tant que pas atteint, violet une fois atteint.
 function couleurNeutre(realise: number, objectif: number): { barre: string; texte: string; trait: string } {
     if (objectif > 0 && realise >= objectif) return { barre: "bg-violet-500", texte: "text-violet-600", trait: "#8b5cf6" };
     return { barre: "bg-indigo-300", texte: "text-indigo-600", trait: "#a5b4fc" };
@@ -125,7 +124,6 @@ export default function MesObjectifsV3({ conseillerId }: { conseillerId: string;
 
         Promise.all([
             getMissionsCompletes(conseillerId),
-            getMissionsReelles(conseillerId).catch(() => []),
             getJoursTravail(conseillerId, now.getFullYear(), now.getMonth() + 1),
             getObjectifsSemaineFiges([conseillerId], debut, fin).catch(() => ({} as Record<string, Record<string, number>>)),
             getVentesDepuisLundi(conseillerId, debut).catch(() => [] as any[]),
@@ -134,7 +132,7 @@ export default function MesObjectifsV3({ conseillerId }: { conseillerId: string;
             Promise.all(moisPrecedents.map(({ m, a }) =>
                 getVentesParMois(conseillerId, a, m).then((v) => ({ label: MOIS_COURTS[m], ventes: v })).catch(() => ({ label: MOIS_COURTS[m], ventes: {} as Record<string, number> }))
             )),
-        ]).then(([missions, missionsJour, jt, figes, ventesSemaine, comboSemaine, stats, hist]) => {
+        ]).then(([missions, jt, figes, ventesSemaine, comboSemaine, stats, hist]) => {
             const total = jt.travailles + jt.restants;
             const objSemaine = (figes as Record<string, Record<string, number>>)[conseillerId] ?? {};
 
@@ -145,12 +143,6 @@ export default function MesObjectifsV3({ conseillerId }: { conseillerId: string;
             });
             if (comboSemaine) Object.entries(comboSemaine).forEach(([code, n]) => { realiseSemaine[code] = n as number; });
 
-            // Objectif du jour = même calcul que l'Accueil (combos absents de l'Accueil → pas de jour).
-            const jourParCode: Record<string, { realise: number; objectif: number }> = {};
-            (missionsJour as { produit: string; objectif: number; realise: number }[]).forEach((m) => {
-                jourParCode[codeDepuisNom(m.produit)] = { realise: m.realise, objectif: m.objectif };
-            });
-
             setCartes((missions as MissionComplete[]).map((m) => {
                 const code = codeDepuisNom(m.produit);
                 const attendu = total > 0 ? (m.objectifMensuel * jt.travailles) / total : 0;
@@ -158,7 +150,6 @@ export default function MesObjectifsV3({ conseillerId }: { conseillerId: string;
                 return {
                     code,
                     produit: m.produit,
-                    jour: jourParCode[code] ?? null,
                     semaine: objSem !== undefined ? { realise: realiseSemaine[code] ?? 0, objectif: objSem } : null,
                     mois: { realise: m.realise, objectif: m.objectifMensuel, attendu, projection: m.projectionFinMois, parJour: m.objectifJour },
                     ecart: Math.round(m.realise - attendu),
@@ -188,7 +179,6 @@ export default function MesObjectifsV3({ conseillerId }: { conseillerId: string;
         (t, c) => { const h = f(c); return h ? { realise: t.realise + h.realise, objectif: t.objectif + h.objectif } : t; },
         { realise: 0, objectif: 0 }
     );
-    const totJour = somme((c) => c.jour);
     const totSemaine = somme((c) => c.semaine);
     const totMois = somme((c) => c.mois);
     const attenduMois = ventes.reduce((t, c) => t + c.mois.attendu, 0);
@@ -196,15 +186,10 @@ export default function MesObjectifsV3({ conseillerId }: { conseillerId: string;
 
     const horizons = [
         {
-            label: "Aujourd'hui", h: totJour, repere: null as number | null, repos: totJour.objectif === 0 && totJour.realise === 0,
-            sous: totJour.objectif === 0 && totJour.realise === 0 ? "Repos aujourd'hui"
-                : totJour.realise >= totJour.objectif ? "Journée complète ✓" : `Encore ${totJour.objectif - totJour.realise}`,
-        },
-        {
-            label: "Cette semaine", h: totSemaine, repere: null as number | null, repos: false,
+            label: "Cette semaine", h: totSemaine, repere: null as number | null,
             sous: totSemaine.realise >= totSemaine.objectif ? "Semaine complète ✓" : `Encore ${totSemaine.objectif - totSemaine.realise}`,
         },
-        { label: "Ce mois", h: totMois, repere: attenduMois as number | null, repos: false, sous: `Rythme attendu ${pctAttendu} %` },
+        { label: "Ce mois", h: totMois, repere: attenduMois as number | null, sous: `Rythme attendu ${pctAttendu} %` },
     ];
 
     const aRattraper = ventes.filter((c) => c.ecart < 0 && c.mois.realise < c.mois.objectif).sort((a, b) => a.ecart - b.ecart).slice(0, 3);
@@ -221,7 +206,7 @@ export default function MesObjectifsV3({ conseillerId }: { conseillerId: string;
                         {MOIS_NOMS[now.getMonth()]} · jour {jours.ecoules} sur {jours.total} planifiés
                     </p>
                 </div>
-                <div className="relative mt-5 grid gap-3 sm:grid-cols-3">
+                <div className="relative mt-5 grid gap-3 sm:grid-cols-2">
                     {horizons.map((x) => {
                         const p = pct(x.h);
                         const c = x.repere !== null ? couleur(x.h.realise, x.h.objectif, x.repere) : couleurNeutre(x.h.realise, x.h.objectif);
@@ -229,7 +214,7 @@ export default function MesObjectifsV3({ conseillerId }: { conseillerId: string;
                             <div key={x.label} className="flex items-center gap-4 rounded-2xl bg-white/[0.06] p-4 ring-1 ring-white/10">
                                 <div className="relative shrink-0">
                                     <Anneau valeur={p} couleurTrait={c.trait} />
-                                    <span className="absolute inset-0 flex items-center justify-center text-lg font-black tabular-nums">{x.repos ? "😴" : `${p}%`}</span>
+                                    <span className="absolute inset-0 flex items-center justify-center text-lg font-black tabular-nums">{`${p}%`}</span>
                                 </div>
                                 <div className="min-w-0">
                                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/50">{x.label}</p>
@@ -296,7 +281,6 @@ export default function MesObjectifsV3({ conseillerId }: { conseillerId: string;
                                         </p>
 
                                         <div className="mt-3 space-y-1.5">
-                                            <MiniBarre label="J" h={c.jour} />
                                             <MiniBarre label="S" h={c.semaine} />
                                             <MiniBarre label="M" h={{ realise: c.mois.realise, objectif: c.mois.objectif }} repere={avecRythme ? c.mois.attendu : undefined} />
                                         </div>
