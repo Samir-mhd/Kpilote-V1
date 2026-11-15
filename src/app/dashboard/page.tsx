@@ -9,6 +9,7 @@ import HeroHeader from "@/components/dashboard/HeroHeader";
 import HeroCompact from "@/components/dashboard/HeroCompact";
 import StatsBar from "@/components/dashboard/StatsBar";
 import MorningCheck from "@/components/dashboard/MorningCheck";
+import MorningCheckV2 from "@/components/dashboard/MorningCheckV2";
 import MissionCard, { QuestionCrossSell } from "@/components/MissionCard";
 import { detecterEvenement } from "@/engine/eventEngine";
 import { genererMessageCoach } from "@/engine/coachEngine";
@@ -100,6 +101,9 @@ export default function Dashboard() {
     const conseillerId = searchParams.get("id") || "";
     // Nouvelle mise en page par défaut ; l'ancienne reste accessible quelque temps avec &layout=v1.
     const layoutV2 = searchParams.get("layout") !== "v1";
+    // Cerebro Check repensé, en test : &cerebro=v2 ; &apercuCheck=1 l'affiche même s'il est déjà validé.
+    const cerebroV2 = searchParams.get("cerebro") === "v2";
+    const [apercuCheck, setApercuCheck] = useState(searchParams.get("apercuCheck") === "1");
 
     // checkLoading : true pendant la vérification DB (évite un flash du check avant la réponse)
     const [checkLoading,          setCheckLoading]          = useState(!!conseillerId);
@@ -436,13 +440,15 @@ export default function Dashboard() {
         );
     }
 
-    if (!morningCheckValidated) {
+    if (!morningCheckValidated || apercuCheck) {
+        const Check = cerebroV2 ? MorningCheckV2 : MorningCheck;
         return (
-            <MorningCheck
+            <Check
                 nom={nom}
                 conseillerId={conseillerId}
                 isReset={checkForced}
                 onValidated={() => {
+                    setApercuCheck(false);
                     if (conseillerId) {
                         marquerCheckFait(conseillerId).catch(() => {});
                         clearForceCheck(conseillerId).catch(() => {});
