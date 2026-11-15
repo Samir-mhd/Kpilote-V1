@@ -49,7 +49,8 @@ function VariableInner() {
     const searchParams = useSearchParams();
     const conseillerId = searchParams.get("id") ?? "";
     const nomConseiller = searchParams.get("nom") ?? "";
-    const v2 = searchParams.get("variable") === "v2";
+    // Nouvelle présentation par défaut ; l'ancienne reste accessible quelque temps avec &variable=v1.
+    const v2 = searchParams.get("variable") !== "v1";
     const [declarationOuverte, setDeclarationOuverte] = useState(false);
     // Contexte boutique (R/O, notes collectives) saisi par le manager → lecture seule ici.
     const [contexteManager, setContexteManager] = useState(false);
