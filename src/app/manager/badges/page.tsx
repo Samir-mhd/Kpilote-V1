@@ -10,11 +10,18 @@ import { getDetenteursBadges, DetenteurBadge, construireClassementTrophees, Cons
 import { CATEGORIES_MOIS, ClassementMois, calculerClassementMois, attribuerTropheesMoisPrecedent } from "@/services/tropheesMoisService";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
+import { getGenres, Genre } from "@/utils/genre";
 
 type BadgeAffiche = Badge & { secrete?: boolean };
 
 const ext = (famille: BadgeExtension["famille"]): BadgeAffiche[] =>
     BADGES_EXTENSION.filter((x) => x.famille === famille).map((x) => ({ ...x.badge, secrete: true }));
+
+let GENRES: Record<string, Genre> = {};
+/** Libellé du trophée : au féminin si tous ses détenteurs sont des femmes. */
+function libelleMur(b: { label: string; labelF?: string }, holders: { conseillerId: string }[]): string {
+    return b.labelF && holders.length > 0 && holders.every((h) => GENRES[h.conseillerId] === "F") ? b.labelF : b.label;
+}
 
 function CarteTrophee({ badge, holders, photos }: { badge: BadgeAffiche; holders: DetenteurBadge[]; photos: Record<string, string | null> }) {
     return (
@@ -27,7 +34,7 @@ function CarteTrophee({ badge, holders, photos }: { badge: BadgeAffiche; holders
                     {badge.emoji}
                 </div>
                 <div className="min-w-0 flex-1">
-                    <p className="truncate font-black text-sm text-slate-800">{badge.label}</p>
+                    <p className="truncate font-black text-sm text-slate-800">{libelleMur(badge, holders)}</p>
                     <p className="truncate text-xs text-slate-400">{badge.description}</p>
                 </div>
                 {badge.secrete && (
@@ -86,8 +93,9 @@ export default function BadgesManagerPage() {
     useEffect(() => {
         // Titres du mois précédent attribués avant lecture (idempotent).
         attribuerTropheesMoisPrecedent().catch(() => {})
-            .then(() => Promise.all([getDetenteursBadges(), construireClassementTrophees()]))
-            .then(async ([data, cl]) => {
+            .then(() => Promise.all([getDetenteursBadges(), construireClassementTrophees(), getGenres()]))
+            .then(async ([data, cl, genres]) => {
+                GENRES = genres;
                 setParBadge(data);
                 setClassement(cl);
                 const ids = [...new Set([...Object.values(data).flat().map((h) => h.conseillerId), ...cl.map((c) => c.id)])];
@@ -100,7 +108,7 @@ export default function BadgesManagerPage() {
 
     const streakBadgesAffiches: BadgeAffiche[] = [
         ...STREAK_BADGES.map((b) => ({ code: b.code, label: b.label, emoji: b.emoji, de: b.de, a: b.a, description: `${b.seuil} jours d'affilée` })),
-        ...STREAK_BADGES_EXTENSION.map((b) => ({ code: b.code, label: b.label, emoji: b.emoji, de: b.de, a: b.a, description: `${b.seuil} jours d'affilée`, secrete: true })),
+        ...STREAK_BADGES_EXTENSION.map((b) => ({ code: b.code, label: b.label, labelF: b.labelF, emoji: b.emoji, de: b.de, a: b.a, description: `${b.seuil} jours d'affilée`, secrete: true })),
     ];
     // Maîtrise produit : Bronze/Argent/Or puis Platine/Diamant (secrètes), produit par produit.
     const produitAffiches: BadgeAffiche[] = Object.keys(PALIERS_PRODUIT).flatMap((code) => [
@@ -196,7 +204,7 @@ export default function BadgesManagerPage() {
                                     {palmares.filter((p) => p.mois === m).map((p) => (
                                         <span key={p.cat!.id} className="flex items-center gap-1.5 rounded-full bg-slate-50 py-1 pl-1 pr-3 ring-1 ring-slate-100">
                                             <span className="flex h-6 w-6 items-center justify-center rounded-full text-sm" style={{ background: `linear-gradient(135deg, ${p.cat!.de}, ${p.cat!.a})` }}>{p.cat!.emoji}</span>
-                                            <span className="text-xs font-bold text-slate-500">{p.cat!.label} :</span>
+                                            <span className="text-xs font-bold text-slate-500">{libelleMur(p.cat!, p.holders)} :</span>
                                             <span className="text-xs font-black text-slate-800">{p.holders.map((h) => prenom(h.nom)).join(", ")}</span>
                                         </span>
                                     ))}

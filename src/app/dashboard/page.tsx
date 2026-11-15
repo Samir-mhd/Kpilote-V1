@@ -163,6 +163,7 @@ export default function Dashboard() {
 
     // Genre du conseiller — récupéré au chargement, stocké en ref pour éviter les closures
     const genreRef = useRef<"H" | "F" | null>(null);
+    const [genre, setGenre] = useState<"H" | "F" | null>(null);
 
     // Avatar cartoon — état calculé automatiquement selon les ventes du jour
     const { etat: avatarEtat, refresh: refreshAvatar } = useAvatarEtat(conseillerId);
@@ -350,6 +351,7 @@ export default function Dashboard() {
                     .eq("id", conseillerId)
                     .single();
                 genreRef.current = (data?.genre as "H" | "F") ?? null;
+                setGenre(genreRef.current);
                 setVariableActivee(data?.variable_activee !== false);
             } catch { /* genre inconnu = défaut masculin */ }
             await Promise.all([chargerMissions(), chargerRang(), chargerDefis()]);
@@ -1075,6 +1077,7 @@ export default function Dashboard() {
                     prochainBadge={prochainBadge}
                     badgeHref={`/dashboard/badges?id=${conseillerId}&nom=${encodeURIComponent(nom)}`}
                     travailleAujourdhui={travailleAujourdhui}
+                    genre={genre}
                 />
             ) : (
                 <HeroHeader
@@ -1084,6 +1087,7 @@ export default function Dashboard() {
                     progression={tauxGlobal}
                     rang={rang}
                     avatarEtat={avatarEtat}
+                    genre={genre}
                 />
             )}
 

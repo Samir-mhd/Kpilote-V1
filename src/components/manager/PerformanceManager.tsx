@@ -25,7 +25,7 @@ export default function PerformanceManager({
       />
 
       <p className="text-slate-500 -mt-4 mb-8">
-        Meilleur vendeur de la journée
+        Meilleure performance de la journée
       </p>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">

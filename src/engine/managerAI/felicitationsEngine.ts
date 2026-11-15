@@ -18,7 +18,7 @@ export function construireFelicitations(
       conseiller: champion.prenom,
 
       raison:
-        `Meilleur vendeur du jour avec ${champion.ventes} ventes.`
+        `Meilleure performance du jour avec ${champion.ventes} ventes.`
 
     });
 

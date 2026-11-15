@@ -64,7 +64,7 @@ export function construireBriefManager(
 
     briefs.push({
 
-      titre: "🏆 Champion",
+      titre: "🏆 Meilleure performance",
 
       message: `${champion.prenom} réalise actuellement la meilleure performance.`,
 

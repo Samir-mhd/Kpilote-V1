@@ -2,6 +2,7 @@
 
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 import type { Periode } from "@/utils/periodes";
+import { accord, useGenres, type Genre } from "@/utils/genre";
 
 type Participant = { id: string; nom: string; total: number };
 
@@ -67,7 +68,7 @@ function pluriel(n: number, mot: string | null): string {
 }
 
 /** Message personnel : ce qu'il manque pour monter (ou garder sa place). */
-function messageMotivation(classement: Participant[], conseillerId: string, unite: string | null): string | null {
+function messageMotivation(classement: Participant[], conseillerId: string, unite: string | null, genre: Genre = null): string | null {
     const idx = classement.findIndex((c) => c.id === conseillerId);
     if (idx < 0) return null;
     const moi = classement[idx];
@@ -79,7 +80,7 @@ function messageMotivation(classement: Participant[], conseillerId: string, unit
         const avance = moi.total - second.total;
         return avance > 0
             ? `👑 Tu es en tête avec ${pluriel(avance, unite)} d'avance sur ${second.nom}. Ne lâche rien !`
-            : `👑 Tu es en tête, mais ${second.nom} est à égalité. ${unite ? `Une ${unite} de plus` : "Encore un"} et la couronne est à toi seul·e !`;
+            : `👑 Tu es en tête, mais ${second.nom} est à égalité. ${unite ? `Une ${unite} de plus` : "Encore un"} et la couronne est à toi ${accord(genre, "seul", "seule")} !`;
     }
 
     const devant = classement[idx - 1];
@@ -112,6 +113,7 @@ function messageEquipe(classement: Participant[], unite: string | null): string 
 }
 
 export default function PodiumTopPerformers({ classement, conseillerId, periode, unite = "vente" }: Props) {
+    const genres = useGenres();
     const top3 = classement.slice(0, 3);
     if (top3.length < 2) return null;
 
@@ -119,7 +121,7 @@ export default function PodiumTopPerformers({ classement, conseillerId, periode,
     const parRang: Record<number, Participant | undefined> = { 1: top3[0], 2: top3[1], 3: top3[2] };
     const message = podiumVide
         ? null
-        : conseillerId ? messageMotivation(classement, conseillerId, unite) : messageEquipe(classement, unite);
+        : conseillerId ? messageMotivation(classement, conseillerId, unite, genres[conseillerId] ?? null) : messageEquipe(classement, unite);
 
     return (
         <section className="relative overflow-hidden rounded-[28px] bg-[radial-gradient(ellipse_at_top,#4a1d06_0%,#1c1917_45%,#0c0a09_100%)] shadow-[0_20px_60px_rgba(124,45,18,.35)]">

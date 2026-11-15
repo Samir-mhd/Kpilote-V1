@@ -94,7 +94,7 @@ export function construireNotifications(
 
       emoji: "🏆",
 
-      titre: "Top vendeur",
+      titre: "Top 3 de la boutique",
 
       message:
         "Tu fais actuellement partie du Top 3 de la boutique.",

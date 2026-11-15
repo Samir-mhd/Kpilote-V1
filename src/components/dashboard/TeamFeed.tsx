@@ -91,7 +91,7 @@ function buildMessage(
             `${prenom} passe en tête du classement ! 👑`,
             `${prenom} s'empare de la 1ère place ! 🔝`,
             `${prenom} prend le leadership de la boutique ! 🏆`,
-            `Renversement de situation — ${prenom} est 1er ! 🔥`,
+            `Renversement de situation — ${prenom} est ${genre === "F" ? "1re" : "1er"} ! 🔥`,
             `${prenom} détrône tout le monde ! 🥇`,
             `La 1ère place change de mains — c'est ${prenom} ! 🏆`,
         ]);
@@ -190,6 +190,7 @@ export default function TeamFeed({ conseillerId, grand = false, condense = false
     const [entries, setEntries] = useState<Entry[]>([]);
     const [dbError, setDbError] = useState<string | null>(null);
     const namesRef    = useRef<Record<string, string>>({});
+    const genresRef   = useRef<Record<string, string | null>>({});
     const countsRef   = useRef<Counts>({});
     const ranksRef    = useRef<Record<string, number>>({});
     const produitsRef = useRef<Record<string, string>>({}); // produit_id -> code (pour le realtime, sans jointure)
@@ -201,7 +202,7 @@ export default function TeamFeed({ conseillerId, grand = false, condense = false
 
         (async () => {
             const [resC, resV, resP] = await Promise.all([
-                supabase.from("conseillers").select("id, nom, profil_actif"),
+                supabase.from("conseillers").select("id, nom, profil_actif, genre"),
                 supabase
                     .from("ventes")
                     .select("id, conseiller_id, created_at, source, quantite, produit_id, produits(nom, code)")
@@ -224,6 +225,7 @@ export default function TeamFeed({ conseillerId, grand = false, condense = false
             const amap: Record<string, boolean> = {};
             (resC.data ?? []).forEach((c: any) => {
                 amap[c.id] = c.profil_actif !== false;
+                genresRef.current[c.id] = c.genre ?? null;
                 if (c.profil_actif === false) return; // profil désactivé = invisible du feed
                 map[c.id] = c.nom;
             });
@@ -298,6 +300,7 @@ export default function TeamFeed({ conseillerId, grand = false, condense = false
                         tempCounts[cid].total,
                         rankAfter,
                         rankBefore,
+                        genresRef.current[cid],
                     ),
                 });
             });
@@ -388,6 +391,7 @@ export default function TeamFeed({ conseillerId, grand = false, condense = false
                         countsRef.current[cid].total,
                         rankAfter,
                         rankBefore,
+                        genresRef.current[cid],
                     ),
                 };
                 setEntries(prev => [entry, ...prev].slice(0, 50));

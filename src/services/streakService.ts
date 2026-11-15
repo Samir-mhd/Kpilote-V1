@@ -17,6 +17,7 @@ export type StreakBadge = {
     emoji: string;
     de: string;
     a: string;
+    labelF?: string;
 };
 
 export const STREAK_BADGES: StreakBadge[] = [
@@ -31,7 +32,7 @@ export const STREAK_BADGES: StreakBadge[] = [
 /** Paliers cachés : révélés (et débloquables) seulement une fois Centurion (100 j) obtenu. */
 export const STREAK_BADGES_EXTENSION: StreakBadge[] = [
     { code: "streak_150", seuil: 150, label: "Mythe", emoji: "🌋", de: "#fdba74", a: "#c2410c" },
-    { code: "streak_200", seuil: 200, label: "Immortel", emoji: "🪐", de: "#c7d2fe", a: "#3730a3" },
+    { code: "streak_200", seuil: 200, label: "Immortel", labelF: "Immortelle", emoji: "🪐", de: "#c7d2fe", a: "#3730a3" },
 ];
 export const PREREQUIS_STREAK_EXTENSION = "streak_100";
 

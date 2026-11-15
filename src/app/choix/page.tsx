@@ -6,8 +6,9 @@ import { ArrowLeft } from "lucide-react";
 import { getConseillers } from "@/services/conseillers";
 import { getJoursTravailPlageTous } from "@/services/planningService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
+import { accord, Genre } from "@/utils/genre";
 
-type Conseiller = { id: string; nom: string; avatar?: string | null; profil_actif?: boolean | null };
+type Conseiller = { id: string; nom: string; avatar?: string | null; profil_actif?: boolean | null; genre?: Genre };
 
 function salutation(): string {
     const h = new Date().getHours();
@@ -94,7 +95,7 @@ export default function ChoixConseiller() {
                                         <h2 className="mt-4 text-center text-xl font-black text-slate-900 sm:text-2xl">{conseiller.nom}</h2>
                                         {enBoutique !== null && (
                                             <p className={`mt-1 text-xs font-bold ${enBoutique ? "text-emerald-600" : "text-slate-400"}`}>
-                                                {enBoutique ? "En boutique aujourd'hui" : "Pas planifié aujourd'hui"}
+                                                {enBoutique ? "En boutique aujourd'hui" : `Pas ${accord(conseiller.genre, "planifié", "planifiée")} aujourd'hui`}
                                             </p>
                                         )}
 

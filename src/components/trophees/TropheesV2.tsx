@@ -6,11 +6,12 @@ import {
     Badge, EtatBadges, PALIERS_PRODUIT, TIER_LABELS, TIER_COULEURS, PRODUIT_BADGES,
     BOX_BADGES, PRODUIT_STREAK_BADGES, PRODUITS_STREAK, JOUR_PARFAIT_BADGES, PALIERS_JOURS_PARFAITS,
     SEMAINE_PARFAITE_BADGE, SEUIL_SEMAINE, DEFI_JOUR_BADGES, PALIERS_DEFIS_JOUR, SERIE_DEFIS_JOUR,
-    BADGES_EXTENSION, BadgeExtension,
+    BADGES_EXTENSION, BadgeExtension, libelleBadge,
 } from "@/services/badgesService";
 import { StreakInfo, STREAK_BADGES, GELS_PAR_MOIS, STREAK_BADGES_EXTENSION, PREREQUIS_STREAK_EXTENSION } from "@/services/streakService";
 import { getDetenteursBadges, construireClassementTrophees } from "@/services/badgesManagerService";
 import { PRODUITS_ORDRE } from "@/utils/produits";
+import { useGenres, premier } from "@/utils/genre";
 import { CATEGORIES_MOIS, ClassementMois, calculerClassementMois, attribuerTropheesMoisPrecedent } from "@/services/tropheesMoisService";
 
 /**
@@ -47,6 +48,8 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
             .then(setCourseMois).catch(() => {});
     }, [conseillerId]);
 
+    const genre = useGenres()[conseillerId] ?? null;
+    const lib = (b: { label: string; labelF?: string }) => libelleBadge(b, genre);
     const d = etat.debloques;
     const nouveau = (code: string) => etat.nouveaux.includes(code);
 
@@ -67,7 +70,7 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
             groupes: [{
                 cle: "serie",
                 items: STREAK_BADGES.map((s) => ({ badge: { code: s.code, label: s.label, emoji: s.emoji, de: s.de, a: s.a, description: `${s.seuil} jours d'affilée` }, obtenuLe: acquis[s.code], valeur: info.streakActuel, seuil: s.seuil })),
-                extensions: STREAK_BADGES_EXTENSION.map((s) => ({ badge: { code: s.code, label: s.label, emoji: s.emoji, de: s.de, a: s.a, description: `${s.seuil} jours d'affilée` }, obtenuLe: acquis[s.code], valeur: info.streakActuel, seuil: s.seuil })),
+                extensions: STREAK_BADGES_EXTENSION.map((s) => ({ badge: { code: s.code, label: s.label, labelF: s.labelF, emoji: s.emoji, de: s.de, a: s.a, description: `${s.seuil} jours d'affilée` }, obtenuLe: acquis[s.code], valeur: info.streakActuel, seuil: s.seuil })),
                 revele: !!acquis[PREREQUIS_STREAK_EXTENSION], condition: labelDe(PREREQUIS_STREAK_EXTENSION),
             }],
         },
@@ -152,7 +155,7 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
                             <div className="h-full rounded-full bg-gradient-to-r from-amber-300 to-orange-500 transition-[width] duration-700" style={{ width: `${pct}%` }} />
                         </div>
                         <p className="mt-2 text-sm font-semibold text-white/60">
-                            {pct} % de la collection{titresMois.length > 0 && <> · <span className="font-black text-amber-300">+{titresMois.length} titre{titresMois.length > 1 ? "s" : ""} du mois</span></>}{rang > 0 && <> · <span className="font-black text-white">{rang === 1 ? "👑 1er" : `${rang}ᵉ`}</span> de l&apos;équipe sur {effectif}</>}
+                            {pct} % de la collection{titresMois.length > 0 && <> · <span className="font-black text-amber-300">+{titresMois.length} titre{titresMois.length > 1 ? "s" : ""} du mois</span></>}{rang > 0 && <> · <span className="font-black text-white">{rang === 1 ? `👑 ${premier(genre)}` : `${rang}ᵉ`}</span> de l&apos;équipe sur {effectif}</>}
                         </p>
                     </div>
                     <div className="rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10">
@@ -176,7 +179,7 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
                                 <div className="flex items-center gap-3">
                                     <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl" style={{ background: `linear-gradient(135deg, ${i.badge.de}, ${i.badge.a})` }}>{i.badge.emoji}</span>
                                     <div className="min-w-0">
-                                        <p className="truncate font-black text-slate-900">{i.badge.label}</p>
+                                        <p className="truncate font-black text-slate-900">{lib(i.badge)}</p>
                                         <p className="truncate text-xs font-semibold text-slate-400">{i.badge.description}</p>
                                     </div>
                                 </div>
@@ -210,7 +213,7 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
                             <div key={cat.id} className={`rounded-2xl p-3 ${enTete ? "bg-amber-50 ring-2 ring-amber-300" : "bg-slate-50 ring-1 ring-slate-100"}`}>
                                 <div className="flex items-center gap-2">
                                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg" style={{ background: `linear-gradient(135deg, ${cat.de}, ${cat.a})` }} aria-hidden="true">{cat.emoji}</span>
-                                    <p className="font-black leading-tight text-slate-900">{cat.label}</p>
+                                    <p className="font-black leading-tight text-slate-900">{lib(cat)}</p>
                                 </div>
                                 <p className="mt-1.5 text-[11px] font-semibold leading-snug text-slate-400">{cat.description}</p>
                                 <p className="mt-2 text-xs font-bold text-slate-600">
@@ -228,7 +231,7 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
                         {titresMois.map((t) => (
                             <span key={`${t.cat!.id}${t.mois}`} className="flex items-center gap-1.5 rounded-xl bg-white py-1 pl-1 pr-2.5 text-xs font-black text-slate-700 ring-1 ring-slate-200">
                                 <span className="flex h-6 w-6 items-center justify-center rounded-lg" style={{ background: `linear-gradient(135deg, ${t.cat!.de}, ${t.cat!.a})` }} aria-hidden="true">{t.cat!.emoji}</span>
-                                {t.cat!.label} · <span className="capitalize text-slate-400">{nomMois(t.mois)}</span>
+                                {lib(t.cat!)} · <span className="capitalize text-slate-400">{nomMois(t.mois)}</span>
                             </span>
                         ))}
                     </div>
@@ -242,7 +245,7 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
                     <div className="flex flex-wrap gap-2">
                         {derniers.map((i) => (
                             <span key={i.badge.code} className="flex items-center gap-2 rounded-2xl bg-white py-1.5 pl-1.5 pr-3 text-sm font-black text-slate-800 shadow-sm ring-1 ring-slate-100">
-                                <span className="flex h-7 w-7 items-center justify-center rounded-xl text-base" style={{ background: `linear-gradient(135deg, ${i.badge.de}, ${i.badge.a})` }} aria-hidden="true">{i.badge.emoji}</span> {i.badge.label}
+                                <span className="flex h-7 w-7 items-center justify-center rounded-xl text-base" style={{ background: `linear-gradient(135deg, ${i.badge.de}, ${i.badge.a})` }} aria-hidden="true">{i.badge.emoji}</span> {lib(i.badge)}
                                 <span className="text-[11px] font-bold text-slate-400">· {fmtDate(i.obtenuLe!)}</span>
                             </span>
                         ))}
@@ -296,7 +299,7 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
                                                 : <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-xl opacity-50 grayscale" aria-hidden="true">{i.badge.emoji}</span>}
                                             {i.nouveau && <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-black uppercase text-white">Nouveau</span>}
                                         </div>
-                                        <p className={`mt-1 truncate text-sm font-black ${ok ? "text-slate-900" : "text-slate-500"}`}>{i.badge.label}</p>
+                                        <p className={`mt-1 truncate text-sm font-black ${ok ? "text-slate-900" : "text-slate-500"}`}>{lib(i.badge)}</p>
                                         <p className={`truncate text-[11px] font-semibold text-slate-400`}>{i.badge.description}</p>
                                         {ok ? (
                                             <p className="mt-1.5 text-[10px] font-black uppercase tracking-wide text-emerald-600">✓ Débloqué le {fmtDate(i.obtenuLe!)}</p>

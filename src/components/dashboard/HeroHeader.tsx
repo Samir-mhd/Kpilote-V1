@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import CartoonAvatar, { type AvatarEtat } from "@/components/avatar/CartoonAvatar";
+import { accorderPhrase, type Genre } from "@/utils/genre";
 
 type Props = {
     nom: string;
@@ -11,12 +12,13 @@ type Props = {
     rang?: number;
     defi?: boolean;
     avatarEtat?: AvatarEtat;
+    genre?: Genre;
 };
 
 export const AVATAR_PHRASES: Record<AvatarEtat, string[]> = {
     souriant_main: [
         "Bonjour {nom} 👋",
-        "Belle journée en vue, {nom} ! Prêt à cartonner ?",
+        "Belle journée en vue, {nom} ! Prêt{e} à cartonner ?",
         "C'est parti {nom} ! La journée commence, tout est possible.",
         "Salut {nom} ! Nouvelle journée, nouvelles opportunités.",
         "Bienvenue {nom} ! Ton tableau de bord est prêt.",
@@ -61,7 +63,7 @@ export const AVATAR_PHRASES: Record<AvatarEtat, string[]> = {
     ],
     heureux_gagne: [
         "Belle victoire ! Profite de cette énergie pour enchaîner. 🏆",
-        "Champion ! Tu l'as mérité, maintenant va chercher le suivant.",
+        "Champion{ne} ! Tu l'as mérité, maintenant va chercher le suivant.",
         "Gagné ! Cette victoire, c'est ton fuel pour la suite.",
         "Impressionnant ! Continue sur cette dynamique.",
         "Le trophée est à toi — et maintenant, l'objectif suivant !",
@@ -78,11 +80,11 @@ export const AVATAR_PHRASES: Record<AvatarEtat, string[]> = {
     ],
 };
 
-function pickPhrase(etat: AvatarEtat, nom: string, lastIdx: number): { phrase: string; idx: number } {
+function pickPhrase(etat: AvatarEtat, nom: string, lastIdx: number, genre: Genre = null): { phrase: string; idx: number } {
     const pool = AVATAR_PHRASES[etat];
     let idx = Math.floor(Math.random() * pool.length);
     if (pool.length > 1 && idx === lastIdx) idx = (idx + 1) % pool.length;
-    return { phrase: pool[idx].replace("{nom}", nom), idx };
+    return { phrase: accorderPhrase(pool[idx].replace("{nom}", nom), genre), idx };
 }
 
 export default function HeroHeader({
@@ -93,9 +95,10 @@ export default function HeroHeader({
     rang = 0,
     defi = false,
     avatarEtat = "souriant_main",
+    genre = null,
 }: Props) {
     const [titreVisible, setTitreVisible] = useState(true);
-    const [titrePhrase,  setTitrePhrase]  = useState(() => AVATAR_PHRASES[avatarEtat][0].replace("{nom}", nom));
+    const [titrePhrase,  setTitrePhrase]  = useState(() => accorderPhrase(AVATAR_PHRASES[avatarEtat][0].replace("{nom}", nom), genre));
     const lastIdxRef   = useRef(0);
     const prevEtatRef  = useRef(avatarEtat);
 
@@ -139,7 +142,7 @@ export default function HeroHeader({
                         <div className="mt-3 flex flex-wrap gap-2">
                             {rang > 0 && (
                                 <div className="rounded-full bg-white/10 px-4 py-2 text-sm">
-                                    🏆 {rang}ᵉ vendeur
+                                    🏆 {rang}ᵉ au classement
                                 </div>
                             )}
                             {defi && (

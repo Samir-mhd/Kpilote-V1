@@ -23,6 +23,8 @@ export type Badge = {
     de: string;
     a: string;
     description: string;
+    /** Libellé au féminin quand il diffère (accord selon le genre du conseiller). */
+    labelF?: string;
 };
 
 // ─── Maîtrise produit (bronze / argent / or, volume cumulé à vie) ─────────────────
@@ -60,14 +62,14 @@ export const BOX_BADGES: Badge[] = [
     { code: "box_premier", label: "Premier raccordement", emoji: "🔌", de: "#a7f3d0", a: "#059669", description: "1ère box raccordée avec succès" },
     { code: "box_closer", label: "Closer Box", emoji: "📦", de: "#93c5fd", a: "#2563eb", description: "10 box raccordées cumulées" },
     { code: "box_sans_faute", label: "Sans faute", emoji: "🛡️", de: "#fecaca", a: "#dc2626", description: "0 box perdue sur les 3 derniers mois clôturés" },
-    { code: "box_roi_4p", label: "Roi du 4P", emoji: "👑", de: "#ddd6fe", a: "#7c3aed", description: "25 abonnés 4P cumulés (box + forfait)" },
+    { code: "box_roi_4p", label: "Roi du 4P", labelF: "Reine du 4P", emoji: "👑", de: "#ddd6fe", a: "#7c3aed", description: "25 abonnés 4P cumulés (box + forfait)" },
 ];
 
 // ─── Défis & compétition ────────────────────────────────────────────────────────
 
 export const DEFI_BADGES: Badge[] = [
     { code: "defi_premier_sang", label: "Premier sang", emoji: "🥇", de: "#fecdd3", a: "#e11d48", description: "1ère victoire en défi (1v1 ou équipe)" },
-    { code: "defi_guerrier", label: "Guerrier", emoji: "⚔️", de: "#fed7aa", a: "#ea580c", description: "5 victoires cumulées" },
+    { code: "defi_guerrier", label: "Guerrier", labelF: "Guerrière", emoji: "⚔️", de: "#fed7aa", a: "#ea580c", description: "5 victoires cumulées" },
     { code: "defi_invincible", label: "Invincible", emoji: "💎", de: "#bfdbfe", a: "#1d4ed8", description: "100% de victoires sur un mois (min. 3 défis 1v1)" },
     { code: "defi_esprit_equipe", label: "Esprit d'équipe", emoji: "🤝", de: "#c7d2fe", a: "#4338ca", description: "3 victoires en défi d'équipe" },
 ];
@@ -184,12 +186,12 @@ export const BADGES_EXTENSION: BadgeExtension[] = [
         mesure: (m) => m.nbBoxRaccordees,
     },
     {
-        badge: { code: "box_empereur_4p", label: "Empereur 4P", emoji: "🏰", de: "#e9d5ff", a: "#6d28d9", description: "60 abonnés 4P cumulés (box + forfait)" },
+        badge: { code: "box_empereur_4p", label: "Empereur 4P", labelF: "Impératrice 4P", emoji: "🏰", de: "#e9d5ff", a: "#6d28d9", description: "60 abonnés 4P cumulés (box + forfait)" },
         famille: "box", groupe: "box", prerequis: ["box_premier", "box_closer", "box_sans_faute", "box_roi_4p"], seuil: 60,
         mesure: (m) => m.nb4PCumule,
     },
     ...[50, 100].map((seuil) => ({
-        badge: { code: `defi_jour_${seuil}`, label: seuil === 100 ? "Centurion du défi" : "Maître du défi", emoji: seuil === 100 ? "💎" : "🥇", de: seuil === 100 ? "#f5d0fe" : "#fef08a", a: seuil === 100 ? "#a21caf" : "#ca8a04", description: `${seuil} défis du jour remportés` },
+        badge: { code: `defi_jour_${seuil}`, label: seuil === 100 ? "Centurion du défi" : "Maître du défi", labelF: seuil === 100 ? "Centurionne du défi" : "Maîtresse du défi", emoji: seuil === 100 ? "💎" : "🥇", de: seuil === 100 ? "#f5d0fe" : "#fef08a", a: seuil === 100 ? "#a21caf" : "#ca8a04", description: `${seuil} défis du jour remportés` },
         famille: "defisjour" as const, groupe: "defisjour", prerequis: ["defi_jour_30", "defi_jour_serie"], seuil,
         mesure: (m: MesuresBadges) => m.nbDefisJour,
     })),
@@ -199,6 +201,11 @@ export const BADGES_EXTENSION: BadgeExtension[] = [
         mesure: (m) => m.serieDefisJour,
     },
 ];
+
+/** Libellé accordé au genre du conseiller. */
+export function libelleBadge(b: { label: string; labelF?: string }, genre: "H" | "F" | null | undefined): string {
+    return genre === "F" && b.labelF ? b.labelF : b.label;
+}
 
 export type EtatBadges = {
     debloques: Record<string, string>;

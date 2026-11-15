@@ -6,6 +6,7 @@ import { TrendingUp, TrendingDown } from "lucide-react";
 import CartoonAvatar, { type AvatarEtat } from "@/components/avatar/CartoonAvatar";
 import { AVATAR_PHRASES } from "@/components/dashboard/HeroHeader";
 import type { ProchainBadge } from "@/services/badgesService";
+import { accorderPhrase, type Genre } from "@/utils/genre";
 
 type Props = {
     nom: string;
@@ -20,6 +21,7 @@ type Props = {
     badgeHref: string;
     /** false = pas planifié aujourd'hui (off, congés…) : jamais de relance d'inactivité. */
     travailleAujourdhui?: boolean;
+    genre?: Genre;
 };
 
 // Situations qui priment sur l'état "temps depuis la dernière vente" de l'avatar : un conseiller
@@ -38,7 +40,7 @@ const PHRASES_EN_TETE = [
 const OUVERTURE_H = 10;
 const FERMETURE_H = 20;
 const PHRASES_AVANT_OUVERTURE = [
-    "Bonjour {nom} 👋 Ouverture à 10h, prêt à cartonner ?",
+    "Bonjour {nom} 👋 Ouverture à 10h, prêt{e} à cartonner ?",
     "Salut {nom} ! Plus que quelques minutes avant l'ouverture.",
 ];
 const PHRASES_APRES_FERMETURE_VENTES = [
@@ -72,7 +74,7 @@ function situation(avatarEtat: AvatarEtat, taux: number, rang: number, realise: 
     return { etat: avatarEtat, phrases: AVATAR_PHRASES[avatarEtat] };
 }
 
-export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, taux, cagnotte, prochainBadge, badgeHref, travailleAujourdhui = true }: Props) {
+export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, taux, cagnotte, prochainBadge, badgeHref, travailleAujourdhui = true, genre = null }: Props) {
     const prenom = nom.split(" ")[0];
     // Heure relue chaque minute pour basculer à l'ouverture / la fermeture sans recharger.
     const [heure, setHeure] = useState(() => new Date().getHours());
@@ -86,8 +88,8 @@ export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, 
     // qui varie d'un jour et d'un conseiller à l'autre.
     const titre = useMemo(() => {
         const graine = [...`${prenom}${new Date().toDateString()}`].reduce((t, c) => t + c.charCodeAt(0), 0);
-        return phrases[graine % phrases.length].replace("{nom}", prenom);
-    }, [phrases, prenom]);
+        return accorderPhrase(phrases[graine % phrases.length].replace("{nom}", prenom), genre);
+    }, [phrases, prenom, genre]);
 
     const [flashVisible, setFlashVisible] = useState<{ key: number; montant: number; label?: string } | null>(null);
     useEffect(() => {

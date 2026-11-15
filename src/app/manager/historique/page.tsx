@@ -295,7 +295,7 @@ export default function HistoriquePage() {
                             </div>
                             <div className="rounded-[20px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                    {selectedId === "boutique" ? "Top vendeur" : "Produit fort"}
+                                    {selectedId === "boutique" ? "N°1 des ventes" : "Produit fort"}
                                 </p>
                                 <p className="mt-2 text-2xl font-black text-slate-900 truncate">
                                     {selectedId === "boutique"

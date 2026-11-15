@@ -11,11 +11,11 @@ import { getRealiseVentesComboParConseiller } from "@/services/variableConseille
 
 export type CategorieMois = "combo" | "progression" | "defis" | "avis";
 
-export const CATEGORIES_MOIS: { id: CategorieMois; label: string; emoji: string; de: string; a: string; description: string; unite: string }[] = [
-    { id: "combo", label: "Roi du combo", emoji: "🛒", de: "#ccfbf1", a: "#0d9488", description: "Le plus de ventes combo (2 articles et +) du mois", unite: "combos" },
-    { id: "progression", label: "Fusée du mois", emoji: "🚀", de: "#e0e7ff", a: "#4f46e5", description: "Plus forte hausse d'actes par jour travaillé vs le mois d'avant", unite: "%" },
-    { id: "defis", label: "Maître des défis", emoji: "🎯", de: "#fae8ff", a: "#a21caf", description: "Le plus de défis du jour remportés dans le mois", unite: "défis" },
-    { id: "avis", label: "Ambassadeur", emoji: "⭐", de: "#fef3c7", a: "#d97706", description: "Le plus d'avis Google du mois", unite: "avis" },
+export const CATEGORIES_MOIS: { id: CategorieMois; label: string; labelF: string; emoji: string; de: string; a: string; description: string; unite: string }[] = [
+    { id: "combo", label: "Roi du combo", labelF: "Reine du combo", emoji: "🛒", de: "#ccfbf1", a: "#0d9488", description: "Le plus de ventes combo (2 articles et +) du mois", unite: "combos" },
+    { id: "progression", label: "Fusée du mois", labelF: "Fusée du mois", emoji: "🚀", de: "#e0e7ff", a: "#4f46e5", description: "Plus forte hausse d'actes par jour travaillé vs le mois d'avant", unite: "%" },
+    { id: "defis", label: "Maître des défis", labelF: "Maîtresse des défis", emoji: "🎯", de: "#fae8ff", a: "#a21caf", description: "Le plus de défis du jour remportés dans le mois", unite: "défis" },
+    { id: "avis", label: "Ambassadeur", labelF: "Ambassadrice", emoji: "⭐", de: "#fef3c7", a: "#d97706", description: "Le plus d'avis Google du mois", unite: "avis" },
 ];
 
 export type ScoreMois = { id: string; nom: string; valeur: number };
