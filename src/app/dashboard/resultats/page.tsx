@@ -7,6 +7,7 @@ import { getMissionsCompletes, getVentesParMois, MissionComplete } from "@/servi
 import { getStatsTransactionsMois, StatsTransactionsMois } from "@/services/ventesTransactions";
 import ArticlesParVenteCard from "@/components/dashboard/ArticlesParVenteCard";
 import MesObjectifsV2 from "@/components/objectifs/MesObjectifsV2";
+import MesObjectifsV3 from "@/components/objectifs/MesObjectifsV3";
 
 const MOIS_LABELS = ["", "Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
 const MOIS_NOMS  = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
@@ -312,9 +313,12 @@ function ResultatsInner() {
     );
 }
 
-// Nouvelle version en test (comparaison) : /dashboard/resultats?...&objectifs=v2
+// Nouvelles versions en test (comparaison) : /dashboard/resultats?...&objectifs=v2 ou v3
 function ResultatsAiguillage() {
     const searchParams = useSearchParams();
+    if (searchParams.get("objectifs") === "v3") {
+        return <MesObjectifsV3 conseillerId={searchParams.get("id") ?? ""} nom={searchParams.get("nom") ?? "Conseiller"} />;
+    }
     if (searchParams.get("objectifs") === "v2") {
         return <MesObjectifsV2 conseillerId={searchParams.get("id") ?? ""} nom={searchParams.get("nom") ?? "Conseiller"} />;
     }
