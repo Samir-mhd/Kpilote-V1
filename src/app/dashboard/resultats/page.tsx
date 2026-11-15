@@ -6,7 +6,6 @@ import { useSearchParams } from "next/navigation";
 import { getMissionsCompletes, getVentesParMois, MissionComplete } from "@/services/missionsReelles";
 import { getStatsTransactionsMois, StatsTransactionsMois } from "@/services/ventesTransactions";
 import ArticlesParVenteCard from "@/components/dashboard/ArticlesParVenteCard";
-import MesObjectifsV2 from "@/components/objectifs/MesObjectifsV2";
 import MesObjectifsV3 from "@/components/objectifs/MesObjectifsV3";
 
 const MOIS_LABELS = ["", "Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
@@ -313,16 +312,12 @@ function ResultatsInner() {
     );
 }
 
-// Nouvelles versions en test (comparaison) : /dashboard/resultats?...&objectifs=v2 ou v3
+// Vue "par horizon" (semaine / mois) par défaut ; l'ancienne page reste accessible quelque temps
+// avec &objectifs=v1.
 function ResultatsAiguillage() {
     const searchParams = useSearchParams();
-    if (searchParams.get("objectifs") === "v3") {
-        return <MesObjectifsV3 conseillerId={searchParams.get("id") ?? ""} nom={searchParams.get("nom") ?? "Conseiller"} />;
-    }
-    if (searchParams.get("objectifs") === "v2") {
-        return <MesObjectifsV2 conseillerId={searchParams.get("id") ?? ""} nom={searchParams.get("nom") ?? "Conseiller"} />;
-    }
-    return <ResultatsInner />;
+    if (searchParams.get("objectifs") === "v1") return <ResultatsInner />;
+    return <MesObjectifsV3 conseillerId={searchParams.get("id") ?? ""} nom={searchParams.get("nom") ?? "Conseiller"} />;
 }
 
 export default function ResultatsPage() {
