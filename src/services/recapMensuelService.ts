@@ -4,7 +4,8 @@
  */
 import { supabase } from "@/lib/supabase";
 import { fetchToutesLesLignes } from "@/utils/supabasePaging";
-import { PRODUITS_ORDRE } from "@/utils/produits";
+import { PRODUITS_ORDRE, PRODUITS_HORS_TOTAL_CLASSEMENT, COMBOS_DANS_TOTAL, ProduitCode } from "@/utils/produits";
+import { getRealiseVentesCombo } from "@/services/variableConseiller";
 
 const MOIS_FR = [
     "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
@@ -22,6 +23,11 @@ export type RecapMensuel = {
     parProduit: { code: string; label: string; emoji: string; nombre: number; objectif: number; taux: number }[];
     meilleurJour: { date: string; nombre: number } | null;
     joursActifs: number;
+    /** Actes commerciaux, même périmètre que le classement : hors Avis Google / Récap Co, + McAfee Mobile et Assurance essentielle. */
+    totalActes: number;
+    /** Avis Google + Récap Co (Quali) — jamais appelés "ventes". */
+    totalQuali: number;
+    combos: { mcafee_mobile: number; assurance_essentielle: number; canal_plus: number };
 };
 
 /** KPILOTE n'a pas de données pertinentes avant ce mois — jamais affiché, même si nbMois le permettrait. */
@@ -58,6 +64,8 @@ export async function getRecapMensuel(conseillerId: string, mois: string): Promi
         ),
         supabase.from("objectifs_mensuels").select("objectif, produits(code)").eq("conseiller_id", conseillerId),
     ]);
+    const finJour = `${annee}-${String(m).padStart(2, "0")}-${String(fin.getDate()).padStart(2, "0")}`;
+    const combos = await getRealiseVentesCombo(conseillerId, `${mois}-01`, finJour).catch(() => ({ mcafee_mobile: 0, assurance_essentielle: 0, canal_plus: 0 }));
 
     // Note : objectifs_mensuels n'est pas historisé par mois dans KPILOTE — une seule ligne
     // évolutive par conseiller/produit, mise à jour directement par le manager. Pour un mois
@@ -72,14 +80,17 @@ export async function getRecapMensuel(conseillerId: string, mois: string): Promi
     const parJour: Record<string, number> = {};
     const parProduitCount: Record<string, number> = {};
     let total = 0;
+    let totalQuali = 0;
 
     rows.forEach((v: any) => {
         const code = (Array.isArray(v.produits) ? v.produits[0] : v.produits)?.code;
         if (!code || code === "spiderhome") return;
         const q = v.quantite ?? 1;
         total += q;
+        if (PRODUITS_HORS_TOTAL_CLASSEMENT.includes(code as ProduitCode)) totalQuali += q;
         parProduitCount[code] = (parProduitCount[code] ?? 0) + q;
-        const jour = new Date(v.created_at).toISOString().slice(0, 10);
+        const d = new Date(v.created_at); // jour local (pas UTC : une vente à 0h30 reste sur le bon jour)
+        const jour = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         parJour[jour] = (parJour[jour] ?? 0) + q;
     });
 
@@ -109,5 +120,8 @@ export async function getRecapMensuel(conseillerId: string, mois: string): Promi
         parProduit,
         meilleurJour,
         joursActifs: Object.keys(parJour).length,
+        totalActes: total - totalQuali + COMBOS_DANS_TOTAL.reduce((t, c) => t + (combos[c] ?? 0), 0),
+        totalQuali,
+        combos,
     };
 }

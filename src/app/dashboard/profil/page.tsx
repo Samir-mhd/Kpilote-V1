@@ -9,6 +9,7 @@ import { uploadPhoto, getPhotoUrl } from "@/services/photoService";
 import ThemePicker from "@/components/dashboard/ThemePicker";
 import OrdreMissionsCard from "@/components/dashboard/OrdreMissionsCard";
 import { getMoisDisponibles, getRecapMensuel, RecapMensuel } from "@/services/recapMensuelService";
+import ProfilV2 from "@/components/profil/ProfilV2";
 
 function ProfilInner() {
     const searchParams = useSearchParams();
@@ -300,7 +301,15 @@ function ProfilInner() {
     );
 }
 
+function ProfilAiguillage() {
+    const searchParams = useSearchParams();
+    if (searchParams.get("profil") === "v2") {
+        return <ProfilV2 conseillerId={searchParams.get("id") ?? ""} nom={searchParams.get("nom") ?? "Conseiller"} />;
+    }
+    return <ProfilInner />;
+}
+
 export default function ProfilPage() {
-    return <Suspense><ProfilInner /></Suspense>;
+    return <Suspense><ProfilAiguillage /></Suspense>;
 }
 
