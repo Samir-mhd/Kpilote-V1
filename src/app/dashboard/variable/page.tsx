@@ -33,7 +33,8 @@ import { CompositionVariable, DejaEnRoute } from "@/components/variable/Variable
 const CHAMPS_AUTO: (keyof VenteConseiller)[] = ["forfait_free_serie", "forfait_free_max", "smartphones"];
 const CHAMPS_A_DECLARER: (keyof VenteConseiller)[] = [
     "migration_2e_vers_free_serie", "migration_vers_free_max", "cross_sell_4p", "migration_adsl_fibre",
-    "actes_ast_box", "mcafee_499", "mcafee_699", "canal_option1", "canal_option2", "canal_option3",
+    // McAfee et Canal+ : déclarés sur la fiche de chaque box (onglet "Mes box"), payés avec elle à M+2.
+    "actes_ast_box",
     "lead_box", "lead_forfait", "lead_coms_pro",
 ];
 const LABEL_CHAMP: Record<string, string> = Object.fromEntries(
@@ -306,7 +307,7 @@ function VariableInner() {
                                 <h2 className="text-base font-black text-slate-900">✏️ Ma déclaration</h2>
                                 <p className="mt-0.5 text-xs font-semibold text-slate-500">
                                     Rempli automatiquement : {ventes.forfait_free_serie} forfaits Free / Série · {ventes.forfait_free_max} Free Max · {ventes.smartphones} smartphones.
-                                    {" "}À compléter : migrations, AST, McAfee, Canal+, leads, notes individuelles.
+                                    {" "}À compléter : migrations, AST, leads, notes individuelles.
                                 </p>
                             </div>
                             <span className="shrink-0 rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white">
@@ -318,7 +319,7 @@ function VariableInner() {
                             <div className="mt-5 grid gap-4 xl:grid-cols-2">
                                 <CardShell>
                                     <p className="mb-1 text-xs font-black uppercase tracking-widest text-violet-300">À déclarer</p>
-                                    <p className="mb-4 text-[11px] text-white/40">Ce qui ne se compte pas tout seul depuis l&apos;Accueil.</p>
+                                    <p className="mb-4 text-[11px] text-white/40">Ce qui ne se compte pas tout seul depuis l&apos;Accueil. McAfee et Canal+ se cochent sur la fiche de la box (onglet « Mes box »).</p>
                                     <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                                         {CHAMPS_A_DECLARER.map((k) => (
                                             <NumberField key={k} label={LABEL_CHAMP[k] ?? k} value={ventes[k]} onChange={(v) => updateVente(k, v)} />
