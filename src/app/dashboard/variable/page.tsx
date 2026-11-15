@@ -275,7 +275,7 @@ function VariableInner() {
             </div>
 
             {onglet === "box" ? (
-                searchParams.get("box") === "v2"
+                searchParams.get("box") !== "v1" // "Mes box" simplifié par défaut ; ancienne vue avec &box=v1
                     ? <BoxRaccordementTabV2 conseillerId={conseillerId} bareme={bareme} />
                     : <BoxRaccordementTab conseillerId={conseillerId} bareme={bareme} />
             ) : onglet === "historique" ? (
