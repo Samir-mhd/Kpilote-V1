@@ -6,6 +6,7 @@ import { calculerStreak, STREAK_BADGES, GELS_PAR_MOIS, StreakInfo } from "@/serv
 import {
     calculerBadgesConseiller, PALIERS_PRODUIT, TIER_LABELS, TIER_COULEURS,
     BOX_BADGES, DEFI_BADGES, PRODUIT_STREAK_BADGES, JOUR_PARFAIT_BADGES, SEMAINE_PARFAITE_BADGE,
+    DEFI_JOUR_BADGES, PALIERS_DEFIS_JOUR, SERIE_DEFIS_JOUR,
     PRODUIT_BADGES, SEUIL_SEMAINE, Badge, EtatBadges,
 } from "@/services/badgesService";
 import { PRODUITS_ORDRE } from "@/utils/produits";
@@ -143,7 +144,7 @@ function BadgesInner() {
     const [celebration, setCelebration] = useState<{ badges: Badge[]; confettis: Particule[] } | null>(null);
 
     const TOUS_BADGES = [
-        ...BOX_BADGES, ...DEFI_BADGES, ...PRODUIT_STREAK_BADGES, ...JOUR_PARFAIT_BADGES, SEMAINE_PARFAITE_BADGE,
+        ...BOX_BADGES, ...DEFI_BADGES, ...PRODUIT_STREAK_BADGES, ...JOUR_PARFAIT_BADGES, SEMAINE_PARFAITE_BADGE, ...DEFI_JOUR_BADGES,
     ];
 
     useEffect(() => {
@@ -378,6 +379,17 @@ function BadgesInner() {
                     <CarteBadgeGenerique badge={DEFI_BADGES[1]} obtenuLe={etat.debloques["defi_guerrier"]} sousTitre={`${etat.defisGagnes + etat.equipeGagnes}/5 victoires`} index={1} estNouveau={etat.nouveaux.includes("defi_guerrier")} />
                     <CarteBadgeGenerique badge={DEFI_BADGES[2]} obtenuLe={etat.debloques["defi_invincible"]} index={2} estNouveau={etat.nouveaux.includes("defi_invincible")} />
                     <CarteBadgeGenerique badge={DEFI_BADGES[3]} obtenuLe={etat.debloques["defi_esprit_equipe"]} sousTitre={`${etat.equipeGagnes}/3 victoires d'équipe`} index={3} estNouveau={etat.nouveaux.includes("defi_esprit_equipe")} />
+                </div>
+            </div>
+
+            {/* ── Défis du jour (Cerebro Check) ───────────────────────────────── */}
+            <div>
+                <p className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-slate-400">🎯 Défis du jour</p>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+                    {PALIERS_DEFIS_JOUR.map((seuil, i) => (
+                        <CarteBadgeGenerique key={seuil} badge={DEFI_JOUR_BADGES[i]} obtenuLe={etat.debloques[`defi_jour_${seuil}`]} sousTitre={`${Math.min(etat.nbDefisJour, seuil)}/${seuil} défi${seuil > 1 ? "s" : ""}`} index={i} estNouveau={etat.nouveaux.includes(`defi_jour_${seuil}`)} />
+                    ))}
+                    <CarteBadgeGenerique badge={DEFI_JOUR_BADGES[4]} obtenuLe={etat.debloques["defi_jour_serie"]} sousTitre={`${Math.min(etat.serieDefisJour, SERIE_DEFIS_JOUR)}/${SERIE_DEFIS_JOUR} d'affilée`} index={4} estNouveau={etat.nouveaux.includes("defi_jour_serie")} />
                 </div>
             </div>
 

@@ -4,6 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PRODUITS_ORDRE, PRODUITS_HORS_ACTES, type ProduitCode } from "@/utils/produits";
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
+import { getDefisReussisDuJour } from "@/services/defisJourService";
+
+function entreeDefi(id: string, conseillerId: string, nom: string, libelle: string, quand: string, isNew: boolean): Entry {
+    return {
+        id: `defi-${id}`, conseiller_id: conseillerId, nom, produitNom: "", produitCode: "", created_at: quand, isNew,
+        quantite: 0, countToday: 0, rankBefore: 0, rankAfter: 0, reset: true, defi: true,
+        message: `🏆 ${nom.split(" ")[0]} a remporté son défi du jour : ${libelle} ! Bravo !`,
+    };
+}
 
 type Entry = {
     id: string;
@@ -19,6 +28,7 @@ type Entry = {
     rankBefore: number;
     rankAfter: number;
     reset: boolean;       // correction du jour (pas une vente)
+    defi?: boolean;       // défi du jour remporté (félicitations, pas une vente)
 };
 
 type Counts = Record<string, { total: number }>;
@@ -295,6 +305,13 @@ export default function TeamFeed({ conseillerId, grand = false, condense = false
             countsRef.current = tempCounts;
             ranksRef.current = computeRanks(tempCounts);
 
+            // Défis du jour remportés aujourd'hui : messages de félicitations, intercalés à leur heure.
+            const defis = await getDefisReussisDuJour().catch(() => []);
+            defis.forEach((d) => {
+                if (map[d.conseillerId]) built.push(entreeDefi(`${d.conseillerId}`, d.conseillerId, map[d.conseillerId], d.libelle, d.reussiLe, false));
+            });
+            built.sort((a, b) => a.created_at.localeCompare(b.created_at));
+
             setEntries(built.reverse().slice(0, 50));
         })();
     }, []);
@@ -375,6 +392,12 @@ export default function TeamFeed({ conseillerId, grand = false, condense = false
                 };
                 setEntries(prev => [entry, ...prev].slice(0, 50));
             })
+            .on("postgres_changes", { event: "UPDATE", schema: "public", table: "defis_jour" }, (payload: any) => {
+                const d = payload.new;
+                if (d?.statut !== "reussi" || !namesRef.current[d.conseiller_id]) return;
+                const entry = entreeDefi(d.conseiller_id, d.conseiller_id, namesRef.current[d.conseiller_id], d.libelle, d.reussi_le ?? new Date().toISOString(), true);
+                setEntries((prev) => (prev.some((e) => e.id === entry.id) ? prev : [entry, ...prev].slice(0, 50)));
+            })
             .on("postgres_changes", { event: "DELETE", schema: "public", table: "ventes" }, (payload: any) => {
                 const oldId = payload.old?.id;
                 if (!oldId) return;
@@ -429,7 +452,7 @@ export default function TeamFeed({ conseillerId, grand = false, condense = false
                                         </p>
                                     </div>
                                     <div className="flex-shrink-0 text-right">
-                                        <p className={`font-black text-green-600 ${grand ? "text-sm" : "text-xs"}`}>+1</p>
+                                        {!e.defi && <p className={`font-black text-green-600 ${grand ? "text-sm" : "text-xs"}`}>+1</p>}
                                         <p className={`text-slate-300 ${grand ? "text-xs" : "text-[10px]"}`}>{timeAgo(e.created_at)}</p>
                                     </div>
                                 </div>
@@ -516,7 +539,7 @@ function grouper(entries: Entry[]): Groupe[] {
 
 function messageGroupe(g: Groupe): { texte: string; temps_fort: boolean } {
     const p = g.nom.split(" ")[0];
-    if (g.reset) return { texte: g.reset.message, temps_fort: false };
+    if (g.reset) return { texte: g.reset.message, temps_fort: !!g.reset.defi };
     if (g.passeEnTete) return { texte: `${p} passe en tête du classement 👑`, temps_fort: true };
     if (g.palier) return { texte: `${p} atteint ${g.palier} ventes aujourd'hui 🔥`, temps_fort: true };
     if (g.premiere) {

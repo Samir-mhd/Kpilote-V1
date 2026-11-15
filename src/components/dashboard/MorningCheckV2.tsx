@@ -10,6 +10,8 @@ import { getActesParJour } from "@/services/podiumsService";
 import { getCagnotteJour } from "@/services/variableConseiller";
 import { getFichesBoxRaccordement, estPerdue, estDisparu, dateLimite } from "@/services/boxRaccordement";
 import { PRODUITS_ORDRE } from "@/utils/produits";
+import { getOuCreerDefiJour, DefiJour } from "@/services/defisJourService";
+import { DefiJourChoix } from "@/components/dashboard/DefiJour";
 
 /**
  * Cerebro Check repensé (variante &cerebro=v2) : un briefing du matin (dernière journée, position,
@@ -57,6 +59,7 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
     const [briefing, setBriefing] = useState<Briefing | null>(null);
     const [loading, setLoading] = useState(true);
     const [enregistrement, setEnregistrement] = useState(false);
+    const [defi, setDefi] = useState<DefiJour | null>(null);
 
     const now = new Date();
     const jourNom = JOURS[now.getDay()];
@@ -77,7 +80,9 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
             construireClassementPeriode("mois").catch(() => []),
             getActesParJour(jourLocal(ilYa7), jourLocal(hier)).catch(() => ({} as Record<string, Record<string, number>>)),
             getFichesBoxRaccordement(conseillerId).catch(() => []),
-        ]).then(async ([missions, missionsJour, planifie, classement, actesParJour, fiches]) => {
+            getOuCreerDefiJour(conseillerId).catch(() => null),
+        ]).then(async ([missions, missionsJour, planifie, classement, actesParJour, fiches, defiJour]) => {
+            setDefi(defiJour);
             const charges = missions.map((m) => ({ produit: m.produit, code: codeDepuisNom(m.produit), valeur: m.realise }));
             setItems(charges);
             setOriginaux(charges);
@@ -201,6 +206,11 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
                                     </p>
                                 </div>
 
+                                {defi ? (
+                                    <div className="sm:col-span-2">
+                                        <DefiJourChoix defi={defi} onChange={setDefi} />
+                                    </div>
+                                ) : (
                                 <div className="rounded-2xl bg-white/[0.05] p-4 ring-1 ring-white/10 sm:col-span-2">
                                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">🎯 Tes objectifs du jour</p>
                                     {briefing.objectifsJour.length > 0 ? (
@@ -213,6 +223,7 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
                                         </div>
                                     ) : <p className="mt-1 text-sm text-white/50">{briefing.travaille ? "Pas d'objectif fixé aujourd'hui." : "Profite de ta journée 🌴"}</p>}
                                 </div>
+                                )}
 
                                 {briefing.boxUrgentes && (
                                     <div className="rounded-2xl bg-rose-500/10 p-4 ring-1 ring-rose-400/25 sm:col-span-2">

@@ -10,6 +10,7 @@ import HeroCompact from "@/components/dashboard/HeroCompact";
 import StatsBar from "@/components/dashboard/StatsBar";
 import MorningCheck from "@/components/dashboard/MorningCheck";
 import MorningCheckV2 from "@/components/dashboard/MorningCheckV2";
+import { DefiJourBandeau } from "@/components/dashboard/DefiJour";
 import MissionCard, { QuestionCrossSell } from "@/components/MissionCard";
 import { detecterEvenement } from "@/engine/eventEngine";
 import { genererMessageCoach } from "@/engine/coachEngine";
@@ -1075,6 +1076,9 @@ export default function Dashboard() {
                     avatarEtat={avatarEtat}
                 />
             )}
+
+            {/* ── Défi du jour (accepté → progression, refusé → priorité du jour) — en test avec &cerebro=v2 ── */}
+            {cerebroV2 && conseillerId && <DefiJourBandeau conseillerId={conseillerId} nom={nom} />}
 
             {/* ── Invitations défi reçues ──────────────────────────────── */}
             {invitations.map((inv) => (

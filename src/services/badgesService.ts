@@ -4,6 +4,7 @@
  * partagée avec les badges de série de streakService.ts) — jamais retirés une fois débloqués.
  */
 import { supabase } from "@/lib/supabase";
+import { getBilanDefisJour } from "@/services/defisJourService";
 import { fetchToutesLesLignes } from "@/utils/supabasePaging";
 import { PRODUITS_ORDRE } from "@/utils/produits";
 import { getFichesBoxRaccordement, estPerdue, dateLimite, FicheBoxRaccordement } from "@/services/boxRaccordement";
@@ -71,6 +72,19 @@ export const DEFI_BADGES: Badge[] = [
     { code: "defi_esprit_equipe", label: "Esprit d'équipe", emoji: "🤝", de: "#c7d2fe", a: "#4338ca", description: "3 victoires en défi d'équipe" },
 ];
 
+// ─── Défis du jour (Cerebro Check) ──────────────────────────────────────────────
+
+export const PALIERS_DEFIS_JOUR = [1, 5, 15, 30];
+export const SERIE_DEFIS_JOUR = 3;
+
+export const DEFI_JOUR_BADGES: Badge[] = [
+    { code: "defi_jour_1", label: "Défi relevé", emoji: "🎯", de: "#ddd6fe", a: "#7c3aed", description: "1er défi du jour remporté" },
+    { code: "defi_jour_5", label: "Challenger", emoji: "💪", de: "#fbcfe8", a: "#db2777", description: "5 défis du jour remportés" },
+    { code: "defi_jour_15", label: "Machine à défis", emoji: "⚡", de: "#fde68a", a: "#d97706", description: "15 défis du jour remportés" },
+    { code: "defi_jour_30", label: "Légende du défi", emoji: "🏆", de: "#fef3c7", a: "#b45309", description: "30 défis du jour remportés" },
+    { code: "defi_jour_serie", label: "Inarrêtable", emoji: "🔥", de: "#fed7aa", a: "#ea580c", description: `${SERIE_DEFIS_JOUR} défis du jour remportés d'affilée` },
+];
+
 // ─── Streak par produit (box / mcafee / assurance) ─────────────────────────────
 
 /** Une "semaine" ici = jours TRAVAILLÉS d'affilée, pas des jours calendaires (5 jours ouvrés). */
@@ -129,6 +143,8 @@ export type EtatBadges = {
     streakParProduit: Record<string, number>;
     nbJoursParfaits: number;
     streakJoursParfaits: number;
+    nbDefisJour: number;
+    serieDefisJour: number;
     /** Codes tout juste débloqués PAR CET APPEL (pour déclencher une célébration côté page). */
     nouveaux: string[];
 };
@@ -311,6 +327,7 @@ export async function calculerBadgesConseiller(conseillerId: string): Promise<Et
         getVentesParJourParProduit(conseillerId, debutFenetre),
         getJoursParfaitsTous(conseillerId),
     ]);
+    const bilanDefisJour = await getBilanDefisJour(conseillerId).catch(() => ({ total: 0, serie: 0 }));
 
     const streakParProduit: Record<string, number> = {};
     PRODUITS_STREAK.forEach((code) => {
@@ -357,6 +374,11 @@ export async function calculerBadgesConseiller(conseillerId: string): Promise<Et
 
     if (streakJoursParfaits >= SEUIL_SEMAINE && !debloques["semaine_parfaite"]) aDebloquer.push("semaine_parfaite");
 
+    PALIERS_DEFIS_JOUR.forEach((seuil) => {
+        if (bilanDefisJour.total >= seuil && !debloques[`defi_jour_${seuil}`]) aDebloquer.push(`defi_jour_${seuil}`);
+    });
+    if (bilanDefisJour.serie >= SERIE_DEFIS_JOUR && !debloques["defi_jour_serie"]) aDebloquer.push("defi_jour_serie");
+
     if (aDebloquer.length > 0) {
         const aujourdhui = new Date().toISOString().slice(0, 10);
         await supabase.from("conseiller_badges").insert(
@@ -375,6 +397,8 @@ export async function calculerBadgesConseiller(conseillerId: string): Promise<Et
         streakParProduit,
         nbJoursParfaits,
         streakJoursParfaits,
+        nbDefisJour: bilanDefisJour.total,
+        serieDefisJour: bilanDefisJour.serie,
         nouveaux: aDebloquer,
     };
 }
@@ -407,6 +431,9 @@ export function prochainBadgeADebloquer(etat: EtatBadges): ProchainBadge | null 
     if (!etat.debloques["defi_premier_sang"]) candidats.push({ badge: DEFI_BADGES[0], restant: Math.max(1 - defisGagnesTotal, 1) });
     if (!etat.debloques["defi_guerrier"] && defisGagnesTotal < 5) candidats.push({ badge: DEFI_BADGES[1], restant: 5 - defisGagnesTotal });
     if (!etat.debloques["defi_esprit_equipe"] && etat.equipeGagnes < 3) candidats.push({ badge: DEFI_BADGES[3], restant: 3 - etat.equipeGagnes });
+
+    const prochainPalierDefi = PALIERS_DEFIS_JOUR.findIndex((seuil) => !etat.debloques[`defi_jour_${seuil}`] && etat.nbDefisJour < seuil);
+    if (prochainPalierDefi >= 0) candidats.push({ badge: DEFI_JOUR_BADGES[prochainPalierDefi], restant: PALIERS_DEFIS_JOUR[prochainPalierDefi] - etat.nbDefisJour });
 
     PRODUITS_STREAK.forEach((code, i) => {
         const badgeCode = `streak_${code}_semaine`;
