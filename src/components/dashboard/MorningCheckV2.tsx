@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 import { getMissionsCompletes, getMissionsReelles, codeDepuisNom, CODES_VENTES_COMBO } from "@/services/missionsReelles";
-import { ajusterCheckCerebro } from "@/services/resetService";
+import { ajusterCheckCerebro, ajusterCheckCerebroCombos, CodeComboCheck } from "@/services/resetService";
+import { COMBO_META, ComboCode } from "@/utils/classementGroupes";
 import { construireClassementPeriode } from "@/services/classementService";
 import { getJoursTravailPlage } from "@/services/planningService";
 import { getActesParJour } from "@/services/podiumsService";
@@ -25,6 +26,8 @@ type Props = {
     /** true = check relancé par le manager → message d'avertissement (jamais destructif) */
     isReset?: boolean;
     onValidated: () => void;
+    /** Ouvert depuis "Corrections" (Accueil) : seulement la vérification des chiffres, sans briefing. */
+    modeCorrection?: boolean;
 };
 
 type Item = { produit: string; code: string; valeur: number };
@@ -33,7 +36,7 @@ const JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "s
 const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 
 function emojiDe(code: string) {
-    return PRODUITS_ORDRE.find((p) => p.code === code)?.emoji ?? "•";
+    return PRODUITS_ORDRE.find((p) => p.code === code)?.emoji ?? COMBO_META[code as ComboCode]?.emoji ?? "•";
 }
 function jourLocal(d: Date) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -51,7 +54,7 @@ type Briefing = {
     boxUrgentes: { nb: number; limite: Date; jours: number } | null;
 };
 
-export default function MorningCheckV2({ nom, conseillerId, isReset = false, onValidated }: Props) {
+export default function MorningCheckV2({ nom, conseillerId, isReset = false, onValidated, modeCorrection = false }: Props) {
     const prenom = nom.split(" ")[0];
     const [visible, setVisible] = useState(false);
     const [items, setItems] = useState<Item[]>([]);
@@ -74,13 +77,13 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
         const hier = new Date(aujourdhui.getFullYear(), aujourdhui.getMonth(), aujourdhui.getDate() - 1);
 
         Promise.all([
-            getMissionsCompletes(conseillerId, CODES_VENTES_COMBO),
+            getMissionsCompletes(conseillerId),
             getMissionsReelles(conseillerId).catch(() => []),
             getJoursTravailPlage(conseillerId, aujourdhui, aujourdhui).catch(() => 1),
             construireClassementPeriode("mois").catch(() => []),
             getActesParJour(jourLocal(ilYa7), jourLocal(hier)).catch(() => ({} as Record<string, Record<string, number>>)),
             getFichesBoxRaccordement(conseillerId).catch(() => []),
-            getOuCreerDefiJour(conseillerId).catch(() => null),
+            modeCorrection ? Promise.resolve(null) : getOuCreerDefiJour(conseillerId).catch(() => null),
         ]).then(async ([missions, missionsJour, planifie, classement, actesParJour, fiches, defiJour]) => {
             setDefi(defiJour);
             const charges = missions.map((m) => ({ produit: m.produit, code: codeDepuisNom(m.produit), valeur: m.realise }));
@@ -130,8 +133,17 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
             try {
                 // Ajustement par écart uniquement (jamais de suppression) — même règle que la v1.
                 const valeurs: Record<string, number> = {};
-                items.forEach((it) => { valeurs[it.code] = it.valeur; });
+                const valeursCombos: Partial<Record<CodeComboCheck, number>> = {};
+                const estCombo = (code: string) => (CODES_VENTES_COMBO as readonly string[]).includes(code);
+                // Combos (stockés ailleurs, voir ajusterCheckCerebroCombos) : si l'un change, on renvoie
+                // les trois — l'ajustement remplace tous les anciens ajustements combo du mois.
+                const comboModifie = items.some((it, i) => estCombo(it.code) && it.valeur !== (originaux[i]?.valeur ?? 0));
+                items.forEach((it) => {
+                    if (estCombo(it.code)) { if (comboModifie) valeursCombos[it.code as CodeComboCheck] = it.valeur; }
+                    else valeurs[it.code] = it.valeur;
+                });
                 await ajusterCheckCerebro(conseillerId, valeurs);
+                await ajusterCheckCerebroCombos(conseillerId, valeursCombos);
             } catch { /* silencieux */ }
             setEnregistrement(false);
         }
@@ -160,7 +172,7 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
                 <div className="flex items-center gap-4">
                     <CartoonAvatar prenom={nom} etat="souriant_main" className="h-24 w-24 shrink-0 object-contain drop-shadow-[0_10px_30px_rgba(139,92,246,.45)] sm:h-28 sm:w-28" />
                     <div>
-                        <p className="text-xs font-black uppercase tracking-[0.3em] text-violet-400">Cerebro Check</p>
+                        <p className="text-xs font-black uppercase tracking-[0.3em] text-violet-400">{modeCorrection ? "Corriger mes chiffres" : "Cerebro Check"}</p>
                         <h1 className="text-3xl font-black leading-tight text-white sm:text-4xl">
                             Bonjour <span className="bg-gradient-to-r from-violet-300 to-fuchsia-300 bg-clip-text text-transparent">{prenom}</span> 👋
                         </h1>
@@ -184,7 +196,7 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
                 ) : (
                     <>
                         {/* ── Briefing ───────────────────────────────────── */}
-                        {briefing && (
+                        {briefing && !modeCorrection && (
                             <div className="mt-7 grid gap-3 sm:grid-cols-2">
                                 <div className="rounded-2xl bg-white/[0.05] p-4 ring-1 ring-white/10">
                                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">{derniereLabel ? `${derniereLabel}, tu as fait` : "Ta dernière journée"}</p>

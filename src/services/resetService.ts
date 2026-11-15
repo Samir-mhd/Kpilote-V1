@@ -254,3 +254,64 @@ export async function resetAllCheckDates(): Promise<void> {
         .update({ last_check_date: null })
         .neq("id", "00000000-0000-0000-0000-000000000001");
 }
+
+// ── Cerebro Check : ventes combo (McAfee Mobile, Assurance essentielle, Canal+) ──────────
+// Elles vivent dans variable_actes_jour, pas dans ventes : même principe d'ajustement par écart,
+// avec des lignes à 0 € (la cagnotte ne bouge pas) datées du 1er du mois et marquées
+// produit_code = "cerebro_check" pour être remplacées au check suivant.
+
+export type CodeComboCheck = "mcafee_mobile" | "assurance_essentielle" | "canal_plus";
+const LABEL_CANAL_CHECK = "Canal+ Option 2"; // libellé compté comme Canal+ (options 2 et 3)
+
+export async function ajusterCheckCerebroCombos(
+    conseillerId: string,
+    desiredTotals: Partial<Record<CodeComboCheck, number>>
+): Promise<void> {
+    const codes = Object.keys(desiredTotals) as CodeComboCheck[];
+    if (codes.length === 0) return;
+
+    const now = new Date();
+    const premier = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const dernier = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, "0")}`;
+
+    const [{ data: bonus }, { data: actes }] = await Promise.all([
+        supabase.from("variable_bonus_manuels").select("id, label").eq("categorie", "autres_primes"),
+        supabase.from("variable_actes_jour")
+            .select("champ, label, bonus_manuel_id, quantite, produit_code")
+            .eq("conseiller_id", conseillerId)
+            .gte("jour", premier)
+            .lte("jour", dernier),
+    ]);
+    const idsMcafee = (bonus ?? [])
+        .filter((b: { label: string }) => b.label.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes("mcafee"))
+        .map((b: { id: string }) => b.id);
+
+    // Réalisé réel du mois (hors anciens ajustements du check).
+    const reel: Record<CodeComboCheck, number> = { mcafee_mobile: 0, assurance_essentielle: 0, canal_plus: 0 };
+    (actes ?? []).forEach((a: { champ: string | null; label: string; bonus_manuel_id: string | null; quantite: number | null; produit_code: string | null }) => {
+        if (a.produit_code === "cerebro_check") return;
+        const q = a.quantite ?? 1;
+        if (a.champ === "assurance_essentielle") reel.assurance_essentielle += q;
+        if (a.bonus_manuel_id && idsMcafee.includes(a.bonus_manuel_id)) reel.mcafee_mobile += q;
+        if (a.label === "Canal+ Option 2" || a.label === "Canal+ Option 3") reel.canal_plus += q;
+    });
+
+    await supabase.from("variable_actes_jour")
+        .delete()
+        .eq("conseiller_id", conseillerId)
+        .eq("produit_code", "cerebro_check")
+        .gte("jour", premier)
+        .lte("jour", dernier);
+
+    const base = { conseiller_id: conseillerId, jour: premier, montant: 0, produit_code: "cerebro_check" };
+    const inserts = codes.flatMap((code) => {
+        const delta = (desiredTotals[code] ?? 0) - reel[code];
+        if (delta === 0) return [];
+        if (code === "assurance_essentielle") return [{ ...base, label: "Assurance essentielle (Cerebro Check)", quantite: delta, champ: "assurance_essentielle" }];
+        if (code === "mcafee_mobile") return idsMcafee[0] ? [{ ...base, label: "McAfee Mobile (Cerebro Check)", quantite: delta, bonus_manuel_id: idsMcafee[0] }] : [];
+        return [{ ...base, label: LABEL_CANAL_CHECK, quantite: delta }];
+    });
+    if (inserts.length === 0) return;
+    const { error } = await supabase.from("variable_actes_jour").insert(inserts);
+    if (error) throw new Error(error.message ?? "Erreur ajustement check Cerebro (combos)");
+}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import CorrigerVentesJourCard from "@/components/dashboard/CorrigerVentesJourCard";
-import MorningCheck from "@/components/dashboard/MorningCheck";
+import MorningCheckV2 from "@/components/dashboard/MorningCheckV2";
 import { PRODUITS_HORS_ACTES, ProduitCode } from "@/utils/produits";
 
 /**
@@ -97,10 +97,11 @@ export default function CorrectionsAccueil({ conseillerId, nom, onCorrige }: { c
             </details>
 
             {check && (
-                <MorningCheck
+                <MorningCheckV2
                     nom={nom}
                     conseillerId={conseillerId}
                     isReset={false}
+                    modeCorrection
                     onValidated={() => { setCheck(false); onCorrige(); }}
                 />
             )}

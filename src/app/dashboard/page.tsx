@@ -103,8 +103,9 @@ export default function Dashboard() {
     const conseillerId = searchParams.get("id") || "";
     // Nouvelle mise en page par défaut ; l'ancienne reste accessible quelque temps avec &layout=v1.
     const layoutV2 = searchParams.get("layout") !== "v1";
-    // Cerebro Check repensé, en test : &cerebro=v2 ; &apercuCheck=1 l'affiche même s'il est déjà validé.
-    const cerebroV2 = searchParams.get("cerebro") === "v2";
+    // Cerebro Check repensé (briefing + défi du jour) par défaut ; l'ancien avec &cerebro=v1.
+    // &apercuCheck=1 l'affiche même s'il est déjà validé aujourd'hui.
+    const cerebroV2 = searchParams.get("cerebro") !== "v1";
     const [apercuCheck, setApercuCheck] = useState(searchParams.get("apercuCheck") === "1");
     // Planifié aujourd'hui ? (sinon pas de relance d'inactivité dans l'en-tête)
     const [travailleAujourdhui, setTravailleAujourdhui] = useState(true);
@@ -1086,7 +1087,7 @@ export default function Dashboard() {
                 />
             )}
 
-            {/* ── Défi du jour (accepté → progression, refusé → priorité du jour) — en test avec &cerebro=v2 ── */}
+            {/* ── Défi du jour (accepté → progression, refusé → priorité du jour) ── */}
             {cerebroV2 && conseillerId && <DefiJourBandeau conseillerId={conseillerId} nom={nom} />}
 
             {/* ── Invitations défi reçues ──────────────────────────────── */}
