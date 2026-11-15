@@ -105,7 +105,7 @@ export default function ObjectifsConseillerPage() {
 
     useEffect(() => {
         setV2(new URLSearchParams(window.location.search).get("vue") !== "v1");
-        setApercu(new URLSearchParams(window.location.search).get("apercu") === "v2");
+        setApercu(new URLSearchParams(window.location.search).get("apercu") !== "v1");
         getObjectifsEquipeMois().then(setObjBoutique).catch(() => {});
     }, []);
 
