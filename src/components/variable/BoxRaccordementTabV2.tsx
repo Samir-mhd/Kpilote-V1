@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { MoreHorizontal, Search } from "lucide-react";
 import { BaremeVariable } from "@/services/variableConseiller";
 import {
@@ -68,6 +68,7 @@ export default function BoxRaccordementTabV2({ conseillerId, bareme }: { conseil
     const [loading, setLoading] = useState(true);
     const [onglet, setOnglet] = useState<Onglet>("attente");
     const [recherche, setRecherche] = useState("");
+    const [tri, setTri] = useState<"echeance" | "recentes" | "anciennes">("echeance");
     const [ouverte, setOuverte] = useState<string | null>(null);
     const [enCoursId, setEnCoursId] = useState<string | null>(null);
     const [ajoutOuvert, setAjoutOuvert] = useState(false);
@@ -160,8 +161,13 @@ export default function BoxRaccordementTabV2({ conseillerId, bareme }: { conseil
             if (!q) return true;
             return (commentaires[f.id] ?? "").toLowerCase().includes(q) || MODELE_BOX_LABELS[f.modele].toLowerCase().includes(q);
         })
-        // En attente : échéance la plus proche d'abord, puis vente la plus récente.
-        .sort((a, b) => (onglet === "attente" ? a.moisPaiement.localeCompare(b.moisPaiement) : 0) || b.dateVente.localeCompare(a.dateVente));
+        // Échéance : la date limite la plus proche d'abord (= ventes les plus anciennes du suivi),
+        // puis la vente la plus récente. Sinon, simple tri par date de vente.
+        .sort((a, b) =>
+            tri === "anciennes" ? a.dateVente.localeCompare(b.dateVente)
+            : tri === "recentes" ? b.dateVente.localeCompare(a.dateVente)
+            : a.moisPaiement.localeCompare(b.moisPaiement) || b.dateVente.localeCompare(a.dateVente));
+    const nbParMois = liste.reduce<Record<string, number>>((r, f) => ({ ...r, [f.moisVente]: (r[f.moisVente] ?? 0) + 1 }), {});
 
     const ONGLETS: { id: Onglet; label: string; nb: number }[] = [
         { id: "attente", label: "En attente", nb: enAttente.length },
@@ -206,6 +212,13 @@ export default function BoxRaccordementTabV2({ conseillerId, bareme }: { conseil
                             </button>
                         ))}
                     </div>
+                    <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-black" role="group" aria-label="Trier">
+                        {([["echeance", "Échéance"], ["recentes", "Plus récentes"], ["anciennes", "Plus anciennes"]] as const).map(([id, label]) => (
+                            <button key={id} onClick={() => setTri(id)} aria-pressed={tri === id} className={`rounded-lg px-2.5 py-1.5 transition-all ${tri === id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
+                                {label}
+                            </button>
+                        ))}
+                    </div>
                     <label className="relative min-w-[180px] flex-1">
                         <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
@@ -239,19 +252,34 @@ export default function BoxRaccordementTabV2({ conseillerId, bareme }: { conseil
                     </p>
                 ) : (
                     <ul className="mt-3 divide-y divide-slate-100">
-                        {liste.map((f) => {
+                        {liste.map((f, i) => {
+                            const nouveauMois = i === 0 || liste[i - 1].moisVente !== f.moisVente;
                             const jours = joursAvant(dateLimite(f.moisPaiement));
                             const urgente = onglet === "attente" && jours <= SEUIL_URGENCE_JOURS;
                             const options = optionsVendues(f);
                             const estOuverte = ouverte === f.id;
                             return (
-                                <li key={f.id} className={`py-3 ${urgente ? "-mx-2 rounded-xl bg-rose-50 px-2" : ""}`}>
+                                <Fragment key={f.id}>
+                                {nouveauMois && (
+                                    <li className="flex items-center gap-3 pb-1.5 pt-4 first:pt-1">
+                                        <span className="whitespace-nowrap rounded-full bg-violet-100 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-violet-700">
+                                            Vendues en {nomMois(f.moisVente)} · {nbParMois[f.moisVente]}
+                                        </span>
+                                        {onglet === "attente" && (
+                                            <span className="text-[11px] font-semibold text-slate-400">à raccorder avant le {dateLimite(f.moisPaiement).toLocaleDateString("fr-FR")}</span>
+                                        )}
+                                        {onglet === "raccordees" && (
+                                            <span className="text-[11px] font-semibold text-slate-400">payées en {nomMois(f.moisPaiement)}</span>
+                                        )}
+                                    </li>
+                                )}
+                                <li className={`py-3 ${urgente ? "-mx-2 rounded-xl bg-rose-50 px-2" : ""}`}>
                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                                        <div className="w-28 shrink-0">
+                                        <div className="w-32 shrink-0">
                                             <p className="text-sm font-black text-slate-900">{MODELE_BOX_LABELS[f.modele].split(" / ")[0]}</p>
                                             <p className="text-[11px] font-semibold text-slate-400">
                                                 vendue le {fmtJour(f.dateVente)}
-                                                {urgente && <span className="font-black text-rose-600"> · J-{jours}</span>}
+                                                {urgente && <span className="whitespace-nowrap font-black text-rose-600"> · J-{jours}</span>}
                                             </p>
                                         </div>
                                         <input
@@ -322,6 +350,7 @@ export default function BoxRaccordementTabV2({ conseillerId, bareme }: { conseil
                                         </div>
                                     )}
                                 </li>
+                                </Fragment>
                             );
                         })}
                     </ul>
