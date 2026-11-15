@@ -20,6 +20,23 @@ import { getCoeffRecapCommercial, sauvegarderCoeffRecapCommercial } from "@/serv
 import { getCoeffAvisGoogle, sauvegarderCoeffAvisGoogle } from "@/services/avisGoogleConfig";
 import type { ProduitCode } from "@/utils/produits";
 import Link from "next/link";
+import { getObjectifsEquipeMois } from "@/services/objectifsEquipe";
+
+// ── Vue v2 (&vue=v2) : un seul tableau éditable, colonnes groupées, totaux vs objectif boutique ──
+const GROUPES_V2: { titre: string; codes: string[]; teinte: string }[] = [
+    { titre: "Core business", codes: ["box", "forfaits", "telephones"], teinte: "bg-emerald-50 text-emerald-700" },
+    { titre: "Upsell", codes: ["mcafee", "assurance"], teinte: "bg-violet-50 text-violet-700" },
+    { titre: "Ventes combo", codes: ["mcafee_mobile", "assurance_essentielle", "canal_plus"], teinte: "bg-sky-50 text-sky-700" },
+];
+const AUTO_V2 = [
+    { code: "avis_google", label: "Avis", emoji: "⭐" },
+    { code: "recap_commercial", label: "Récap", emoji: "📋" },
+    { code: "spiderhome", label: "Spider", emoji: "🏠" },
+];
+const COURT: Record<string, string> = {
+    box: "Box", forfaits: "Forfaits", telephones: "Tél.", mcafee: "McAfee", assurance: "Assu.",
+    mcafee_mobile: "McAfee M.", assurance_essentielle: "Assu. ess.", canal_plus: "Canal+",
+};
 
 const PRODUITS_MANUELS = [
     { label: "Box",        code: "box",        emoji: "📦", text: "text-emerald-600", bg: "bg-emerald-50/70", border: "border-emerald-100", focus: "focus:border-emerald-400 focus:ring-emerald-100" },
@@ -79,6 +96,14 @@ export default function ObjectifsConseillerPage() {
     const [coeffRecap, setCoeffRecap]             = useState(1);
     const [coeffAvis, setCoeffAvis]               = useState(1);
     const [photos, setPhotos]                     = useState<Record<string, string | null>>({});
+    const [v2, setV2]                             = useState(false);
+    const [onglet, setOnglet]                     = useState<"objectifs" | "planning" | "corrections">("objectifs");
+    const [objBoutique, setObjBoutique]           = useState<Record<string, number>>({});
+
+    useEffect(() => {
+        setV2(new URLSearchParams(window.location.search).get("vue") === "v2");
+        getObjectifsEquipeMois().then(setObjBoutique).catch(() => {});
+    }, []);
 
     useEffect(() => {
         const stored = localStorage.getItem("spiderhome_coeff");
@@ -207,6 +232,178 @@ export default function ObjectifsConseillerPage() {
         });
 
         exporterObjectifsSemainePDF(lignesSemaine, colonnesProduits, debut, fin);
+    }
+
+    if (v2) {
+        const valeur = (cellule: { id: string; objectif: number } | undefined) => cellule ? (edits[cellule.id] ?? cellule.objectif) : null;
+        const auto = (code: string, conseillerId: string) => {
+            const j = joursPlanifies[conseillerId] ?? 0;
+            return code === "avis_google" ? Math.round(coeffAvis * j) : code === "recap_commercial" ? coeffRecap * j : coeff * j;
+        };
+        const totalCol = (code: string) => lignes.reduce((t, l) => t + (AUTO_V2.some((a) => a.code === code) ? auto(code, l.conseillerId) : valeur(l.cellules[code]) ?? 0), 0);
+        const nbModifs = Object.keys(edits).length;
+        const tousCodes = GROUPES_V2.flatMap((g) => g.codes);
+
+        return (
+            <main className="space-y-6 pb-24">
+                {/* En-tête */}
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                        <p className="text-xs font-black uppercase tracking-[0.35em] text-emerald-600">KPILOTE Manager</p>
+                        <h1 className="mt-2 text-4xl font-black text-slate-900">Objectifs conseiller</h1>
+                        <p className="mt-1 text-sm text-slate-500">
+                            {new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" })} · {lignes.length} conseillers · {Object.values(joursPlanifies).reduce((t, j) => t + j, 0)} jours planifiés au total
+                        </p>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={handleExportSemainePDF} className="rounded-xl bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">🗓️ Imprimer semaine</button>
+                        <button onClick={handleExportPDF} className="rounded-xl bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">📄 Exporter PDF</button>
+                    </div>
+                </div>
+
+                {/* Onglets */}
+                <div className="flex gap-1.5 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-slate-100 w-fit">
+                    {([["objectifs", "🎯 Objectifs du mois"], ["planning", "🗓️ Planning"], ["corrections", "🛠️ Corrections"]] as const).map(([id, label]) => (
+                        <button key={id} onClick={() => setOnglet(id)} className={`rounded-xl px-4 py-2 text-sm font-black transition-all ${onglet === id ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:bg-slate-50"}`}>
+                            {label}
+                        </button>
+                    ))}
+                </div>
+
+                {confirmation && <div className="rounded-2xl border border-green-200 bg-green-50 p-4 font-semibold text-green-700">{confirmation}</div>}
+
+                {onglet === "objectifs" && (
+                    <>
+                        {/* Réglages des objectifs automatiques */}
+                        <section className="flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                            <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Objectifs auto <span className="normal-case tracking-normal font-semibold">(× jours planifiés)</span></p>
+                            {[
+                                { emoji: "⭐", label: "Avis Google", val: coeffAvis, set: handleCoeffAvis, step: 0.5, min: 0 },
+                                { emoji: "📋", label: "Récap Co", val: coeffRecap, set: handleCoeffRecap, step: 1, min: 1 },
+                                { emoji: "🏠", label: "Spiderhome", val: coeff, set: handleCoeff, step: 1, min: 1 },
+                            ].map((c) => (
+                                <label key={c.label} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-1.5 text-sm font-bold text-slate-600 ring-1 ring-slate-100">
+                                    <span aria-hidden="true">{c.emoji}</span> {c.label}
+                                    <input type="number" min={c.min} step={c.step} value={c.val} onChange={(e) => c.set(Number(e.target.value))} className="w-14 rounded-lg border border-slate-200 bg-white px-1 py-1 text-center font-black text-slate-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                                    <span className="text-xs font-semibold text-slate-400">/ jour</span>
+                                </label>
+                            ))}
+                        </section>
+
+                        {/* Tableau */}
+                        <section className="overflow-x-auto rounded-[24px] bg-white p-4 shadow-[0_4px_24px_rgba(15,23,42,.07)] sm:p-6">
+                            <table className="w-full min-w-[940px] border-separate border-spacing-0 text-sm">
+                                <thead>
+                                    <tr>
+                                        <th rowSpan={2} className="sticky left-0 z-10 bg-white pb-2 pr-3 text-left align-bottom text-[11px] font-black uppercase tracking-[0.15em] text-slate-400">Conseiller</th>
+                                        <th rowSpan={2} className="pb-2 px-2 text-center align-bottom text-[11px] font-black uppercase tracking-[0.15em] text-slate-400" title="Jours planifiés ce mois">Jours</th>
+                                        {GROUPES_V2.map((g) => (
+                                            <th key={g.titre} colSpan={g.codes.length} className="px-1 pb-1.5">
+                                                <span className={`block rounded-lg py-1 text-[11px] font-black uppercase tracking-[0.12em] ${g.teinte}`}>{g.titre}</span>
+                                            </th>
+                                        ))}
+                                        <th colSpan={AUTO_V2.length} className="px-1 pb-1.5">
+                                            <span className="block rounded-lg bg-slate-100 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-slate-500">Auto</span>
+                                        </th>
+                                    </tr>
+                                    <tr>
+                                        {tousCodes.map((code) => (
+                                            <th key={code} className="px-1 pb-2 text-center text-xs font-black text-slate-600">{COURT[code]}</th>
+                                        ))}
+                                        {AUTO_V2.map((a) => <th key={a.code} className="px-1 pb-2 text-center text-xs font-black text-slate-400"><span aria-hidden="true">{a.emoji}</span> {a.label}</th>)}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {lignes.map((l, i) => {
+                                        const jours = joursPlanifies[l.conseillerId] ?? 0;
+                                        const fond = i % 2 === 0 ? "bg-slate-50/70" : "bg-white";
+                                        return (
+                                            <tr key={l.conseillerId} className={fond}>
+                                                <td className={`sticky left-0 z-10 rounded-l-xl py-2 pl-2 pr-3 ${fond}`}>
+                                                    <div className="flex items-center gap-2.5">
+                                                        <PhotoAvatar nom={l.nom} photoUrl={photos[l.conseillerId] ?? null} size={32} />
+                                                        <div className="min-w-0">
+                                                            <p className="truncate font-black text-slate-900">{l.nom.split(" ")[0]}</p>
+                                                            <Link href={`/manager/entretien/${l.conseillerId}`} className="text-[11px] font-bold text-violet-600 hover:underline">Bilan →</Link>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-2 py-2 text-center font-black tabular-nums text-slate-500">{jours}</td>
+                                                {tousCodes.map((code) => {
+                                                    const cellule = l.cellules[code];
+                                                    const v = valeur(cellule);
+                                                    const modifie = cellule ? edits[cellule.id] !== undefined && edits[cellule.id] !== cellule.objectif : false;
+                                                    return (
+                                                        <td key={code} className="px-1 py-2 text-center">
+                                                            {cellule ? (
+                                                                <input
+                                                                    type="number"
+                                                                    min={0}
+                                                                    value={v ?? 0}
+                                                                    aria-label={`${COURT[code]} — ${l.nom}`}
+                                                                    onChange={(e) => setEdits((prev) => ({ ...prev, [cellule.id]: Math.max(0, Number(e.target.value) || 0) }))}
+                                                                    className={`w-14 rounded-lg border px-0.5 py-1.5 text-center font-black tabular-nums outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 ${modifie ? "border-amber-300 bg-amber-50 text-amber-800" : v === 0 ? "border-transparent bg-transparent text-slate-300 hover:border-slate-200" : "border-transparent bg-transparent text-slate-900 hover:border-slate-200"}`}
+                                                                />
+                                                            ) : <span className="text-slate-300">—</span>}
+                                                        </td>
+                                                    );
+                                                })}
+                                                {AUTO_V2.map((a, j) => (
+                                                    <td key={a.code} className={`px-1 py-2 text-center font-bold tabular-nums text-slate-400 ${j === AUTO_V2.length - 1 ? "rounded-r-xl" : ""}`}>{auto(a.code, l.conseillerId)}</td>
+                                                ))}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td className="sticky left-0 z-10 border-t-2 border-slate-200 bg-white pt-3 pr-3 text-xs font-black uppercase tracking-[0.15em] text-slate-500">Total conseillers</td>
+                                        <td className="border-t-2 border-slate-200 pt-3" />
+                                        {tousCodes.map((code) => <td key={code} className="border-t-2 border-slate-200 pt-3 text-center font-black tabular-nums text-slate-900">{totalCol(code)}</td>)}
+                                        {AUTO_V2.map((a) => <td key={a.code} className="border-t-2 border-slate-200 pt-3 text-center font-bold tabular-nums text-slate-400">{totalCol(a.code)}</td>)}
+                                    </tr>
+                                    <tr>
+                                        <td className="sticky left-0 z-10 bg-white pt-1.5 pr-3 text-xs font-black uppercase tracking-[0.15em] text-emerald-600">
+                                            Objectif boutique <Link href="/manager/matrice-objectifs" className="ml-1 normal-case tracking-normal text-[11px] font-bold text-slate-400 hover:underline">(matrice)</Link>
+                                        </td>
+                                        <td />
+                                        {tousCodes.map((code) => {
+                                            const b = objBoutique[code];
+                                            const t = totalCol(code);
+                                            const ecart = b ? Math.round(((t - b) / b) * 100) : null;
+                                            return (
+                                                <td key={code} className="pt-1.5 text-center tabular-nums">
+                                                    <span className="font-black text-emerald-700">{b ?? "—"}</span>
+                                                    {ecart !== null && <span className={`block text-[10px] font-black ${ecart >= 0 ? "text-slate-400" : "text-red-500"}`}>{ecart >= 0 ? "+" : ""}{ecart} %</span>}
+                                                </td>
+                                            );
+                                        })}
+                                        {AUTO_V2.map((a) => <td key={a.code} className="pt-1.5 text-center font-bold tabular-nums text-emerald-700/60">{objBoutique[a.code] ?? "—"}</td>)}
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            <p className="mt-3 text-[11px] text-slate-400">
+                                Clique sur un chiffre pour le modifier (en orange = modifié, pas encore enregistré). Le % sous l&apos;objectif boutique = écart entre la somme des conseillers et l&apos;objectif boutique (en rouge si les conseillers sont en dessous).
+                            </p>
+                        </section>
+                    </>
+                )}
+
+                {onglet === "planning" && lignes.length > 0 && <PlanningCalendrier conseillers={lignes.map((l) => ({ id: l.conseillerId, nom: l.nom }))} />}
+                {onglet === "corrections" && lignes.length > 0 && <ResetVentesCard conseillers={lignes.map((l) => ({ id: l.conseillerId, nom: l.nom }))} />}
+
+                {/* Barre d'enregistrement */}
+                {onglet === "objectifs" && nbModifs > 0 && (
+                    <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
+                        <div className="flex items-center gap-3 rounded-2xl bg-slate-900 px-5 py-3 text-white shadow-[0_20px_50px_rgba(15,23,42,.4)]">
+                            <span className="text-sm font-bold">{nbModifs} modification{nbModifs > 1 ? "s" : ""} non enregistrée{nbModifs > 1 ? "s" : ""}</span>
+                            <button onClick={() => setEdits({})} disabled={enregistrement} className="rounded-xl bg-white/10 px-3 py-2 text-sm font-bold hover:bg-white/15">Annuler</button>
+                            <button onClick={handleEnregistrer} disabled={enregistrement} className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-black hover:bg-emerald-400 disabled:opacity-60">{enregistrement ? "Enregistrement…" : "Enregistrer"}</button>
+                        </div>
+                    </div>
+                )}
+            </main>
+        );
     }
 
     return (
