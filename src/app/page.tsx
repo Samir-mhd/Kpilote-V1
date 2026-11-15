@@ -1,6 +1,14 @@
 import Link from "next/link";
+import AccueilA from "@/components/accueil/AccueilA";
+import AccueilB from "@/components/accueil/AccueilB";
+import AccueilC from "@/components/accueil/AccueilC";
 
-export default function Home() {
+// Propositions de refonte en test : ?v=a (écran partagé), ?v=b (l'équipe d'abord), ?v=c (vitrine).
+export default async function Home({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const v = (await searchParams).v;
+  if (v === "a") return <AccueilA />;
+  if (v === "b") return <AccueilB />;
+  if (v === "c") return <AccueilC />;
   return (
     <main
       className="min-h-screen flex flex-col items-center justify-between px-6 py-10"
