@@ -23,9 +23,8 @@ export default function ChoixConseiller() {
     useEffect(() => {
         getConseillers()
             .then((data) => {
-                // Profils désactivés : gardés, mais en dernier (ordre stable sinon).
-                const liste = data as Conseiller[];
-                const actifs = [...liste.filter((c) => c.profil_actif !== false), ...liste.filter((c) => c.profil_actif === false)];
+                // Profils désactivés : invisibles ici comme partout ailleurs.
+                const actifs = (data as Conseiller[]).filter((c) => c.profil_actif !== false);
                 setConseillers(actifs);
                 const aujourdhui = new Date();
                 getJoursTravailPlageTous(actifs.map((c) => c.id), aujourdhui, aujourdhui).then(setPlanifies).catch(() => {});
