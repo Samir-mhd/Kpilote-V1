@@ -6,6 +6,8 @@ import { construireClassementPeriode, ConseillerStats } from "@/services/classem
 import { getRealiseVentesComboParConseiller, getObjectifsComboParConseiller, RealiseVentesCombo } from "@/services/variableConseiller";
 import { getJoursTravailPlageTous, StatutJour } from "@/services/planningService";
 import { PRODUITS_HORS_ACTES, ProduitCode } from "@/utils/produits";
+import { getStatsTransactionsMois, StatsTransactionsMois } from "@/services/ventesTransactions";
+import ArticlesParVenteCard from "@/components/dashboard/ArticlesParVenteCard";
 
 /**
  * "Mes stats" (variante &stats=v2) : heatmap en moyenne par jour travaillé (filtrable par produit),
@@ -27,8 +29,13 @@ const PRODUITS: { code: string; label: string; emoji: string }[] = [
     { code: "assurance", label: "Assurance", emoji: "✅" },
     { code: "mcafee_mobile", label: "McAfee Mobile", emoji: "📶" },
     { code: "assurance_essentielle", label: "Assurance Ess.", emoji: "🧩" },
+    { code: "canal_plus", label: "Canal+", emoji: "📺" },
 ];
+// Comptés dans les actes (comme le classement). Canal+ : affiché par produit, hors total d'actes.
 const COMBOS = ["mcafee_mobile", "assurance_essentielle"] as const;
+const COMBOS_TOUS: string[] = ["mcafee_mobile", "assurance_essentielle", "canal_plus"];
+// Comparaison avec l'équipe ramenée à 10 jours travaillés (lisible même pour les ventes rares).
+const BASE_JOURS = 10;
 
 function jourLocal(d: Date) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -52,7 +59,8 @@ function estActe(code: string) {
 type Donnees = {
     ventes: VenteStat[];
     planning: Record<string, StatutJour>;
-    combos: Record<string, { mcafee_mobile: number; assurance_essentielle: number }>;
+    combos: Record<string, { mcafee_mobile: number; assurance_essentielle: number; canal_plus: number }>;
+    articles: StatsTransactionsMois | null;
     equipe: ConseillerStats[];
     comboEquipe: Record<string, RealiseVentesCombo>;
     objectifsCombo: Record<string, RealiseVentesCombo>;
@@ -75,9 +83,10 @@ export default function MesStatsV2({ conseillerId }: { conseillerId: string }) {
             construireClassementPeriode("mois"),
             getRealiseVentesComboParConseiller(jourLocal(debutMois), jourLocal(now)).catch(() => ({} as Record<string, RealiseVentesCombo>)),
             getObjectifsComboParConseiller().catch(() => ({} as Record<string, RealiseVentesCombo>)),
-        ]).then(async ([ventes, planning, combos, equipe, comboEquipe, objectifsCombo]) => {
+            getStatsTransactionsMois(conseillerId, now.getFullYear(), now.getMonth() + 1).catch(() => null),
+        ]).then(async ([ventes, planning, combos, equipe, comboEquipe, objectifsCombo, articles]) => {
             const joursEquipe = await getJoursTravailPlageTous(equipe.map((c) => c.id), debutMois, now).catch(() => ({} as Record<string, number>));
-            setD({ ventes, planning, combos, equipe, comboEquipe, objectifsCombo, joursEquipe });
+            setD({ ventes, planning, combos, equipe, comboEquipe, objectifsCombo, joursEquipe, articles });
         });
     }, [conseillerId]);
 
@@ -86,12 +95,15 @@ export default function MesStatsV2({ conseillerId }: { conseillerId: string }) {
         const total: Record<string, number> = {};
         const produit: Record<string, Record<string, number>> = {};
         if (!d) return { total, produit };
-        const add = (jour: string, code: string, n: number) => {
-            total[jour] = (total[jour] ?? 0) + n;
+        const add = (jour: string, code: string, n: number, dansTotal = true) => {
+            if (dansTotal) total[jour] = (total[jour] ?? 0) + n;
             (produit[jour] ??= {})[code] = (produit[jour][code] ?? 0) + n;
         };
         d.ventes.forEach((v) => { if (estActe(v.code)) add(v.jour, v.code, v.quantite); });
-        Object.entries(d.combos).forEach(([jour, c]) => COMBOS.forEach((code) => { if (c[code]) add(jour, code, c[code]); }));
+        Object.entries(d.combos).forEach(([jour, c]) => {
+            COMBOS.forEach((code) => { if (c[code]) add(jour, code, c[code]); });
+            if (c.canal_plus) add(jour, "canal_plus", c.canal_plus, false);
+        });
         return { total, produit };
     }, [d]);
 
@@ -133,26 +145,25 @@ export default function MesStatsV2({ conseillerId }: { conseillerId: string }) {
     const moisDernier = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prefixeMoisDernier = jourLocal(moisDernier).slice(0, 8);
     const sommeMois = (prefixe: string, jusqua: number, code?: string) =>
-        Object.entries(parJour.produit).reduce((t, [jour, p]) => {
-            if (!jour.startsWith(prefixe) || Number(jour.slice(8)) > jusqua) return t;
-            return t + (code ? p[code] ?? 0 : Object.values(p).reduce((a, b) => a + b, 0));
-        }, 0);
+        code
+            ? Object.entries(parJour.produit).reduce((t, [jour, p]) => (jour.startsWith(prefixe) && Number(jour.slice(8)) <= jusqua ? t + (p[code] ?? 0) : t), 0)
+            : Object.entries(parJour.total).reduce((t, [jour, n]) => (jour.startsWith(prefixe) && Number(jour.slice(8)) <= jusqua ? t + n : t), 0);
     const comparaison = [
         { code: "total", label: "Tous les actes", emoji: "🔥", ceMois: sommeMois(prefixeMois, jourDuMois), avant: sommeMois(prefixeMoisDernier, Math.min(jourDuMois, finMoisDernier)) },
         ...PRODUITS.map((p) => ({ ...p, ceMois: sommeMois(prefixeMois, jourDuMois, p.code), avant: sommeMois(prefixeMoisDernier, Math.min(jourDuMois, finMoisDernier), p.code) })),
-    ].filter((l) => l.ceMois > 0 || l.avant > 0);
+    ];
 
     // ── 3. Moi vs l'équipe (ce mois, par jour travaillé) ──────────────────────────
     const valeurDe = (c: ConseillerStats, code: string) =>
-        (COMBOS as readonly string[]).includes(code) ? (d.comboEquipe[c.id]?.[code as keyof RealiseVentesCombo] ?? 0) : (c.produits[code as ProduitCode] ?? 0);
+        COMBOS_TOUS.includes(code) ? (d.comboEquipe[c.id]?.[code as keyof RealiseVentesCombo] ?? 0) : (c.produits[code as ProduitCode] ?? 0);
     const objectifDe = (c: ConseillerStats, code: string) =>
-        (COMBOS as readonly string[]).includes(code) ? (d.objectifsCombo[c.id]?.[code as keyof RealiseVentesCombo] ?? 0) : (c.objectifs[code as ProduitCode] ?? 0);
+        COMBOS_TOUS.includes(code) ? (d.objectifsCombo[c.id]?.[code as keyof RealiseVentesCombo] ?? 0) : (c.objectifs[code as ProduitCode] ?? 0);
     const moi = d.equipe.find((c) => c.id === conseillerId);
     const versusEquipe = moi ? PRODUITS.map((p) => {
         // Seuls les conseillers qui ont un objectif sur ce produit (ex. pas de profil Téléphone exclu).
         const concernes = d.equipe.filter((c) => (d.joursEquipe[c.id] ?? 0) > 0 && objectifDe(c, p.code) > 0);
         if (!concernes.some((c) => c.id === conseillerId)) return null;
-        const parJ = concernes.map((c) => ({ id: c.id, v: valeurDe(c, p.code) / (d.joursEquipe[c.id] || 1) })).sort((a, b) => b.v - a.v);
+        const parJ = concernes.map((c) => ({ id: c.id, v: (valeurDe(c, p.code) / (d.joursEquipe[c.id] || 1)) * BASE_JOURS })).sort((a, b) => b.v - a.v);
         const mien = parJ.find((x) => x.id === conseillerId)!;
         const autres = parJ.filter((x) => x.id !== conseillerId);
         const moyenne = autres.length ? autres.reduce((t, x) => t + x.v, 0) / autres.length : 0;
@@ -205,7 +216,7 @@ export default function MesStatsV2({ conseillerId }: { conseillerId: string }) {
                         <p className="text-xs font-semibold text-slate-400">30 derniers jours · moyenne par jour travaillé (selon ton planning)</p>
                     </div>
                     <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1 text-[11px] font-black">
-                        {[{ code: "tous", label: "Tous" }, ...PRODUITS.filter((p) => !(COMBOS as readonly string[]).includes(p.code))].map((p) => (
+                        {[{ code: "tous", label: "Tous" }, ...PRODUITS.filter((p) => !COMBOS_TOUS.includes(p.code))].map((p) => (
                             <button key={p.code} onClick={() => setProduitHeat(p.code)} aria-pressed={produitHeat === p.code} className={`rounded-lg px-2.5 py-1 transition-all ${produitHeat === p.code ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
                                 {p.label}
                             </button>
@@ -284,7 +295,7 @@ export default function MesStatsV2({ conseillerId }: { conseillerId: string }) {
                 {/* ── 3. Moi vs l'équipe ───────────────────────────────── */}
                 <section className="rounded-[24px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)] sm:p-6">
                     <h2 className="text-base font-black text-slate-900">Toi vs l&apos;équipe</h2>
-                    <p className="text-xs font-semibold text-slate-400">Ce mois-ci · ventes par jour travaillé · conseillers ayant l&apos;objectif</p>
+                    <p className="text-xs font-semibold text-slate-400">Ce mois-ci · ventes pour {BASE_JOURS} jours travaillés · conseillers ayant l&apos;objectif</p>
                     <ul className="mt-3 divide-y divide-slate-100">
                         {versusEquipe.map((l) => (
                             <li key={l.code} className="flex items-center gap-3 py-2">
@@ -343,6 +354,8 @@ export default function MesStatsV2({ conseillerId }: { conseillerId: string }) {
                     <p className="mt-2 text-[11px] text-slate-400">Barre hachurée : semaine en cours.</p>
                 </section>
             </div>
+
+            {d.articles && <ArticlesParVenteCard stats={d.articles} />}
         </div>
     );
 }

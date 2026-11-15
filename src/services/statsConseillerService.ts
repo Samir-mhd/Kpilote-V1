@@ -50,13 +50,13 @@ export async function getPlanningPlage(conseillerId: string, debut: Date, fin: D
     return r;
 }
 
-/** McAfee Mobile et Assurance essentielle par jour (variable_actes_jour), pour un conseiller. */
-export async function getCombosParJour(conseillerId: string, debut: Date, fin: Date): Promise<Record<string, { mcafee_mobile: number; assurance_essentielle: number }>> {
+/** McAfee Mobile, Assurance essentielle et Canal+ (options 2 et 3) par jour (variable_actes_jour), pour un conseiller. */
+export async function getCombosParJour(conseillerId: string, debut: Date, fin: Date): Promise<Record<string, { mcafee_mobile: number; assurance_essentielle: number; canal_plus: number }>> {
     const [{ data: bonus }, { data: actes }] = await Promise.all([
         supabase.from("variable_bonus_manuels").select("id, label").eq("categorie", "autres_primes"),
         supabase
             .from("variable_actes_jour")
-            .select("jour, champ, bonus_manuel_id, quantite")
+            .select("jour, champ, label, bonus_manuel_id, quantite")
             .eq("conseiller_id", conseillerId)
             .gte("jour", jourLocal(debut))
             .lte("jour", jourLocal(fin)),
@@ -66,9 +66,10 @@ export async function getCombosParJour(conseillerId: string, debut: Date, fin: D
             .filter((b: { label: string }) => b.label.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes("mcafee"))
             .map((b: { id: string }) => b.id)
     );
-    const r: Record<string, { mcafee_mobile: number; assurance_essentielle: number }> = {};
-    (actes ?? []).forEach((a: { jour: string; champ: string | null; bonus_manuel_id: string | null; quantite: number | null }) => {
-        const ligne = (r[a.jour] ??= { mcafee_mobile: 0, assurance_essentielle: 0 });
+    const r: Record<string, { mcafee_mobile: number; assurance_essentielle: number; canal_plus: number }> = {};
+    (actes ?? []).forEach((a: { jour: string; champ: string | null; label: string; bonus_manuel_id: string | null; quantite: number | null }) => {
+        const ligne = (r[a.jour] ??= { mcafee_mobile: 0, assurance_essentielle: 0, canal_plus: 0 });
+        if (a.label === "Canal+ Option 2" || a.label === "Canal+ Option 3") ligne.canal_plus += a.quantite ?? 1;
         if (a.champ === "assurance_essentielle") ligne.assurance_essentielle += a.quantite ?? 1;
         else if (a.bonus_manuel_id && idsMcafee.has(a.bonus_manuel_id)) ligne.mcafee_mobile += a.quantite ?? 1;
     });

@@ -193,22 +193,9 @@ function StatsInner() {
         : insight.tendance < 0 ? TrendingDown
         : Minus;
 
-    // v2 : les outils de correction passent dans une section repliée, en bas.
+    // v2 : les corrections (ventes du jour, Cerebro Check) sont sur l'Accueil, section "Corrections".
     function enveloppeOutils(contenu: React.ReactNode) {
-        if (!v2) return contenu;
-        return (
-            <details className="group rounded-[24px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)] sm:p-6">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-                    <span>
-                        <span className="block text-base font-black text-slate-900">🛠️ Outils</span>
-                        <span className="block text-xs font-semibold text-slate-400">Corriger mes ventes du jour · revoir mon Cerebro Check</span>
-                    </span>
-                    <span className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600 group-open:hidden">Ouvrir</span>
-                    <span className="hidden rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600 group-open:inline">Fermer</span>
-                </summary>
-                <div className="mt-5 space-y-5">{contenu}</div>
-            </details>
-        );
+        return v2 ? null : contenu;
     }
 
     return (

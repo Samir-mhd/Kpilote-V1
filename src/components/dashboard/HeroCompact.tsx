@@ -93,7 +93,8 @@ export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, 
     }, [cagnotte?.flash]);
 
     const hier = cagnotte?.hier ?? null;
-    const progressionCagnotte = cagnotte && hier != null && hier > 0 ? Math.round(((cagnotte.total - hier) / hier) * 100) : null;
+    // Pas de badge tant que rien n'est fait aujourd'hui (évite un "-100 % vs hier" chaque matin).
+    const progressionCagnotte = cagnotte && cagnotte.total > 0 && hier != null && hier > 0 ? Math.round(((cagnotte.total - hier) / hier) * 100) : null;
     const pctBarre = Math.min(taux, 100);
 
     return (

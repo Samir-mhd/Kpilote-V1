@@ -29,6 +29,7 @@ import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 import TeamFeed from "@/components/dashboard/TeamFeed";
 import CagnotteJourCard from "@/components/dashboard/CagnotteJourCard";
 import AutresActesCard from "@/components/dashboard/AutresActesCard";
+import CorrectionsAccueil from "@/components/dashboard/CorrectionsAccueil";
 import ComboVenteModal, { ComboSelection } from "@/components/dashboard/ComboVenteModal";
 import ComboSansVarianteModal, { ComboSansVarianteSelection } from "@/components/dashboard/ComboSansVarianteModal";
 import { enregistrerTransaction } from "@/services/ventesTransactions";
@@ -1332,6 +1333,15 @@ export default function Dashboard() {
                 <AutresActesCard
                     bonusManuels={bonusManuels}
                     onChoisir={ajouterActeVariable}
+                />
+            )}
+
+            {/* ── Corrections (ventes du jour, Cerebro Check) — repliées ── */}
+            {conseillerId && (
+                <CorrectionsAccueil
+                    conseillerId={conseillerId}
+                    nom={nom}
+                    onCorrige={() => { chargerMissions(); chargerRang(); refreshAvatar(); }}
                 />
             )}
 

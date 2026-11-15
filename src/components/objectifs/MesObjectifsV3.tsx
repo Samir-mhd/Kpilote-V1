@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { getMissionsCompletes, getVentesParMois, codeDepuisNom, MissionComplete } from "@/services/missionsReelles";
-import { getStatsTransactionsMois, StatsTransactionsMois } from "@/services/ventesTransactions";
 import { getJoursTravail } from "@/services/planningService";
 import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import { getVentesDepuisLundi } from "@/services/stats";
@@ -10,7 +9,6 @@ import { getRealiseVentesCombo } from "@/services/variableConseiller";
 import { periodeSemaineEffective, joursPeriode } from "@/utils/periodes";
 import { PRODUITS_ORDRE } from "@/utils/produits";
 import { COMBO_META, ComboCode } from "@/utils/classementGroupes";
-import ArticlesParVenteCard from "@/components/dashboard/ArticlesParVenteCard";
 
 /**
  * Variante "par horizon" de Mes objectifs (&objectifs=v3) : tout se lit en Semaine / Mois.
@@ -106,7 +104,6 @@ function MiniBarre({ label, h, repere }: { label: string; h: Horizon; repere?: n
 export default function MesObjectifsV3({ conseillerId }: { conseillerId: string; nom: string }) {
     const [cartes, setCartes] = useState<Carte[]>([]);
     const [jours, setJours] = useState({ ecoules: 0, total: 0, restants: 0 });
-    const [statsArticles, setStatsArticles] = useState<StatsTransactionsMois | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -128,11 +125,10 @@ export default function MesObjectifsV3({ conseillerId }: { conseillerId: string;
             getObjectifsSemaineFiges([conseillerId], debut, fin).catch(() => ({} as Record<string, Record<string, number>>)),
             getVentesDepuisLundi(conseillerId, debut).catch(() => [] as any[]),
             getRealiseVentesCombo(conseillerId, sem.debut, sem.fin).catch(() => null),
-            getStatsTransactionsMois(conseillerId, now.getFullYear(), now.getMonth() + 1).catch(() => null),
             Promise.all(moisPrecedents.map(({ m, a }) =>
                 getVentesParMois(conseillerId, a, m).then((v) => ({ label: MOIS_COURTS[m], ventes: v })).catch(() => ({ label: MOIS_COURTS[m], ventes: {} as Record<string, number> }))
             )),
-        ]).then(([missions, jt, figes, ventesSemaine, comboSemaine, stats, hist]) => {
+        ]).then(([missions, jt, figes, ventesSemaine, comboSemaine, hist]) => {
             const total = jt.travailles + jt.restants;
             const objSemaine = (figes as Record<string, Record<string, number>>)[conseillerId] ?? {};
 
@@ -160,7 +156,6 @@ export default function MesObjectifsV3({ conseillerId }: { conseillerId: string;
                 };
             }));
             setJours({ ecoules: jt.travailles, total, restants: jt.restants });
-            setStatsArticles(stats as StatsTransactionsMois | null);
         }).finally(() => setLoading(false));
     }, [conseillerId]);
 
@@ -314,7 +309,6 @@ export default function MesObjectifsV3({ conseillerId }: { conseillerId: string;
                 );
             })}
 
-            {statsArticles && <ArticlesParVenteCard stats={statsArticles} />}
         </div>
     );
 }
