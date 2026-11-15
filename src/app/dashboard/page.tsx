@@ -11,6 +11,7 @@ import StatsBar from "@/components/dashboard/StatsBar";
 import MorningCheck from "@/components/dashboard/MorningCheck";
 import MorningCheckV2 from "@/components/dashboard/MorningCheckV2";
 import { DefiJourBandeau } from "@/components/dashboard/DefiJour";
+import { getJoursTravailPlage } from "@/services/planningService";
 import MissionCard, { QuestionCrossSell } from "@/components/MissionCard";
 import { detecterEvenement } from "@/engine/eventEngine";
 import { genererMessageCoach } from "@/engine/coachEngine";
@@ -105,6 +106,13 @@ export default function Dashboard() {
     // Cerebro Check repensé, en test : &cerebro=v2 ; &apercuCheck=1 l'affiche même s'il est déjà validé.
     const cerebroV2 = searchParams.get("cerebro") === "v2";
     const [apercuCheck, setApercuCheck] = useState(searchParams.get("apercuCheck") === "1");
+    // Planifié aujourd'hui ? (sinon pas de relance d'inactivité dans l'en-tête)
+    const [travailleAujourdhui, setTravailleAujourdhui] = useState(true);
+    useEffect(() => {
+        if (!conseillerId) return;
+        const maintenant = new Date();
+        getJoursTravailPlage(conseillerId, maintenant, maintenant).then((n) => setTravailleAujourdhui(n > 0)).catch(() => {});
+    }, [conseillerId]);
 
     // checkLoading : true pendant la vérification DB (évite un flash du check avant la réponse)
     const [checkLoading,          setCheckLoading]          = useState(!!conseillerId);
@@ -1065,6 +1073,7 @@ export default function Dashboard() {
                     cagnotte={variableActivee ? { total: cagnotteTotal, hier: cagnotteHier, flash: cagnotteFlash } : null}
                     prochainBadge={prochainBadge}
                     badgeHref={`/dashboard/badges?id=${conseillerId}&nom=${encodeURIComponent(nom)}`}
+                    travailleAujourdhui={travailleAujourdhui}
                 />
             ) : (
                 <HeroHeader

@@ -18,6 +18,8 @@ type Props = {
     cagnotte: { total: number; hier: number | null; flash: { key: number; montant: number; label?: string } | null } | null;
     prochainBadge: ProchainBadge | null;
     badgeHref: string;
+    /** false = pas planifié aujourd'hui (off, congés…) : jamais de relance d'inactivité. */
+    travailleAujourdhui?: boolean;
 };
 
 // Situations qui priment sur l'état "temps depuis la dernière vente" de l'avatar : un conseiller
@@ -53,7 +55,10 @@ function fmtEuro(n: number) {
 
 /** Ordre de priorité : série en feu > journée complète > hors horaires d'ouverture > en tête >
  *  état avatar habituel (dont les relances glaçon / endormi, donc seulement de 10h à 20h). */
-function situation(avatarEtat: AvatarEtat, taux: number, rang: number, realise: number, heure: number): { etat: AvatarEtat; phrases: string[] } {
+const PHRASES_REPOS = ["Jour de repos, {nom} ! Profite bien 🌴", "Pas de vente au programme aujourd'hui, {nom}. Recharge les batteries ! 🌴"];
+
+function situation(avatarEtat: AvatarEtat, taux: number, rang: number, realise: number, heure: number, travaille: boolean): { etat: AvatarEtat; phrases: string[] } {
+    if (!travaille && realise === 0) return { etat: "souriant_main", phrases: PHRASES_REPOS };
     const inactif = avatarEtat === "glacon" || avatarEtat === "endormi";
     if (avatarEtat === "en_feu") return { etat: "en_feu", phrases: AVATAR_PHRASES.en_feu };
     if (taux >= 100 && realise > 0) return { etat: inactif ? "heureux_gagne" : avatarEtat, phrases: PHRASES_JOURNEE_COMPLETE };
@@ -67,7 +72,7 @@ function situation(avatarEtat: AvatarEtat, taux: number, rang: number, realise: 
     return { etat: avatarEtat, phrases: AVATAR_PHRASES[avatarEtat] };
 }
 
-export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, taux, cagnotte, prochainBadge, badgeHref }: Props) {
+export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, taux, cagnotte, prochainBadge, badgeHref, travailleAujourdhui = true }: Props) {
     const prenom = nom.split(" ")[0];
     // Heure relue chaque minute pour basculer à l'ouverture / la fermeture sans recharger.
     const [heure, setHeure] = useState(() => new Date().getHours());
@@ -75,7 +80,7 @@ export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, 
         const id = setInterval(() => setHeure(new Date().getHours()), 60_000);
         return () => clearInterval(id);
     }, []);
-    const { etat, phrases } = situation(avatarEtat, taux, rang, realise, heure);
+    const { etat, phrases } = situation(avatarEtat, taux, rang, realise, heure, travailleAujourdhui);
 
     // Phrase stable pour la journée (pas de Math.random → même rendu serveur et navigateur),
     // qui varie d'un jour et d'un conseiller à l'autre.
