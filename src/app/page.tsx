@@ -10,7 +10,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
   if (v === "a") return <AccueilA />;
   if (v === "b") return <AccueilB />;
   if (v === "c") return <AccueilC />;
-  if (v === "d") return <AccueilD />;
+  if (v !== "v1") return <AccueilD />; // nouvelle accueil par défaut ; ancienne via ?v=v1
   return (
     <main
       className="min-h-screen flex flex-col items-center justify-between px-6 py-10"
