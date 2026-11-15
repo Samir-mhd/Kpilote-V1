@@ -101,7 +101,7 @@ export default function ObjectifsConseillerPage() {
     const [objBoutique, setObjBoutique]           = useState<Record<string, number>>({});
 
     useEffect(() => {
-        setV2(new URLSearchParams(window.location.search).get("vue") === "v2");
+        setV2(new URLSearchParams(window.location.search).get("vue") !== "v1");
         getObjectifsEquipeMois().then(setObjBoutique).catch(() => {});
     }, []);
 
@@ -252,7 +252,7 @@ export default function ObjectifsConseillerPage() {
                         <p className="text-xs font-black uppercase tracking-[0.35em] text-emerald-600">KPILOTE Manager</p>
                         <h1 className="mt-2 text-4xl font-black text-slate-900">Objectifs conseiller</h1>
                         <p className="mt-1 text-sm text-slate-500">
-                            {new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" })} · {lignes.length} conseillers · {Object.values(joursPlanifies).reduce((t, j) => t + j, 0)} jours planifiés au total
+                            {new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" })} · {Object.values(joursPlanifies).reduce((t, j) => t + j, 0)} jours planifiés au total
                         </p>
                     </div>
                     <div className="flex gap-2">
