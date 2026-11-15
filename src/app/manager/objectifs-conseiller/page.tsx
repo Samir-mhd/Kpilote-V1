@@ -21,12 +21,14 @@ import { getCoeffAvisGoogle, sauvegarderCoeffAvisGoogle } from "@/services/avisG
 import type { ProduitCode } from "@/utils/produits";
 import Link from "next/link";
 import { getObjectifsEquipeMois } from "@/services/objectifsEquipe";
+import PlanningEquipe from "@/components/manager/PlanningEquipe";
+import { exporterObjectifsPDFv2, nomMoisFr, GroupePDF } from "@/utils/exportObjectifsPDFv2";
 
 // ── Vue v2 (&vue=v2) : un seul tableau éditable, colonnes groupées, totaux vs objectif boutique ──
-const GROUPES_V2: { titre: string; codes: string[]; teinte: string }[] = [
-    { titre: "Core business", codes: ["box", "forfaits", "telephones"], teinte: "bg-emerald-50 text-emerald-700" },
-    { titre: "Upsell", codes: ["mcafee", "assurance"], teinte: "bg-violet-50 text-violet-700" },
-    { titre: "Ventes combo", codes: ["mcafee_mobile", "assurance_essentielle", "canal_plus"], teinte: "bg-sky-50 text-sky-700" },
+const GROUPES_V2: { titre: string; codes: string[]; teinte: string; couleur: string }[] = [
+    { titre: "Core business", codes: ["box", "forfaits", "telephones"], teinte: "bg-emerald-50 text-emerald-700", couleur: "#047857" },
+    { titre: "Upsell", codes: ["mcafee", "assurance"], teinte: "bg-violet-50 text-violet-700", couleur: "#6d28d9" },
+    { titre: "Ventes combo", codes: ["mcafee_mobile", "assurance_essentielle", "canal_plus"], teinte: "bg-sky-50 text-sky-700", couleur: "#0369a1" },
 ];
 const AUTO_V2 = [
     { code: "avis_google", label: "Avis", emoji: "⭐" },
@@ -99,9 +101,12 @@ export default function ObjectifsConseillerPage() {
     const [v2, setV2]                             = useState(false);
     const [onglet, setOnglet]                     = useState<"objectifs" | "planning" | "corrections">("objectifs");
     const [objBoutique, setObjBoutique]           = useState<Record<string, number>>({});
+    // Aperçu (&apercu=v2) : planning vue équipe + nouveau PDF.
+    const [apercu, setApercu]                     = useState(false);
 
     useEffect(() => {
         setV2(new URLSearchParams(window.location.search).get("vue") !== "v1");
+        setApercu(new URLSearchParams(window.location.search).get("apercu") === "v2");
         getObjectifsEquipeMois().then(setObjBoutique).catch(() => {});
     }, []);
 
@@ -244,6 +249,53 @@ export default function ObjectifsConseillerPage() {
         const nbModifs = Object.keys(edits).length;
         const tousCodes = GROUPES_V2.flatMap((g) => g.codes);
 
+        const groupesPDF: GroupePDF[] = [
+            ...GROUPES_V2.map((g) => ({ titre: g.titre, couleur: g.couleur, colonnes: g.codes.map((c) => ({ code: c, label: COURT[c] })) })),
+            { titre: "Auto", couleur: "#64748b", colonnes: [{ code: "avis_google", label: "Avis" }, { code: "recap_commercial", label: "Récap" }] },
+        ];
+        const NOTE_PDF = "Avis Google et Récap Co = coefficient × jours planifiés.";
+        function exporterMoisV2() {
+            exporterObjectifsPDFv2({
+                titre: `Objectifs de ${nomMoisFr()}`,
+                periode: "Objectifs mensuels",
+                groupes: groupesPDF,
+                lignes: lignes.map((l) => ({
+                    nom: l.nom, photoUrl: photos[l.conseillerId] ?? null, jours: joursPlanifies[l.conseillerId] ?? 0,
+                    valeurs: Object.fromEntries([
+                        ...tousCodes.map((c) => [c, valeur(l.cellules[c])]),
+                        ["avis_google", auto("avis_google", l.conseillerId)],
+                        ["recap_commercial", auto("recap_commercial", l.conseillerId)],
+                    ]),
+                })),
+                boutique: objBoutique,
+                note: NOTE_PDF,
+            });
+        }
+        async function exporterSemaineV2() {
+            const { debut, fin } = periodeSemaineEffective();
+            const ids = lignes.map((l) => l.conseillerId);
+            const [joursSemaine, objSemaine] = await Promise.all([getJoursTravailSemaineTous(ids, debut, fin), getObjectifsSemaineFiges(ids, debut, fin)]);
+            const fmt = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+            exporterObjectifsPDFv2({
+                titre: "Objectifs de la semaine",
+                periode: `Du ${fmt(debut)} au ${fmt(fin)} ${fin.getFullYear()}`,
+                groupes: groupesPDF,
+                lignes: lignes.map((l) => {
+                    const sem = (objSemaine[l.conseillerId] ?? {}) as Record<string, number>;
+                    const j = joursSemaine[l.conseillerId] ?? 0;
+                    return {
+                        nom: l.nom, photoUrl: photos[l.conseillerId] ?? null, jours: j,
+                        valeurs: Object.fromEntries([
+                            ...tousCodes.map((c) => [c, l.cellules[c] ? (sem[c] ?? 0) : null]),
+                            ["avis_google", sem["avis_google"] ?? Math.round(coeffAvis * j)],
+                            ["recap_commercial", coeffRecap * j],
+                        ]),
+                    };
+                }),
+                note: `Objectifs figés de la semaine (selon le planning). ${NOTE_PDF}`,
+            });
+        }
+
         return (
             <main className="space-y-6 pb-24">
                 {/* En-tête */}
@@ -256,8 +308,8 @@ export default function ObjectifsConseillerPage() {
                         </p>
                     </div>
                     <div className="flex gap-2">
-                        <button onClick={handleExportSemainePDF} className="rounded-xl bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">🗓️ Imprimer semaine</button>
-                        <button onClick={handleExportPDF} className="rounded-xl bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">📄 Exporter PDF</button>
+                        <button onClick={apercu ? exporterSemaineV2 : handleExportSemainePDF} className="rounded-xl bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">🗓️ Imprimer semaine</button>
+                        <button onClick={apercu ? exporterMoisV2 : handleExportPDF} className="rounded-xl bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">📄 Exporter PDF</button>
                     </div>
                 </div>
 
@@ -389,7 +441,9 @@ export default function ObjectifsConseillerPage() {
                     </>
                 )}
 
-                {onglet === "planning" && lignes.length > 0 && <PlanningCalendrier conseillers={lignes.map((l) => ({ id: l.conseillerId, nom: l.nom }))} />}
+                {onglet === "planning" && lignes.length > 0 && (apercu
+                    ? <PlanningEquipe conseillers={lignes.map((l) => ({ id: l.conseillerId, nom: l.nom }))} photos={photos} />
+                    : <PlanningCalendrier conseillers={lignes.map((l) => ({ id: l.conseillerId, nom: l.nom }))} />)}
                 {onglet === "corrections" && lignes.length > 0 && <ResetVentesCard conseillers={lignes.map((l) => ({ id: l.conseillerId, nom: l.nom }))} />}
 
                 {/* Barre d'enregistrement */}
