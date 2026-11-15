@@ -13,10 +13,10 @@ import { getJoursTravail } from "@/services/planningService";
 import { getMissionsCompletes } from "@/services/missionsReelles";
 
 /**
- * "Ma variable" mise en avant (variante &variable=v2) : montant du mois, projection à ton rythme,
- * scénario "objectifs atteints", et leviers chiffrés ("Encore 3 POP → +X €"). Tous les montants
- * passent par calculerVariableConseiller (le vrai barème) ; les produits payés plus tard (box M+2,
- * assurance M+1, McAfee M+2) sont affichés avec leur mois de paiement.
+ * "Ma variable" mise en avant (variante &variable=v2) : montant acquis, fin de mois à ton rythme,
+ * et surtout la variable "tous tes objectifs atteints" avec ce qu'il reste à vendre pour y arriver.
+ * Tous les montants passent par calculerVariableConseiller (le vrai barème) ; box / assurances /
+ * McAfee manquants sont valorisés à part, payés plus tard (M+1 / M+2).
  */
 
 type Props = {
@@ -30,23 +30,27 @@ type Props = {
     totalExtra: number;           // contributions déjà figées payées ce mois (box M+2, 4P, assurance M+1)
 };
 
-// Volumes du mois qui suivent le rythme de vente (synchronisés depuis l'Accueil ou déclarés au fil
-// du mois). Exclus : box / assurance / McAfee (payés plus tard), notes SatisFD et présence.
+// Volumes du mois qui suivent le rythme de vente. Exclus : box / assurance / McAfee (payés plus
+// tard), notes SatisFD et présence.
 const CHAMPS_RYTHME: (keyof VenteConseiller)[] = [
     "forfait_free_serie", "forfait_free_max", "migration_2e_vers_free_serie", "migration_vers_free_max",
     "smartphones", "cross_sell_4p", "migration_adsl_fibre", "actes_ast_box",
     "lead_box", "lead_forfait", "lead_coms_pro", "canal_option1", "canal_option2", "canal_option3",
 ];
 
+// Objectifs qui comptent dans la variable (nom de mission → emoji / libellé).
+const OBJECTIFS_VARIABLE: { produit: string; emoji: string; libelle: (n: number) => string }[] = [
+    { produit: "Box", emoji: "📦", libelle: () => "box" },
+    { produit: "Forfaits", emoji: "📱", libelle: (n) => `forfait${n > 1 ? "s" : ""}` },
+    { produit: "Téléphones", emoji: "📲", libelle: (n) => `smartphone${n > 1 ? "s" : ""}` },
+    { produit: "Assurance", emoji: "🛡️", libelle: (n) => `assurance${n > 1 ? "s" : ""}` },
+    { produit: "Assurance Essentielle", emoji: "🧩", libelle: (n) => `assurance${n > 1 ? "s" : ""} essentielle${n > 1 ? "s" : ""}` },
+    { produit: "McAfee", emoji: "🔒", libelle: () => "McAfee" },
+];
+
 function fmtEuro(n: number) {
     return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
-function moisPlus(mois: string, delta: number) {
-    const [y, m] = mois.split("-").map(Number);
-    return new Date(y, m - 1 + delta, 1).toLocaleDateString("fr-FR", { month: "long" });
-}
-
-type Levier = { id: string; emoji: string; texte: string; gain: number; quand: string; note?: string };
 
 export default function VariableSynthese({ conseillerId, mois, ventes, boost, bareme, bonusManuels, bonusVolumes, totalExtra }: Props) {
     const [jours, setJours] = useState<{ travailles: number; restants: number } | null>(null);
@@ -84,14 +88,14 @@ export default function VariableSynthese({ conseillerId, mois, ventes, boost, ba
         [projete, boost, bareme, bonusManuels, totalExtra] // eslint-disable-line react-hooks/exhaustive-deps
     );
 
+    const manque = (produit: string) => {
+        const o = objectifs[produit];
+        return o ? Math.max(o.objectif - o.realise, 0) : 0;
+    };
+
     // Scénario "tous tes objectifs atteints" : la projection, avec forfaits et smartphones portés au
-    // moins à l'objectif du mois (toujours ≥ projection) ; box / assurances / McAfee manquants
-    // valorisés à part (payés plus tard).
-    const scenarioObjectifs = useMemo(() => {
-        const manque = (produit: string) => {
-            const o = objectifs[produit];
-            return o ? Math.max(o.objectif - o.realise, 0) : 0;
-        };
+    // moins à l'objectif du mois (payés ce mois) ; box / assurances / McAfee manquants payés plus tard.
+    const scenario = useMemo(() => {
         const objectifDe = (produit: string) => objectifs[produit]?.objectif ?? 0;
         const v = { ...(projete?.v ?? ventes) };
         const forfaits = v.forfait_free_serie + v.forfait_free_max;
@@ -106,93 +110,63 @@ export default function VariableSynthese({ conseillerId, mois, ventes, boost, ba
         return { ceMois, aVenir };
     }, [objectifs, projete, ventes, boost, bareme, bonusManuels, bonusVolumes, totalExtra]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Leviers : gain réel (barème + boosts) de quelques ventes de plus.
-    const leviers = useMemo(() => {
-        const base = calc(ventes);
-        const l: Levier[] = [];
-        const versSeuil = (actuel: number, seuil: number) => (seuil > 0 && actuel <= seuil && seuil - actuel + 1 <= 10 ? seuil - actuel + 1 : 3);
-
-        const nbForfaits = ventes.forfait_free_serie + ventes.forfait_free_max;
-        const kF = versSeuil(nbForfaits, bareme.seuil_forfait);
-        const gF = calc({ ...ventes, forfait_free_serie: ventes.forfait_free_serie + kF }) - base;
-        l.push({
-            id: "forfaits", emoji: "📱", texte: `${kF} forfait${kF > 1 ? "s" : ""} Free / Série`, gain: gF, quand: "ce mois-ci",
-            note: bareme.seuil_forfait > 0 && nbForfaits <= bareme.seuil_forfait && nbForfaits + kF > bareme.seuil_forfait ? "débloque le boost forfait" : undefined,
-        });
-        const gMax = calc({ ...ventes, forfait_free_max: ventes.forfait_free_max + 2 }) - base;
-        l.push({ id: "freemax", emoji: "🚀", texte: "2 Free Max", gain: gMax, quand: "ce mois-ci" });
-
-        const kS = versSeuil(ventes.smartphones, bareme.seuil_smartphone);
-        const gS = calc({ ...ventes, smartphones: ventes.smartphones + kS }) - base;
-        l.push({
-            id: "smartphones", emoji: "📲", texte: `${kS} smartphone${kS > 1 ? "s" : ""}`, gain: gS, quand: "ce mois-ci",
-            note: bareme.seuil_smartphone > 0 && ventes.smartphones <= bareme.seuil_smartphone && ventes.smartphones + kS > bareme.seuil_smartphone ? "débloque le boost smartphone" : undefined,
-        });
-
-        const enM2 = `en ${moisPlus(mois, 2)}`;
-        const enM1 = `en ${moisPlus(mois, 1)}`;
-        l.push({ id: "pop", emoji: "📦", texte: "3 box POP", gain: 3 * bareme.box_pop, quand: enM2, note: "à leur raccordement" });
-        l.push({ id: "ultra", emoji: "📦", texte: "2 box Ultra", gain: 2 * bareme.box_ultra, quand: enM2, note: "à leur raccordement" });
-        l.push({ id: "assurance", emoji: "🛡️", texte: "4 assurances Nouveau Mobile", gain: 4 * bareme.assurance_nouveau_mobile, quand: enM1 });
-        l.push({ id: "essentielle", emoji: "🧩", texte: "4 assurances essentielles", gain: 4 * bareme.assurance_essentielle, quand: enM1 });
-        l.push({ id: "mcafee", emoji: "🛡️", texte: "3 McAfee 6,99 €", gain: 3 * bareme.mcafee_699, quand: enM2 });
-
-        return l.filter((x) => x.gain > 0).sort((a, b) => b.gain - a.gain);
-    }, [ventes, boost, bareme, bonusManuels, bonusVolumes, mois]); // eslint-disable-line react-hooks/exhaustive-deps
+    const restants = OBJECTIFS_VARIABLE
+        .map((o) => ({ ...o, n: manque(o.produit), avecObjectif: (objectifs[o.produit]?.objectif ?? 0) > 0 }))
+        .filter((o) => o.avecObjectif && o.n > 0);
+    const objectifsCharges = Object.keys(objectifs).length > 0;
 
     const nomDuMois = new Date(Number(mois.slice(0, 4)), Number(mois.slice(5, 7)) - 1, 1).toLocaleDateString("fr-FR", { month: "long" });
 
     return (
-        <div className="space-y-5">
-            {/* ── Montant + scénarios ───────────────────────────────── */}
-            <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-violet-700 via-fuchsia-700 to-violet-900 p-6 text-white shadow-[0_20px_60px_rgba(124,58,237,.35)] sm:p-7">
-                <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-                <div className="relative grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
-                    <div>
-                        <p className="text-xs font-black uppercase tracking-[0.3em] text-white/70">Ta variable de {nomDuMois}</p>
-                        <p className="mt-1 text-5xl font-black tabular-nums sm:text-6xl">{fmtEuro(acquis)}</p>
-                        <p className="mt-1 text-sm font-semibold text-white/70">acquis à ce jour</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2.5 sm:min-w-[420px]">
-                        <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/15">
-                            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white/60">Fin de mois à ton rythme</p>
-                            <p className="mt-1 text-2xl font-black tabular-nums">{projection !== null ? fmtEuro(projection) : "…"}</p>
-                            {projection !== null && projection > acquis && (
-                                <p className="text-[11px] font-bold text-emerald-200">+{fmtEuro(projection - acquis)} d&apos;ici la fin du mois</p>
-                            )}
-                        </div>
-                        <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/15">
-                            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white/60">Avec tous tes objectifs atteints</p>
-                            <p className="mt-1 text-2xl font-black tabular-nums">{fmtEuro(scenarioObjectifs.ceMois)}</p>
-                            {scenarioObjectifs.aVenir > 0 && (
-                                <p className="text-[11px] font-bold text-amber-200">+{fmtEuro(scenarioObjectifs.aVenir)} à venir (box, assurances, McAfee)</p>
-                            )}
-                        </div>
+        <section className="grid gap-4 lg:grid-cols-[1fr_1.25fr]">
+            {/* ── Acquis + rythme ───────────────────────────────────── */}
+            <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-violet-700 via-fuchsia-700 to-violet-900 p-6 text-white shadow-[0_20px_60px_rgba(124,58,237,.30)]">
+                <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+                <div className="relative">
+                    <p className="text-xs font-black uppercase tracking-[0.3em] text-white/70">Ta variable de {nomDuMois}</p>
+                    <p className="mt-1 text-5xl font-black tabular-nums">{fmtEuro(acquis)}</p>
+                    <p className="mt-1 text-sm font-semibold text-white/70">acquis à ce jour</p>
+                    <div className="mt-5 rounded-2xl bg-white/10 p-4 ring-1 ring-white/15">
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white/60">Fin de mois à ton rythme</p>
+                        <p className="mt-1 text-2xl font-black tabular-nums">{projection !== null ? fmtEuro(projection) : "…"}</p>
+                        {projection !== null && projection > acquis && (
+                            <p className="text-[11px] font-bold text-emerald-200">+{fmtEuro(projection - acquis)} d&apos;ici la fin du mois</p>
+                        )}
                     </div>
                 </div>
-            </section>
+            </div>
 
-            {/* ── Leviers : une liste, triée du plus rentable au moins rentable ─────── */}
-            <section className="rounded-[24px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)] sm:p-6">
-                <h2 className="text-base font-black text-slate-900">💡 Si tu vends en plus…</h2>
-                <p className="text-xs font-semibold text-slate-400">Ce que ta variable gagne, calculé avec le barème du mois (boosts compris).</p>
-                <ul className="mt-3 divide-y divide-slate-100">
-                    {leviers.map((l) => (
-                        <li key={l.id} className="flex items-center gap-3 py-2.5">
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg" aria-hidden="true">{l.emoji}</span>
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-black text-slate-800">{l.texte}</p>
-                                {l.note && <p className="text-[11px] font-semibold text-violet-600">{l.note}</p>}
-                            </div>
-                            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${l.quand === "ce mois-ci" ? "bg-violet-100 text-violet-700" : "bg-amber-100 text-amber-800"}`}>
-                                {l.quand === "ce mois-ci" ? "ce mois-ci" : `payé ${l.quand}`}
-                            </span>
-                            <span className="w-24 shrink-0 text-right text-lg font-black tabular-nums text-emerald-600">+{fmtEuro(l.gain)}</span>
-                        </li>
-                    ))}
-                </ul>
-            </section>
-        </div>
+            {/* ── Objectifs atteints (mis en avant) ──────────────────── */}
+            <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-amber-300 via-amber-400 to-orange-500 p-6 text-amber-950 shadow-[0_20px_60px_rgba(245,158,11,.35)]">
+                <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/30 blur-3xl" />
+                <div className="relative">
+                    <p className="text-xs font-black uppercase tracking-[0.3em] text-amber-900/70">🎯 Avec tous tes objectifs atteints</p>
+                    <p className="mt-1 text-5xl font-black tabular-nums sm:text-6xl">{fmtEuro(scenario.ceMois + scenario.aVenir)}</p>
+                    <p className="mt-1 text-sm font-bold text-amber-900/80">
+                        {fmtEuro(scenario.ceMois)} en {nomDuMois}
+                        {scenario.aVenir > 0 && <> · +{fmtEuro(scenario.aVenir)} payés les mois suivants (box, assurances, McAfee)</>}
+                    </p>
+
+                    <div className="mt-5 rounded-2xl bg-white/45 p-4 ring-1 ring-white/50">
+                        <p className="text-[11px] font-black uppercase tracking-[0.15em] text-amber-900/70">
+                            {restants.length > 0 ? "Il te reste pour y arriver" : "Ce mois-ci"}
+                        </p>
+                        {!objectifsCharges ? (
+                            <p className="mt-1 text-sm font-semibold text-amber-900/70">…</p>
+                        ) : restants.length === 0 ? (
+                            <p className="mt-1 text-sm font-black">🎉 Tous tes objectifs du mois sont atteints !</p>
+                        ) : (
+                            <ul className="mt-2 flex flex-wrap gap-2">
+                                {restants.map((o) => (
+                                    <li key={o.produit} className="rounded-xl bg-white/80 px-3 py-1.5 text-sm font-black text-amber-950 shadow-sm">
+                                        <span aria-hidden="true">{o.emoji}</span> {o.n} {o.libelle(o.n)}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </section>
     );
 }
-

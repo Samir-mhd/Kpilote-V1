@@ -100,8 +100,10 @@ export function CompositionVariable({
         .filter((f) => f.total > 0)
         .sort((a, b) => b.total - a.total);
     const total = avecMontant.reduce((t, f) => t + f.total, 0);
-    const max = Math.max(...avecMontant.map((f) => f.total), 1);
+    const detailOuvert = avecMontant.find((f) => f.id === ouverte);
 
+    // Mosaïque : une tuile par famille, triées par montant ; la première (la plus grosse) est mise
+    // en avant sur deux colonnes. Le détail de la tuile choisie s'ouvre sous la mosaïque.
     return (
         <section className="rounded-[24px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)] sm:p-6">
             <div className="flex items-baseline justify-between gap-3">
@@ -111,42 +113,59 @@ export function CompositionVariable({
             {avecMontant.length === 0 ? (
                 <p className="py-6 text-center text-sm text-slate-400">Pas encore de montant ce mois-ci.</p>
             ) : (
-                <ul className="mt-3 space-y-1.5">
-                    {avecMontant.map((f) => {
-                        const estOuverte = ouverte === f.id;
-                        const part = total > 0 ? Math.round((f.total / total) * 100) : 0;
-                        return (
-                            <li key={f.id} className="rounded-xl bg-slate-50">
-                                <button onClick={() => setOuverte(estOuverte ? null : f.id)} className="w-full px-3 py-2.5 text-left" aria-expanded={estOuverte}>
-                                    <div className="flex items-center justify-between gap-2">
-                                        <p className="min-w-0 truncate text-sm font-black text-slate-800">
+                <>
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {avecMontant.map((f, i) => {
+                            const estOuverte = ouverte === f.id;
+                            const part = total > 0 ? Math.round((f.total / total) * 100) : 0;
+                            const premiere = i === 0;
+                            return (
+                                <button
+                                    key={f.id}
+                                    onClick={() => setOuverte(estOuverte ? null : f.id)}
+                                    aria-expanded={estOuverte}
+                                    className={`rounded-2xl p-3.5 text-left transition-all ${premiere ? "col-span-2" : ""} ${
+                                        estOuverte ? "bg-violet-600 text-white ring-2 ring-violet-300"
+                                        : premiere ? "bg-violet-50 ring-1 ring-violet-200 hover:bg-violet-100"
+                                        : "bg-slate-50 ring-1 ring-slate-100 hover:bg-slate-100"
+                                    }`}
+                                >
+                                    <div className="flex items-start justify-between gap-2">
+                                        <p className={`text-sm font-black ${estOuverte ? "text-white" : "text-slate-800"}`}>
                                             <span aria-hidden="true">{f.emoji}</span> {f.titre}
-                                            <span className="ml-1.5 text-[11px] font-semibold text-slate-400">{f.provenance}</span>
                                         </p>
-                                        <p className="flex shrink-0 items-center gap-1.5">
-                                            <span className="text-sm font-black tabular-nums text-slate-900">{fmtEuro(f.total)}</span>
-                                            <span className="w-9 text-right text-[11px] font-bold tabular-nums text-slate-400">{part} %</span>
-                                            <ChevronDown size={14} className={`text-slate-300 transition-transform ${estOuverte ? "rotate-180" : ""}`} />
-                                        </p>
+                                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-black tabular-nums ${estOuverte ? "bg-white/20 text-white" : "bg-white text-violet-700"}`}>
+                                            {part} %
+                                        </span>
                                     </div>
-                                    <div className="mt-1.5 h-2 rounded bg-slate-200/70">
-                                        <div className="h-full rounded bg-violet-500" style={{ width: `${Math.max((f.total / max) * 100, 2)}%` }} />
-                                    </div>
+                                    <p className={`mt-1.5 font-black tabular-nums ${premiere ? "text-3xl" : "text-xl"} ${estOuverte ? "text-white" : "text-slate-900"}`}>
+                                        {fmtEuro(f.total)}
+                                    </p>
+                                    <p className={`mt-0.5 flex items-center justify-between gap-1 text-[11px] font-semibold ${estOuverte ? "text-white/75" : "text-slate-400"}`}>
+                                        <span className="truncate">{f.provenance}</span>
+                                        <ChevronDown size={13} className={`shrink-0 transition-transform ${estOuverte ? "rotate-180" : ""}`} />
+                                    </p>
                                 </button>
-                                {estOuverte && (
-                                    <ul className="space-y-1 px-3 pb-3">
-                                        {f.lignes.map((l, i) => (
-                                            <li key={i} className="flex justify-between text-xs">
-                                                <span className="text-slate-500">{l.label}</span>
-                                                <span className="font-bold tabular-nums text-slate-700">{fmtEuro(l.montant)}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </li>
-                        );
-                    })}
-                </ul>
+                            );
+                        })}
+                    </div>
+
+                    {detailOuvert && (
+                        <div className="mt-3 rounded-2xl bg-violet-50 p-4 ring-1 ring-violet-100">
+                            <p className="mb-2 text-xs font-black uppercase tracking-[0.15em] text-violet-700">
+                                {detailOuvert.emoji} {detailOuvert.titre} · détail
+                            </p>
+                            <ul className="space-y-1">
+                                {detailOuvert.lignes.map((l, i) => (
+                                    <li key={i} className="flex justify-between gap-3 text-sm">
+                                        <span className="text-slate-600">{l.label}</span>
+                                        <span className="font-black tabular-nums text-slate-900">{fmtEuro(l.montant)}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </>
             )}
         </section>
     );

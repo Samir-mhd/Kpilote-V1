@@ -394,3 +394,24 @@ export async function savePlanning(
         if (error) throw new Error(error.message ?? "Erreur insertion planning");
     }
 }
+
+// ─── Taux de présence (variable) ───────────────────────────────────────────────
+
+/**
+ * Taux de présence du mois (%) pour la variable : jours présents ÷ (jours présents + congés payés
+ * + arrêts maladie). Off, férié et formation sont neutres. Un jour ouvré sans planning compte
+ * comme présent (même règle que getJoursTravail). Aucun jour pris en compte → 100 %.
+ */
+export async function getTauxPresenceMois(conseillerId: string, mois: string): Promise<number> {
+    const [annee, m] = mois.split("-").map(Number);
+    const planning = await getPlanningMois(conseillerId, annee, m);
+    const nb = new Date(annee, m, 0).getDate();
+    let presents = 0;
+    let absents = 0;
+    for (let j = 1; j <= nb; j++) {
+        const statut = planning[jourStrParts(annee, m, j)] as StatutJour | undefined;
+        if (statut === "present" || (statut === undefined && !estWeekend(new Date(annee, m - 1, j)))) presents++;
+        else if (statut === "conges_payes" || statut === "arret_maladie") absents++;
+    }
+    return presents + absents > 0 ? Math.round((presents / (presents + absents)) * 100) : 100;
+}

@@ -52,6 +52,7 @@ function VariableInner() {
     const [declarationOuverte, setDeclarationOuverte] = useState(false);
     // Contexte boutique (R/O, notes collectives) saisi par le manager → lecture seule ici.
     const [contexteManager, setContexteManager] = useState(false);
+    const [presenceAuto, setPresenceAuto] = useState(false);
 
     const [ventes, setVentes] = useState<VenteConseiller>(VENTES_VIDES);
     const [boost, setBoost] = useState<BoostData>(BOOST_VIDE);
@@ -107,6 +108,7 @@ function VariableInner() {
                 setTauxPresencePct(v.tauxPresencePct);
                 setBonusVolumes(v.bonusVolumes);
                 setContexteManager(!!v.contexteManager);
+                setPresenceAuto(!!v.presenceAuto);
                 setLoading(false);
                 chargeInitiale.current = false;
             }
@@ -304,7 +306,7 @@ function VariableInner() {
                                 <h2 className="text-base font-black text-slate-900">✏️ Ma déclaration</h2>
                                 <p className="mt-0.5 text-xs font-semibold text-slate-500">
                                     Rempli automatiquement : {ventes.forfait_free_serie} forfaits Free / Série · {ventes.forfait_free_max} Free Max · {ventes.smartphones} smartphones.
-                                    {" "}À compléter : migrations, AST, McAfee, Canal+, leads, notes, présence.
+                                    {" "}À compléter : migrations, AST, McAfee, Canal+, leads, notes individuelles.
                                 </p>
                             </div>
                             <span className="shrink-0 rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white">
@@ -350,7 +352,7 @@ function VariableInner() {
                                         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                                             <NumberField label="SatisFD individuelle (%)" value={ventes.note_satisfd_individuelle} onChange={(v) => updateVente("note_satisfd_individuelle", v)} />
                                             <NumberField label="SatisFD AST individuelle (%)" value={ventes.note_satisfd_ast_individuelle} onChange={(v) => updateVente("note_satisfd_ast_individuelle", v)} />
-                                            <NumberField label="Taux de présence (%)" value={tauxPresencePct} onChange={setTauxPresencePct} />
+                                            <NumberField label={presenceAuto ? "Présence (%) · selon ton planning" : "Taux de présence (%)"} value={tauxPresencePct} onChange={setTauxPresencePct} readOnly={presenceAuto} />
                                         </div>
                                     </CardShell>
 
@@ -457,9 +459,10 @@ function VariableInner() {
                                 readOnly={contexteManager}
                             />
                             <NumberField
-                                label="Taux de présence (%)"
+                                label={presenceAuto ? "Présence (%) · selon ton planning" : "Taux de présence (%)"}
                                 value={tauxPresencePct}
                                 onChange={setTauxPresencePct}
+                                readOnly={presenceAuto}
                             />
                         </div>
                         {bonusManuels.some((b) => b.categorie === "satisfd") && (

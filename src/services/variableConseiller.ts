@@ -5,6 +5,7 @@
  */
 
 import { supabase } from "@/lib/supabase";
+import { getTauxPresenceMois } from "@/services/planningService";
 
 // ── Actes du conseiller (données de simulation / réelles) ──────────────────
 export type VenteConseiller = {
@@ -411,6 +412,8 @@ export type VentesConseillerMois = {
     bonusVolumes: BonusVolumes;
     /** true si le contexte boutique (R/O, notes collectives) vient de la saisie du manager. */
     contexteManager?: boolean;
+    /** true si le taux de présence a été calculé depuis le planning (et non saisi). */
+    presenceAuto?: boolean;
 };
 
 // ── Contexte boutique du mois (saisi une fois par le manager) ─────────────────
@@ -437,7 +440,7 @@ export async function sauvegarderContexteBoutique(mois: string, contexte: Contex
 }
 
 export async function getVentesConseillerMois(conseillerId: string, mois: string): Promise<VentesConseillerMois> {
-    const [{ data }, contexte] = await Promise.all([
+    const [{ data }, contexte, presencePlanning] = await Promise.all([
         supabase
             .from("variable_ventes_conseiller")
             .select("ventes, boost, taux_presence_pct, bonus_volumes")
@@ -445,6 +448,7 @@ export async function getVentesConseillerMois(conseillerId: string, mois: string
             .eq("mois", mois)
             .maybeSingle(),
         getContexteBoutique(mois).catch(() => null),
+        getTauxPresenceMois(conseillerId, mois).catch(() => null),
     ]);
 
     const resultat: VentesConseillerMois = data
@@ -470,6 +474,11 @@ export async function getVentesConseillerMois(conseillerId: string, mois: string
             note_satisfd_ast_collective: contexte.note_satisfd_ast_collective,
         };
         resultat.contexteManager = true;
+    }
+    // Présence calculée depuis le planning (congés payés et arrêts maladie la font baisser).
+    if (presencePlanning !== null) {
+        resultat.tauxPresencePct = presencePlanning;
+        resultat.presenceAuto = true;
     }
     return resultat;
 }
