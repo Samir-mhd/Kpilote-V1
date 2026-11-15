@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import DashboardV2 from "@/components/manager/DashboardV2";
 import { useManagerDashboard } from "@/hooks/useManagerDashboard";
 import { PRODUITS_CLASSEMENT } from "@/utils/produits";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
@@ -35,7 +37,17 @@ const TABS: { id: Tab; label: string; emoji: string }[] = [
     { id: "defis", label: "Défis", emoji: "⚔️" },
 ];
 
+/** Cockpit repensé en test via &dashboard=v2 ; l'actuel reste par défaut. */
+function Aiguillage() {
+    const v2 = useSearchParams().get("dashboard") === "v2";
+    return v2 ? <DashboardV2 /> : <ManagerDashboardV1 />;
+}
+
 export default function ManagerDashboard() {
+    return <Suspense><Aiguillage /></Suspense>;
+}
+
+function ManagerDashboardV1() {
     const { dashboard, loading } = useManagerDashboard();
     const [tab, setTab] = useState<Tab>("objectifs");
 

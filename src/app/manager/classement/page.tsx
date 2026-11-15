@@ -11,6 +11,8 @@ import type { ProduitCode } from "@/utils/produits";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import PodiumTopPerformers from "@/components/dashboard/PodiumTopPerformers";
+import ClassementCourse from "@/components/classement/ClassementCourse";
+import PodiumsThematiques from "@/components/classement/PodiumsThematiques";
 import FelicitationCard from "@/components/manager/FelicitationCard";
 import { feliciterConseiller } from "@/services/congratulationService";
 import { getRealiseVentesComboParConseiller, getObjectifsComboParConseiller, RealiseVentesCombo } from "@/services/variableConseiller";
@@ -38,6 +40,10 @@ export default function ClassementPage() {
     const [comboPeriode, setComboPeriode]         = useState<Record<string, RealiseVentesCombo>>({});
     const [comboSemaine, setComboSemaine]         = useState<Record<string, RealiseVentesCombo>>({});
     const [comboObjectifs, setComboObjectifs]     = useState<Record<string, RealiseVentesCombo>>({});
+    // Même vue que côté conseiller (course par objectifs + podiums thématiques) ; le tableau
+    // détaillé (taux de placement, NAP, féliciter) reste disponible via "Détail".
+    const [vue, setVue]                           = useState<"course" | "detail">("course");
+    const [ongletPodiums, setOngletPodiums]       = useState(false);
 
     useEffect(() => {
         setHeure(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
@@ -206,18 +212,37 @@ export default function ClassementPage() {
 
             {/* Toggle période + groupe de produits */}
             <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     {(["jour", "semaine", "mois"] as Periode[]).map((p) => (
                         <button
                             key={p}
-                            onClick={() => setPeriode(p)}
+                            onClick={() => { setPeriode(p); setOngletPodiums(false); }}
                             className={`rounded-2xl px-5 py-2.5 text-sm font-bold transition-all ${
-                                periode === p
+                                periode === p && !ongletPodiums
                                     ? "bg-slate-900 text-white shadow-lg"
                                     : "bg-white text-slate-500 shadow-sm hover:bg-slate-50"
                             }`}
                         >
                             {PERIODE_LABELS[p]}
+                        </button>
+                    ))}
+                    <button
+                        onClick={() => setOngletPodiums(true)}
+                        className={`rounded-2xl px-5 py-2.5 text-sm font-bold transition-all ${ongletPodiums ? "bg-amber-500 text-white shadow-lg" : "bg-white text-slate-500 shadow-sm hover:bg-slate-50"}`}
+                    >
+                        🏅 Podiums
+                    </button>
+                </div>
+                {!ongletPodiums && (
+                <div className="flex flex-wrap gap-2">
+                <div className="flex gap-1 rounded-2xl bg-white p-1.5 shadow-sm">
+                    {([["course", "🏁 Course"], ["detail", "📋 Détail"]] as const).map(([v, label]) => (
+                        <button
+                            key={v}
+                            onClick={() => setVue(v)}
+                            className={`rounded-xl px-4 py-2 text-xs font-black transition-all ${vue === v ? "bg-slate-900 text-white shadow" : "text-slate-400 hover:bg-slate-50"}`}
+                        >
+                            {label}
                         </button>
                     ))}
                 </div>
@@ -234,6 +259,8 @@ export default function ClassementPage() {
                         </button>
                     ))}
                 </div>
+                </div>
+                )}
             </div>
 
             {/* Confirmation félicitation */}
@@ -243,7 +270,9 @@ export default function ClassementPage() {
                 </div>
             )}
 
-            {loading ? (
+            {ongletPodiums ? (
+                <PodiumsThematiques conseillerId="" />
+            ) : loading ? (
                 <div className="flex h-48 items-center justify-center">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-600 border-t-transparent" />
                 </div>
@@ -253,6 +282,21 @@ export default function ClassementPage() {
                     <p className="font-black text-slate-700">Aucune vente sur cette période</p>
                     <p className="mt-1 text-sm text-slate-400">Changez la période ou revenez plus tard.</p>
                 </div>
+            ) : vue === "course" ? (
+                <ClassementCourse
+                    lignes={classement.map((c) => {
+                        const combo = comboPeriode[c.id] ?? COMBO_VIDE;
+                        const realise: Record<string, number> = { ...(c.produits as Record<string, number>), ...combo };
+                        const objectif: Record<string, number> = {};
+                        PRODUITS_CLASSEMENT.forEach((p) => { objectif[p.code] = getObjDynamic(c, p.key); });
+                        (Object.keys(COMBO_VIDE) as ComboCode[]).forEach((code) => { objectif[code] = getObjDynamicCombo(c.id, code); });
+                        return { id: c.id, nom: c.nom, realise, objectif };
+                    })}
+                    periode={periode}
+                    groupe={groupe}
+                    conseillerId=""
+                    photos={photos}
+                />
             ) : (
                 <>
                     <PodiumTopPerformers classement={classement} periode={periode} />
