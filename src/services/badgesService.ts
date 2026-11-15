@@ -133,6 +133,73 @@ export const SEMAINE_PARFAITE_BADGE: Badge = {
     description: `${SEUIL_SEMAINE} jours parfaits d'affilée (jours travaillés)`,
 };
 
+// ─── Cartes cachées (extensions) ───────────────────────────────────────────────
+// Invisibles ("fantômes") tant que la dernière carte de leur groupe n'est pas validée ;
+// ne peuvent se débloquer qu'une fois révélées.
+
+export type MesuresBadges = Omit<EtatBadges, "debloques" | "nouveaux">;
+export type BadgeExtension = {
+    badge: Badge;
+    famille: "produit" | "jours" | "semaines" | "box" | "defisjour";
+    /** Regroupement d'affichage (produit pour "produit"/"semaines", sinon la famille). */
+    groupe: string;
+    prerequis: string[];
+    seuil: number;
+    mesure: (m: MesuresBadges) => number;
+};
+
+export const TIERS_EXTENSION: { label: string; facteur: number; de: string; a: string }[] = [
+    { label: "Platine", facteur: 1.5, de: "#cffafe", a: "#0891b2" },
+    { label: "Diamant", facteur: 2.5, de: "#f5d0fe", a: "#c026d3" },
+];
+
+export const BADGES_EXTENSION: BadgeExtension[] = [
+    ...Object.entries(PALIERS_PRODUIT).flatMap(([code, seuils]) => {
+        const produit = PRODUITS_ORDRE.find((p) => p.code === code)!;
+        return TIERS_EXTENSION.map((t, i) => {
+            const seuil = Math.round(seuils[2] * t.facteur);
+            return {
+                badge: { code: `produit_${code}_${3 + i}`, label: `${produit.label} ${t.label}`, emoji: produit.emoji, de: t.de, a: t.a, description: `${seuil} ventes à vie` },
+                famille: "produit" as const, groupe: code, prerequis: [`produit_${code}_2`], seuil,
+                mesure: (m: MesuresBadges) => m.volumeParProduit[code] ?? 0,
+            };
+        });
+    }),
+    ...[75, 100].map((seuil) => ({
+        badge: { code: `jour_parfait_${seuil}`, label: `${seuil} jours parfaits`, emoji: seuil === 100 ? "💠" : "🎯", de: seuil === 100 ? "#fde68a" : "#fce7f3", a: seuil === 100 ? "#ca8a04" : "#be185d", description: `${seuil} jours avec au moins 80 % des objectifs du jour atteints` },
+        famille: "jours" as const, groupe: "jours", prerequis: ["jour_parfait_50"], seuil,
+        mesure: (m: MesuresBadges) => m.nbJoursParfaits,
+    })),
+    ...PRODUITS_STREAK.map((code) => {
+        const produit = PRODUITS_ORDRE.find((p) => p.code === code)!;
+        return {
+            badge: { code: `streak_${code}_mois`, label: `Mois ${produit.label} parfait`, emoji: produit.emoji, de: "#99f6e4", a: "#0f766e", description: `Au moins 1 vente ${produit.label} chaque jour travaillé pendant 20 jours` },
+            famille: "semaines" as const, groupe: code, prerequis: [`streak_${code}_semaine`], seuil: 20,
+            mesure: (m: MesuresBadges) => m.streakParProduit[code] ?? 0,
+        };
+    }),
+    {
+        badge: { code: "box_closer_50", label: "Closer légendaire", emoji: "🏗️", de: "#bfdbfe", a: "#1d4ed8", description: "50 box raccordées cumulées" },
+        famille: "box", groupe: "box", prerequis: ["box_premier", "box_closer", "box_sans_faute", "box_roi_4p"], seuil: 50,
+        mesure: (m) => m.nbBoxRaccordees,
+    },
+    {
+        badge: { code: "box_empereur_4p", label: "Empereur 4P", emoji: "🏰", de: "#e9d5ff", a: "#6d28d9", description: "60 abonnés 4P cumulés (box + forfait)" },
+        famille: "box", groupe: "box", prerequis: ["box_premier", "box_closer", "box_sans_faute", "box_roi_4p"], seuil: 60,
+        mesure: (m) => m.nb4PCumule,
+    },
+    ...[50, 100].map((seuil) => ({
+        badge: { code: `defi_jour_${seuil}`, label: seuil === 100 ? "Centurion du défi" : "Maître du défi", emoji: seuil === 100 ? "💎" : "🥇", de: seuil === 100 ? "#f5d0fe" : "#fef08a", a: seuil === 100 ? "#a21caf" : "#ca8a04", description: `${seuil} défis du jour remportés` },
+        famille: "defisjour" as const, groupe: "defisjour", prerequis: ["defi_jour_30", "defi_jour_serie"], seuil,
+        mesure: (m: MesuresBadges) => m.nbDefisJour,
+    })),
+    {
+        badge: { code: "defi_jour_serie_7", label: "Semaine de feu", emoji: "☄️", de: "#fecaca", a: "#b91c1c", description: "7 défis du jour remportés d'affilée" },
+        famille: "defisjour", groupe: "defisjour", prerequis: ["defi_jour_30", "defi_jour_serie"], seuil: 7,
+        mesure: (m) => m.serieDefisJour,
+    },
+];
+
 export type EtatBadges = {
     debloques: Record<string, string>;
     volumeParProduit: Record<string, number>;
@@ -381,16 +448,7 @@ export async function calculerBadgesConseiller(conseillerId: string): Promise<Et
     });
     if (bilanDefisJour.serie >= SERIE_DEFIS_JOUR && !debloques["defi_jour_serie"]) aDebloquer.push("defi_jour_serie");
 
-    if (aDebloquer.length > 0) {
-        const aujourdhui = new Date().toISOString().slice(0, 10);
-        await supabase.from("conseiller_badges").insert(
-            aDebloquer.map((code) => ({ conseiller_id: conseillerId, badge_code: code, obtenu_le: aujourdhui }))
-        );
-        aDebloquer.forEach((code) => { debloques[code] = aujourdhui; });
-    }
-
-    return {
-        debloques,
+    const mesures: MesuresBadges = {
         volumeParProduit,
         nb4PCumule,
         nbBoxRaccordees: raccordees.length,
@@ -401,8 +459,23 @@ export async function calculerBadgesConseiller(conseillerId: string): Promise<Et
         streakJoursParfaits,
         nbDefisJour: bilanDefisJour.total,
         serieDefisJour: bilanDefisJour.serie,
-        nouveaux: aDebloquer,
     };
+    // Cartes cachées : seulement une fois leurs prérequis validés (y compris par cet appel).
+    const acquis = (code: string) => !!debloques[code] || aDebloquer.includes(code);
+    BADGES_EXTENSION.forEach((x) => {
+        if (acquis(x.badge.code) || !x.prerequis.every(acquis)) return;
+        if (x.mesure(mesures) >= x.seuil) aDebloquer.push(x.badge.code);
+    });
+
+    if (aDebloquer.length > 0) {
+        const aujourdhui = new Date().toISOString().slice(0, 10);
+        await supabase.from("conseiller_badges").insert(
+            aDebloquer.map((code) => ({ conseiller_id: conseillerId, badge_code: code, obtenu_le: aujourdhui }))
+        );
+        aDebloquer.forEach((code) => { debloques[code] = aujourdhui; });
+    }
+
+    return { debloques, ...mesures, nouveaux: aDebloquer };
 }
 
 // ─── Prochain badge à débloquer (le plus proche, tous types confondus) ────────

@@ -6,7 +6,7 @@ import TropheesV2 from "@/components/trophees/TropheesV2";
 import { calculerStreak, STREAK_BADGES, GELS_PAR_MOIS, StreakInfo } from "@/services/streakService";
 import {
     calculerBadgesConseiller, PALIERS_PRODUIT, TIER_LABELS, TIER_COULEURS,
-    BOX_BADGES, DEFI_BADGES, PRODUIT_STREAK_BADGES, JOUR_PARFAIT_BADGES, SEMAINE_PARFAITE_BADGE,
+    BOX_BADGES, DEFI_BADGES, PRODUIT_STREAK_BADGES, JOUR_PARFAIT_BADGES, SEMAINE_PARFAITE_BADGE, BADGES_EXTENSION,
     DEFI_JOUR_BADGES, PALIERS_DEFIS_JOUR, SERIE_DEFIS_JOUR,
     PRODUIT_BADGES, SEUIL_SEMAINE, Badge, EtatBadges,
 } from "@/services/badgesService";
@@ -147,6 +147,7 @@ function BadgesInner() {
 
     const TOUS_BADGES = [
         ...BOX_BADGES, ...DEFI_BADGES, ...PRODUIT_STREAK_BADGES, ...JOUR_PARFAIT_BADGES, SEMAINE_PARFAITE_BADGE, ...DEFI_JOUR_BADGES,
+        ...BADGES_EXTENSION.map((x) => x.badge),
     ];
 
     useEffect(() => {

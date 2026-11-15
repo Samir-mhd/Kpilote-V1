@@ -8,7 +8,7 @@ import { fetchToutesLesLignes } from "@/utils/supabasePaging";
 import { STATUTS_VENDEUR, estWeekend, jourStr, StatutJour } from "@/services/planningService";
 
 export const GELS_PAR_MOIS = 1;
-const PROFONDEUR_JOURS = 200; // couvre le palier 100 jours travaillés
+const PROFONDEUR_JOURS = 300; // couvre le palier caché de 200 jours travaillés
 
 export type StreakBadge = {
     code: string;
@@ -27,6 +27,13 @@ export const STREAK_BADGES: StreakBadge[] = [
     { code: "streak_60", seuil: 60, label: "Inarrêtable", emoji: "⚡", de: "#a5f3fc", a: "#0891b2" },
     { code: "streak_100", seuil: 100, label: "Centurion", emoji: "💎", de: "#fbcfe8", a: "#db2777" },
 ];
+
+/** Paliers cachés : révélés (et débloquables) seulement une fois Centurion (100 j) obtenu. */
+export const STREAK_BADGES_EXTENSION: StreakBadge[] = [
+    { code: "streak_150", seuil: 150, label: "Mythe", emoji: "🌋", de: "#fdba74", a: "#c2410c" },
+    { code: "streak_200", seuil: 200, label: "Immortel", emoji: "🪐", de: "#c7d2fe", a: "#3730a3" },
+];
+export const PREREQUIS_STREAK_EXTENSION = "streak_100";
 
 export type StreakInfo = {
     streakActuel: number;
@@ -147,6 +154,9 @@ export async function calculerStreak(conseillerId: string): Promise<StreakInfo> 
     (badgeRows ?? []).forEach((r: any) => { badgesObtenus[r.badge_code] = r.obtenu_le; });
 
     const aDebloquer = STREAK_BADGES.filter((b) => b.seuil <= streak && !badgesObtenus[b.code]);
+    if (badgesObtenus[PREREQUIS_STREAK_EXTENSION] || aDebloquer.some((b) => b.code === PREREQUIS_STREAK_EXTENSION)) {
+        aDebloquer.push(...STREAK_BADGES_EXTENSION.filter((b) => b.seuil <= streak && !badgesObtenus[b.code]));
+    }
     if (aDebloquer.length > 0) {
         const aujourdhuiStr = jourStr(aujourdhui);
         await supabase.from("conseiller_badges").insert(

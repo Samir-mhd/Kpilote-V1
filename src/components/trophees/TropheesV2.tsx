@@ -6,8 +6,9 @@ import {
     Badge, EtatBadges, PALIERS_PRODUIT, TIER_LABELS, TIER_COULEURS, PRODUIT_BADGES,
     BOX_BADGES, PRODUIT_STREAK_BADGES, PRODUITS_STREAK, JOUR_PARFAIT_BADGES, PALIERS_JOURS_PARFAITS,
     SEMAINE_PARFAITE_BADGE, SEUIL_SEMAINE, DEFI_JOUR_BADGES, PALIERS_DEFIS_JOUR, SERIE_DEFIS_JOUR,
+    BADGES_EXTENSION, BadgeExtension,
 } from "@/services/badgesService";
-import { StreakInfo, STREAK_BADGES, GELS_PAR_MOIS } from "@/services/streakService";
+import { StreakInfo, STREAK_BADGES, GELS_PAR_MOIS, STREAK_BADGES_EXTENSION, PREREQUIS_STREAK_EXTENSION } from "@/services/streakService";
 import { getDetenteursBadges, construireClassementTrophees } from "@/services/badgesManagerService";
 import { PRODUITS_ORDRE } from "@/utils/produits";
 import { CATEGORIES_MOIS, ClassementMois, calculerClassementMois, attribuerTropheesMoisPrecedent } from "@/services/tropheesMoisService";
@@ -19,7 +20,12 @@ import { CATEGORIES_MOIS, ClassementMois, calculerClassementMois, attribuerTroph
  */
 
 type Item = { badge: Badge; obtenuLe?: string; valeur?: number; seuil?: number; nouveau?: boolean };
-type Famille = { id: string; titre: string; regles: string; items: Item[] };
+/** Un groupe = des cartes visibles + des cartes cachées, révélées quand `condition` (la dernière carte) est validée. */
+type Groupe = { cle: string; items: Item[]; extensions: Item[]; revele: boolean; condition: string };
+type Famille = { id: string; titre: string; regles: string; cols: 4 | 5 | 6; groupes: Groupe[] };
+
+const LG_COLS = { 4: "lg:grid-cols-4", 5: "lg:grid-cols-5", 6: "lg:grid-cols-6" } as const;
+const SPAN = (n: number) => (n <= 1 ? "col-span-1" : n === 2 ? "col-span-2" : "col-span-2 lg:col-span-3");
 
 export default function TropheesV2({ conseillerId, info, etat }: { conseillerId: string; info: StreakInfo; etat: EtatBadges }) {
     const [rarete, setRarete] = useState<Record<string, number>>({});
@@ -44,61 +50,80 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
     const d = etat.debloques;
     const nouveau = (code: string) => etat.nouveaux.includes(code);
 
+    // Badges obtenus, toutes sources (la série est persistée par calculerStreak).
+    const acquis: Record<string, string> = { ...info.badgesObtenus, ...d };
+    const itemExt = (x: BadgeExtension, m: Record<string, number>): Item => ({ badge: x.badge, obtenuLe: acquis[x.badge.code], valeur: x.mesure(m as never), seuil: x.seuil, nouveau: nouveau(x.badge.code) });
+    const extensions = (famille: BadgeExtension["famille"], groupe: string) => BADGES_EXTENSION.filter((x) => x.famille === famille && x.groupe === groupe);
+    const groupe = (cle: string, items: Item[], exts: BadgeExtension[], condition: string): Groupe => ({
+        cle, items, extensions: exts.map((x) => itemExt(x, etat as never)),
+        revele: exts.length > 0 && exts[0].prerequis.every((p) => acquis[p]), condition,
+    });
+    const labelDe = (code: string) => [...STREAK_BADGES, ...JOUR_PARFAIT_BADGES, ...PRODUIT_STREAK_BADGES, ...BOX_BADGES, ...DEFI_JOUR_BADGES, ...PRODUIT_BADGES].find((b) => b.code === code)?.label ?? code;
+
     const familles: Famille[] = [
         {
-            id: "serie", titre: "🔥 Série",
+            id: "serie", titre: "🔥 Série", cols: 4,
             regles: "Paliers 3, 7, 14, 30, 60 et 100 jours. Au moins une vente (hors Spiderhome) chaque jour planifié. Repos, formation, congés et arrêts ne comptent pas. Un jour planifié sans vente casse la série, sauf si tu as un gel (1 par mois, utilisé automatiquement).",
-            items: STREAK_BADGES.map((s) => ({
-                badge: { code: s.code, label: s.label, emoji: s.emoji, de: s.de, a: s.a, description: `${s.seuil} jours d'affilée` },
-                obtenuLe: info.badgesObtenus[s.code], valeur: info.streakActuel, seuil: s.seuil,
-            })),
+            groupes: [{
+                cle: "serie",
+                items: STREAK_BADGES.map((s) => ({ badge: { code: s.code, label: s.label, emoji: s.emoji, de: s.de, a: s.a, description: `${s.seuil} jours d'affilée` }, obtenuLe: acquis[s.code], valeur: info.streakActuel, seuil: s.seuil })),
+                extensions: STREAK_BADGES_EXTENSION.map((s) => ({ badge: { code: s.code, label: s.label, emoji: s.emoji, de: s.de, a: s.a, description: `${s.seuil} jours d'affilée` }, obtenuLe: acquis[s.code], valeur: info.streakActuel, seuil: s.seuil })),
+                revele: !!acquis[PREREQUIS_STREAK_EXTENSION], condition: labelDe(PREREQUIS_STREAK_EXTENSION),
+            }],
         },
         {
-            id: "produit", titre: "🏅 Maîtrise produit",
+            id: "produit", titre: "🏅 Maîtrise produit", cols: 5,
             regles: "Ventes cumulées à vie par produit : Bronze, Argent puis Or. Spiderhome n'entre jamais en compte.",
-            items: Object.entries(PALIERS_PRODUIT).flatMap(([code, seuils]) => seuils.map((seuil, i) => {
+            groupes: Object.entries(PALIERS_PRODUIT).map(([code, seuils]) => {
                 const produit = PRODUITS_ORDRE.find((p) => p.code === code)!;
-                const b = PRODUIT_BADGES.find((x) => x.code === `produit_${code}_${i}`)!;
-                return {
-                    badge: { ...b, label: `${produit.label} ${TIER_LABELS[i]}`, emoji: produit.emoji, de: TIER_COULEURS[i][0], a: TIER_COULEURS[i][1], description: `${seuil} ventes à vie` },
-                    obtenuLe: d[b.code], valeur: etat.volumeParProduit[code] ?? 0, seuil, nouveau: nouveau(b.code),
-                };
-            })),
+                const items = seuils.map((seuil, i) => {
+                    const b = PRODUIT_BADGES.find((x) => x.code === `produit_${code}_${i}`)!;
+                    return {
+                        badge: { ...b, label: `${produit.label} ${TIER_LABELS[i]}`, emoji: produit.emoji, de: TIER_COULEURS[i][0], a: TIER_COULEURS[i][1], description: `${seuil} ventes à vie` },
+                        obtenuLe: d[b.code], valeur: etat.volumeParProduit[code] ?? 0, seuil, nouveau: nouveau(b.code),
+                    };
+                });
+                return groupe(code, items, extensions("produit", code), `${produit.label} Or`);
+            }),
         },
         {
-            id: "jours", titre: "🎯 Jours parfaits",
+            id: "jours", titre: "🎯 Jours parfaits", cols: 4,
             regles: "Un jour parfait = au moins 80 % de tes objectifs du jour atteints (ex. 4 sur 5), hors Spiderhome. Compté à vie. La semaine parfaite demande 5 jours parfaits travaillés d'affilée.",
-            items: [
+            groupes: [groupe("jours", [
                 ...PALIERS_JOURS_PARFAITS.map((seuil, i) => ({ badge: JOUR_PARFAIT_BADGES[i], obtenuLe: d[`jour_parfait_${seuil}`], valeur: etat.nbJoursParfaits, seuil, nouveau: nouveau(`jour_parfait_${seuil}`) })),
                 { badge: SEMAINE_PARFAITE_BADGE, obtenuLe: d[SEMAINE_PARFAITE_BADGE.code], valeur: etat.streakJoursParfaits, seuil: SEUIL_SEMAINE, nouveau: nouveau(SEMAINE_PARFAITE_BADGE.code) },
-            ],
+            ], extensions("jours", "jours"), labelDe("jour_parfait_50"))],
         },
         {
-            id: "semaines", titre: "📅 Semaines produit parfaites",
+            id: "semaines", titre: "📅 Semaines produit parfaites", cols: 6,
             regles: "Au moins une vente du produit chaque jour travaillé pendant 5 jours d'affilée. Pas de gel ici : un jour manqué remet le compteur à 0.",
-            items: PRODUITS_STREAK.map((code, i) => ({ badge: PRODUIT_STREAK_BADGES[i], obtenuLe: d[`streak_${code}_semaine`], valeur: etat.streakParProduit[code] ?? 0, seuil: SEUIL_SEMAINE, nouveau: nouveau(`streak_${code}_semaine`) })),
+            groupes: PRODUITS_STREAK.map((code, i) => groupe(code,
+                [{ badge: PRODUIT_STREAK_BADGES[i], obtenuLe: d[`streak_${code}_semaine`], valeur: etat.streakParProduit[code] ?? 0, seuil: SEUIL_SEMAINE, nouveau: nouveau(`streak_${code}_semaine`) }],
+                extensions("semaines", code), PRODUIT_STREAK_BADGES[i].label)),
         },
         {
-            id: "box", titre: "📦 Box & 4P",
+            id: "box", titre: "📦 Box & 4P", cols: 6,
             regles: "Basé sur ton suivi « Mes box » : raccordements, volume de box raccordées, aucune box perdue sur 3 mois clôturés, abonnés 4P cumulés (box + forfait).",
-            items: [
+            groupes: [groupe("box", [
                 { badge: BOX_BADGES[0], obtenuLe: d["box_premier"], valeur: etat.nbBoxRaccordees, seuil: 1, nouveau: nouveau("box_premier") },
                 { badge: BOX_BADGES[1], obtenuLe: d["box_closer"], valeur: etat.nbBoxRaccordees, seuil: 10, nouveau: nouveau("box_closer") },
                 { badge: BOX_BADGES[2], obtenuLe: d["box_sans_faute"], nouveau: nouveau("box_sans_faute") },
                 { badge: BOX_BADGES[3], obtenuLe: d["box_roi_4p"], valeur: etat.nb4PCumule, seuil: 25, nouveau: nouveau("box_roi_4p") },
-            ],
+            ], extensions("box", "box"), "les 4 cartes Box & 4P")],
         },
         {
-            id: "defisjour", titre: "🎯 Défis du jour",
+            id: "defisjour", titre: "🎯 Défis du jour", cols: 4,
             regles: "Le défi proposé chaque matin au Cerebro Check : accepte-le et réussis-le dans la journée. La série demande 3 défis remportés d'affilée.",
-            items: [
+            groupes: [groupe("defisjour", [
                 ...PALIERS_DEFIS_JOUR.map((seuil, i) => ({ badge: DEFI_JOUR_BADGES[i], obtenuLe: d[`defi_jour_${seuil}`], valeur: etat.nbDefisJour, seuil, nouveau: nouveau(`defi_jour_${seuil}`) })),
                 { badge: DEFI_JOUR_BADGES[4], obtenuLe: d["defi_jour_serie"], valeur: etat.serieDefisJour, seuil: SERIE_DEFIS_JOUR, nouveau: nouveau("defi_jour_serie") },
-            ],
+            ], extensions("defisjour", "defisjour"), "toutes les cartes Défis du jour")],
         },
     ];
 
-    const tous = familles.flatMap((f) => f.items);
+    /** Cartes de la collection : visibles + cachées déjà révélées. */
+    const cartes = (g: Groupe) => (g.revele ? [...g.items, ...g.extensions] : g.items);
+    const tous = familles.flatMap((f) => f.groupes.flatMap(cartes));
     const obtenus = tous.filter((i) => i.obtenuLe);
     const prochains = tous
         .filter((i) => !i.obtenuLe && i.seuil !== undefined && i.valeur !== undefined && i.valeur < i.seuil!)
@@ -227,23 +252,40 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
 
             {/* ── Collection par famille ──────────────────────────── */}
             {familles.map((f) => {
-                const nb = f.items.filter((i) => i.obtenuLe).length;
+                const toutes = f.groupes.flatMap(cartes);
+                const nb = toutes.filter((i) => i.obtenuLe).length;
                 return (
                     <section key={f.id} className="rounded-[24px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
                         <div className="flex items-center justify-between gap-3">
-                            <h2 className="font-black text-slate-900">{f.titre} <span className="ml-1 text-sm font-bold tabular-nums text-slate-400">{nb}/{f.items.length}</span></h2>
+                            <h2 className="font-black text-slate-900">{f.titre} <span className="ml-1 text-sm font-bold tabular-nums text-slate-400">{nb}/{toutes.length}</span></h2>
                             <button onClick={() => setReglesOuvertes(reglesOuvertes === f.id ? null : f.id)} aria-expanded={reglesOuvertes === f.id} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-slate-400 hover:bg-slate-100 hover:text-slate-600">
                                 <Info size={14} /> Règles
                             </button>
                         </div>
                         {reglesOuvertes === f.id && <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">{f.regles}</p>}
-                        <div className={`mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 ${f.items.length === 6 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
-                            {f.items.map((i) => {
+                        <div className={`mt-3 grid grid-cols-2 gap-2 ${LG_COLS[f.cols]}`}>
+                            {f.groupes.flatMap((g) => [
+                                ...cartes(g).map((i) => ({ type: "carte" as const, i, cle: i.badge.code })),
+                                ...(!g.revele && g.extensions.length > 0 ? [{ type: "fantome" as const, g, cle: `fantome-${g.cle}` }] : []),
+                            ]).map((el) => {
+                                if (el.type === "fantome") {
+                                    const n = el.g.extensions.length;
+                                    return (
+                                        <div key={el.cle} className={`${SPAN(n)} flex items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-[repeating-linear-gradient(135deg,transparent_0_10px,rgba(148,163,184,.08)_10px_20px)] p-3`}>
+                                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xl text-slate-300" aria-hidden="true">👻</span>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-black text-slate-400">{n} carte{n > 1 ? "s" : ""} secrète{n > 1 ? "s" : ""}</p>
+                                                <p className="text-[11px] font-semibold leading-snug text-slate-400">Se révèle{n > 1 ? "nt" : ""} quand tu valides {el.g.condition}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                const i = el.i;
                                 const ok = !!i.obtenuLe;
                                 const nbDetenteurs = rarete[i.badge.code] ?? 0;
                                 return (
                                     <div
-                                        key={i.badge.code}
+                                        key={el.cle}
                                         title={i.badge.description}
                                         className={`relative rounded-2xl p-3 ${ok ? "bg-white shadow-[0_4px_14px_rgba(15,23,42,.08)] ring-2" : "bg-slate-50 ring-1 ring-slate-100"} ${i.nouveau ? "!ring-amber-400" : ""}`}
                                         style={ok ? { ["--tw-ring-color" as string]: i.badge.a } : undefined}
