@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     calculerVariableConseiller,
     VenteConseiller,
@@ -15,7 +15,19 @@ import {
     getBonusManuels,
     ajouterBonusManuel,
     supprimerBonusManuel,
+    moisCourant,
+    ContexteBoutique,
+    getContexteBoutique,
+    sauvegarderContexteBoutique,
 } from "@/services/variableConseiller";
+
+const CONTEXTE_VIDE: ContexteBoutique = {
+    ro_box_boutique: 0,
+    ro_forfait_boutique: 0,
+    ro_smartphone_boutique: 0,
+    note_satisfd_collective: 0,
+    note_satisfd_ast_collective: 0,
+};
 import { CATEGORIES_VENTES, NumberField, CardShell, BonusManuelsCard, BonusManuelsInline, DetailResultatsCard } from "@/components/variable/variableUi";
 import { nomMois } from "@/services/boxRaccordement";
 
@@ -111,6 +123,30 @@ export default function VariableSimulationPage() {
     const [bonusVolumes, setBonusVolumes] = useState<Record<string, number>>({});
     const [ongletBareme, setOngletBareme] = useState(false);
     const [loading, setLoading] = useState(true);
+    // Contexte boutique du mois (R/O, notes collectives) : saisi ici une fois pour toute l'équipe.
+    const moisContexte = useMemo(() => moisCourant(), []);
+    const [contexte, setContexte] = useState<ContexteBoutique>(CONTEXTE_VIDE);
+    const [contexteSaisi, setContexteSaisi] = useState(false);
+    const [contexteEtat, setContexteEtat] = useState<"" | "enregistrement" | "enregistre" | "erreur">("");
+    const contexteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        getContexteBoutique(moisContexte).then((c) => {
+            if (c) { setContexte({ ...CONTEXTE_VIDE, ...c }); setContexteSaisi(true); }
+        }).catch(() => {});
+    }, [moisContexte]);
+
+    function updateContexte(key: keyof ContexteBoutique, value: number) {
+        const next = { ...contexte, [key]: value };
+        setContexte(next);
+        setContexteEtat("enregistrement");
+        if (contexteTimer.current) clearTimeout(contexteTimer.current);
+        contexteTimer.current = setTimeout(() => {
+            sauvegarderContexteBoutique(moisContexte, next)
+                .then(() => { setContexteEtat("enregistre"); setContexteSaisi(true); })
+                .catch(() => setContexteEtat("erreur"));
+        }, 700);
+    }
 
     async function charger() {
         const [b, m] = await Promise.all([getBareme(), getBonusManuels()]);
@@ -229,6 +265,36 @@ export default function VariableSimulationPage() {
                             Réinitialiser aux valeurs officielles
                         </button>
                     </div>
+
+                    <CardShell>
+                        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs font-black uppercase tracking-widest text-cyan-400">
+                                Contexte boutique — {nomMois(moisContexte)}
+                            </p>
+                            <span className={`rounded-xl px-3 py-1 text-[11px] font-black ${
+                                contexteEtat === "erreur" ? "bg-rose-500/15 text-rose-300"
+                                : contexteEtat === "enregistrement" ? "bg-white/8 text-white/50"
+                                : contexteSaisi ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"
+                            }`}>
+                                {contexteEtat === "erreur" ? "Erreur d'enregistrement"
+                                    : contexteEtat === "enregistrement" ? "Enregistrement…"
+                                    : contexteSaisi ? "Enregistré ✓ — appliqué à toute l'équipe" : "Pas encore saisi ce mois-ci"}
+                            </span>
+                        </div>
+                        <p className="mb-4 text-[11px] text-white/40">
+                            Saisi une seule fois ici : remplace la saisie de chaque conseiller dans sa variable (lecture seule pour eux).
+                        </p>
+                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                            <NumberField label={`R/O box — ${nomMois(moisM2Actuel())} (%)`} value={contexte.ro_box_boutique} onChange={(v) => updateContexte("ro_box_boutique", v)} />
+                            <NumberField label="R/O forfait (%)" value={contexte.ro_forfait_boutique} onChange={(v) => updateContexte("ro_forfait_boutique", v)} />
+                            <NumberField label="R/O smartphone (%)" value={contexte.ro_smartphone_boutique} onChange={(v) => updateContexte("ro_smartphone_boutique", v)} />
+                            <NumberField label="SatisFD collective (%)" value={contexte.note_satisfd_collective} onChange={(v) => updateContexte("note_satisfd_collective", v)} />
+                            <NumberField label="SatisFD AST collective (%)" value={contexte.note_satisfd_ast_collective} onChange={(v) => updateContexte("note_satisfd_ast_collective", v)} />
+                        </div>
+                        <p className="mt-2 text-[11px] text-white/30">
+                            Le R/O box s&apos;applique aux box payées ce mois-ci, vendues en {nomMois(moisM2Actuel())} (paiement à M+2).
+                        </p>
+                    </CardShell>
                     {CATEGORIES_BAREME.map((cat) => {
                         const masques = bareme.champsMasques ?? [];
                         const champsVisibles = cat.champs.filter((c) => !masques.includes(c.key));

@@ -116,33 +116,31 @@ export default function VariableSynthese({ conseillerId, mois, ventes, boost, ba
         const kF = versSeuil(nbForfaits, bareme.seuil_forfait);
         const gF = calc({ ...ventes, forfait_free_serie: ventes.forfait_free_serie + kF }) - base;
         l.push({
-            id: "forfaits", emoji: "📱", texte: `Encore ${kF} forfait${kF > 1 ? "s" : ""} Free / Série`, gain: gF, quand: "ce mois-ci",
+            id: "forfaits", emoji: "📱", texte: `${kF} forfait${kF > 1 ? "s" : ""} Free / Série`, gain: gF, quand: "ce mois-ci",
             note: bareme.seuil_forfait > 0 && nbForfaits <= bareme.seuil_forfait && nbForfaits + kF > bareme.seuil_forfait ? "débloque le boost forfait" : undefined,
         });
         const gMax = calc({ ...ventes, forfait_free_max: ventes.forfait_free_max + 2 }) - base;
-        l.push({ id: "freemax", emoji: "🚀", texte: "Encore 2 Free Max", gain: gMax, quand: "ce mois-ci" });
+        l.push({ id: "freemax", emoji: "🚀", texte: "2 Free Max", gain: gMax, quand: "ce mois-ci" });
 
         const kS = versSeuil(ventes.smartphones, bareme.seuil_smartphone);
         const gS = calc({ ...ventes, smartphones: ventes.smartphones + kS }) - base;
         l.push({
-            id: "smartphones", emoji: "📲", texte: `Encore ${kS} smartphone${kS > 1 ? "s" : ""}`, gain: gS, quand: "ce mois-ci",
+            id: "smartphones", emoji: "📲", texte: `${kS} smartphone${kS > 1 ? "s" : ""}`, gain: gS, quand: "ce mois-ci",
             note: bareme.seuil_smartphone > 0 && ventes.smartphones <= bareme.seuil_smartphone && ventes.smartphones + kS > bareme.seuil_smartphone ? "débloque le boost smartphone" : undefined,
         });
 
         const enM2 = `en ${moisPlus(mois, 2)}`;
         const enM1 = `en ${moisPlus(mois, 1)}`;
-        l.push({ id: "pop", emoji: "📦", texte: "Encore 3 box POP", gain: 3 * bareme.box_pop, quand: enM2, note: "après raccordement, hors boosts" });
-        l.push({ id: "ultra", emoji: "📦", texte: "Encore 2 box Ultra", gain: 2 * bareme.box_ultra, quand: enM2, note: "après raccordement, hors boosts" });
-        l.push({ id: "assurance", emoji: "🛡️", texte: "Encore 4 assurances Nouveau Mobile", gain: 4 * bareme.assurance_nouveau_mobile, quand: enM1 });
-        l.push({ id: "essentielle", emoji: "🧩", texte: "Encore 4 assurances essentielles", gain: 4 * bareme.assurance_essentielle, quand: enM1 });
-        l.push({ id: "mcafee", emoji: "🛡️", texte: "Encore 3 McAfee 6,99 €", gain: 3 * bareme.mcafee_699, quand: enM2 });
+        l.push({ id: "pop", emoji: "📦", texte: "3 box POP", gain: 3 * bareme.box_pop, quand: enM2, note: "à leur raccordement" });
+        l.push({ id: "ultra", emoji: "📦", texte: "2 box Ultra", gain: 2 * bareme.box_ultra, quand: enM2, note: "à leur raccordement" });
+        l.push({ id: "assurance", emoji: "🛡️", texte: "4 assurances Nouveau Mobile", gain: 4 * bareme.assurance_nouveau_mobile, quand: enM1 });
+        l.push({ id: "essentielle", emoji: "🧩", texte: "4 assurances essentielles", gain: 4 * bareme.assurance_essentielle, quand: enM1 });
+        l.push({ id: "mcafee", emoji: "🛡️", texte: "3 McAfee 6,99 €", gain: 3 * bareme.mcafee_699, quand: enM2 });
 
-        return l.filter((x) => x.gain > 0);
+        return l.filter((x) => x.gain > 0).sort((a, b) => b.gain - a.gain);
     }, [ventes, boost, bareme, bonusManuels, bonusVolumes, mois]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const nomDuMois = new Date(Number(mois.slice(0, 4)), Number(mois.slice(5, 7)) - 1, 1).toLocaleDateString("fr-FR", { month: "long" });
-    const ceMois = leviers.filter((l) => l.quand === "ce mois-ci");
-    const plusTard = leviers.filter((l) => l.quand !== "ce mois-ci");
 
     return (
         <div className="space-y-5">
@@ -174,41 +172,27 @@ export default function VariableSynthese({ conseillerId, mois, ventes, boost, ba
                 </div>
             </section>
 
-            {/* ── Leviers ───────────────────────────────────────────── */}
+            {/* ── Leviers : une liste, triée du plus rentable au moins rentable ─────── */}
             <section className="rounded-[24px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)] sm:p-6">
-                <h2 className="text-base font-black text-slate-900">💡 Tes leviers pour augmenter ta variable</h2>
-                <p className="text-xs font-semibold text-slate-400">Calculés avec le barème du mois, boosts compris.</p>
-
-                {ceMois.length > 0 && (
-                    <>
-                        <p className="mt-4 text-[11px] font-black uppercase tracking-[0.2em] text-violet-600">Payé ce mois-ci</p>
-                        <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                            {ceMois.map((l) => <CarteLevier key={l.id} l={l} />)}
-                        </div>
-                    </>
-                )}
-                {plusTard.length > 0 && (
-                    <>
-                        <p className="mt-4 text-[11px] font-black uppercase tracking-[0.2em] text-amber-600">Payé plus tard</p>
-                        <div className="mt-2 grid gap-2 sm:grid-cols-3 xl:grid-cols-5">
-                            {plusTard.map((l) => <CarteLevier key={l.id} l={l} />)}
-                        </div>
-                    </>
-                )}
+                <h2 className="text-base font-black text-slate-900">💡 Si tu vends en plus…</h2>
+                <p className="text-xs font-semibold text-slate-400">Ce que ta variable gagne, calculé avec le barème du mois (boosts compris).</p>
+                <ul className="mt-3 divide-y divide-slate-100">
+                    {leviers.map((l) => (
+                        <li key={l.id} className="flex items-center gap-3 py-2.5">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg" aria-hidden="true">{l.emoji}</span>
+                            <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-black text-slate-800">{l.texte}</p>
+                                {l.note && <p className="text-[11px] font-semibold text-violet-600">{l.note}</p>}
+                            </div>
+                            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${l.quand === "ce mois-ci" ? "bg-violet-100 text-violet-700" : "bg-amber-100 text-amber-800"}`}>
+                                {l.quand === "ce mois-ci" ? "ce mois-ci" : `payé ${l.quand}`}
+                            </span>
+                            <span className="w-24 shrink-0 text-right text-lg font-black tabular-nums text-emerald-600">+{fmtEuro(l.gain)}</span>
+                        </li>
+                    ))}
+                </ul>
             </section>
         </div>
     );
 }
 
-function CarteLevier({ l }: { l: Levier }) {
-    return (
-        <div className="rounded-2xl bg-slate-50 p-3.5 ring-1 ring-slate-100">
-            <p className="text-sm font-bold text-slate-700"><span aria-hidden="true">{l.emoji}</span> {l.texte}</p>
-            <p className="mt-1 text-2xl font-black tabular-nums text-emerald-600">+{fmtEuro(l.gain)}</p>
-            <p className="text-[11px] font-semibold text-slate-400">
-                {l.quand === "ce mois-ci" ? "sur ta variable de ce mois" : `payé ${l.quand}`}
-                {l.note && <span className="text-violet-600"> · {l.note}</span>}
-            </p>
-        </div>
-    );
-}

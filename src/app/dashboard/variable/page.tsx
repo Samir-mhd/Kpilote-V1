@@ -50,6 +50,8 @@ function VariableInner() {
     const nomConseiller = searchParams.get("nom") ?? "";
     const v2 = searchParams.get("variable") === "v2";
     const [declarationOuverte, setDeclarationOuverte] = useState(false);
+    // Contexte boutique (R/O, notes collectives) saisi par le manager → lecture seule ici.
+    const [contexteManager, setContexteManager] = useState(false);
 
     const [ventes, setVentes] = useState<VenteConseiller>(VENTES_VIDES);
     const [boost, setBoost] = useState<BoostData>(BOOST_VIDE);
@@ -104,6 +106,7 @@ function VariableInner() {
                 setBoost(v.boost);
                 setTauxPresencePct(v.tauxPresencePct);
                 setBonusVolumes(v.bonusVolumes);
+                setContexteManager(!!v.contexteManager);
                 setLoading(false);
                 chargeInitiale.current = false;
             }
@@ -353,13 +356,13 @@ function VariableInner() {
 
                                     <CardShell>
                                         <p className="mb-1 text-xs font-black uppercase tracking-widest text-cyan-300">Contexte boutique</p>
-                                        <p className="mb-4 text-[11px] text-white/40">Résultats de toute l&apos;équipe, communiqués par ton manager.</p>
+                                        <p className="mb-4 text-[11px] text-white/40">{contexteManager ? "Saisi par ton manager pour toute l'équipe." : "Pas encore saisi par ton manager ce mois-ci."}</p>
                                         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                                            <NumberField label={`R/O box — ${nomMois(moisVenteBoxPayee)} (%)`} value={boost.ro_box_boutique} onChange={(v) => updateBoost("ro_box_boutique", v)} />
-                                            <NumberField label="R/O forfait (%)" value={boost.ro_forfait_boutique} onChange={(v) => updateBoost("ro_forfait_boutique", v)} />
-                                            <NumberField label="R/O smartphone (%)" value={boost.ro_smartphone_boutique} onChange={(v) => updateBoost("ro_smartphone_boutique", v)} />
-                                            <NumberField label="SatisFD collective (%)" value={ventes.note_satisfd_collective} onChange={(v) => updateVente("note_satisfd_collective", v)} />
-                                            <NumberField label="SatisFD AST collective (%)" value={ventes.note_satisfd_ast_collective} onChange={(v) => updateVente("note_satisfd_ast_collective", v)} />
+                                            <NumberField label={`R/O box — ${nomMois(moisVenteBoxPayee)} (%)`} value={boost.ro_box_boutique} onChange={(v) => updateBoost("ro_box_boutique", v)} readOnly />
+                                            <NumberField label="R/O forfait (%)" value={boost.ro_forfait_boutique} onChange={(v) => updateBoost("ro_forfait_boutique", v)} readOnly />
+                                            <NumberField label="R/O smartphone (%)" value={boost.ro_smartphone_boutique} onChange={(v) => updateBoost("ro_smartphone_boutique", v)} readOnly />
+                                            <NumberField label="SatisFD collective (%)" value={ventes.note_satisfd_collective} onChange={(v) => updateVente("note_satisfd_collective", v)} readOnly />
+                                            <NumberField label="SatisFD AST collective (%)" value={ventes.note_satisfd_ast_collective} onChange={(v) => updateVente("note_satisfd_ast_collective", v)} readOnly />
                                         </div>
                                     </CardShell>
                                 </div>
@@ -445,11 +448,13 @@ function VariableInner() {
                                 label="Note SatisFD collective (%)"
                                 value={ventes.note_satisfd_collective}
                                 onChange={(v) => updateVente("note_satisfd_collective", v)}
+                                readOnly={contexteManager}
                             />
                             <NumberField
                                 label="Note SatisFD AST collective (%)"
                                 value={ventes.note_satisfd_ast_collective}
                                 onChange={(v) => updateVente("note_satisfd_ast_collective", v)}
+                                readOnly={contexteManager}
                             />
                             <NumberField
                                 label="Taux de présence (%)"
@@ -479,9 +484,10 @@ function VariableInner() {
                                 label={`R/O box boutique — ${nomMois(moisVenteBoxPayee)} (%)`}
                                 value={boost.ro_box_boutique}
                                 onChange={(v) => updateBoost("ro_box_boutique", v)}
+                                readOnly={contexteManager}
                             />
-                            <NumberField label="R/O forfait boutique (%)" value={boost.ro_forfait_boutique} onChange={(v) => updateBoost("ro_forfait_boutique", v)} />
-                            <NumberField label="R/O smartphone boutique (%)" value={boost.ro_smartphone_boutique} onChange={(v) => updateBoost("ro_smartphone_boutique", v)} />
+                            <NumberField label="R/O forfait boutique (%)" value={boost.ro_forfait_boutique} onChange={(v) => updateBoost("ro_forfait_boutique", v)} readOnly={contexteManager} />
+                            <NumberField label="R/O smartphone boutique (%)" value={boost.ro_smartphone_boutique} onChange={(v) => updateBoost("ro_smartphone_boutique", v)} readOnly={contexteManager} />
                         </div>
                         <p className="mt-2 text-[11px] text-white/30">
                             Les box sont payées à M+2 : le boost collectif box de ce mois se base sur le R/O du mois où elles ont été vendues ({nomMois(moisVenteBoxPayee)}), pas sur le R/O de ce mois-ci.

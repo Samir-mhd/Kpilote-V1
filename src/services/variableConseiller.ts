@@ -409,24 +409,69 @@ export type VentesConseillerMois = {
     boost: BoostData;
     tauxPresencePct: number;
     bonusVolumes: BonusVolumes;
+    /** true si le contexte boutique (R/O, notes collectives) vient de la saisie du manager. */
+    contexteManager?: boolean;
 };
 
+// ── Contexte boutique du mois (saisi une fois par le manager) ─────────────────
+// R/O boutique et notes SatisFD collectives : mêmes chiffres pour toute l'équipe. Stocké dans
+// variable_bareme (ligne "contexte-YYYY-MM-01"), comme le barème — pas de table dédiée.
+export type ContexteBoutique = {
+    ro_box_boutique: number;
+    ro_forfait_boutique: number;
+    ro_smartphone_boutique: number;
+    note_satisfd_collective: number;
+    note_satisfd_ast_collective: number;
+};
+
+export async function getContexteBoutique(mois: string): Promise<ContexteBoutique | null> {
+    const { data } = await supabase.from("variable_bareme").select("data").eq("id", `contexte-${mois}`).maybeSingle();
+    return data ? (data.data as ContexteBoutique) : null;
+}
+
+export async function sauvegarderContexteBoutique(mois: string, contexte: ContexteBoutique): Promise<void> {
+    const { error } = await supabase
+        .from("variable_bareme")
+        .upsert({ id: `contexte-${mois}`, data: contexte, updated_at: new Date().toISOString() });
+    if (error) throw error;
+}
+
 export async function getVentesConseillerMois(conseillerId: string, mois: string): Promise<VentesConseillerMois> {
-    const { data } = await supabase
-        .from("variable_ventes_conseiller")
-        .select("ventes, boost, taux_presence_pct, bonus_volumes")
-        .eq("conseiller_id", conseillerId)
-        .eq("mois", mois)
-        .maybeSingle();
+    const [{ data }, contexte] = await Promise.all([
+        supabase
+            .from("variable_ventes_conseiller")
+            .select("ventes, boost, taux_presence_pct, bonus_volumes")
+            .eq("conseiller_id", conseillerId)
+            .eq("mois", mois)
+            .maybeSingle(),
+        getContexteBoutique(mois).catch(() => null),
+    ]);
 
-    if (!data) return { ventes: VENTES_VIDES, boost: BOOST_VIDE, tauxPresencePct: 100, bonusVolumes: {} };
+    const resultat: VentesConseillerMois = data
+        ? {
+            ventes: { ...VENTES_VIDES, ...(data.ventes as Partial<VenteConseiller>) },
+            boost: { ...BOOST_VIDE, ...(data.boost as Partial<BoostData>) },
+            tauxPresencePct: data.taux_presence_pct ?? 100,
+            bonusVolumes: (data.bonus_volumes as BonusVolumes) ?? {},
+        }
+        : { ventes: VENTES_VIDES, boost: BOOST_VIDE, tauxPresencePct: 100, bonusVolumes: {} };
 
-    return {
-        ventes: { ...VENTES_VIDES, ...(data.ventes as Partial<VenteConseiller>) },
-        boost: { ...BOOST_VIDE, ...(data.boost as Partial<BoostData>) },
-        tauxPresencePct: data.taux_presence_pct ?? 100,
-        bonusVolumes: (data.bonus_volumes as BonusVolumes) ?? {},
-    };
+    // Le contexte saisi par le manager prime sur les valeurs propres au conseiller.
+    if (contexte) {
+        resultat.boost = {
+            ...resultat.boost,
+            ro_box_boutique: contexte.ro_box_boutique,
+            ro_forfait_boutique: contexte.ro_forfait_boutique,
+            ro_smartphone_boutique: contexte.ro_smartphone_boutique,
+        };
+        resultat.ventes = {
+            ...resultat.ventes,
+            note_satisfd_collective: contexte.note_satisfd_collective,
+            note_satisfd_ast_collective: contexte.note_satisfd_ast_collective,
+        };
+        resultat.contexteManager = true;
+    }
+    return resultat;
 }
 
 export async function sauvegarderVentesConseillerMois(
