@@ -138,7 +138,7 @@ function CarteMaitriseProduit({ code, volume, index = 0, estNouveau = false }: {
 function BadgesInner() {
     const searchParams = useSearchParams();
     const conseillerId = searchParams.get("id") ?? "";
-    const v2 = searchParams.get("trophees") === "v2";
+    const v2 = searchParams.get("trophees") !== "v1";
 
     const [info, setInfo] = useState<StreakInfo | null>(null);
     const [etat, setEtat] = useState<EtatBadges | null>(null);
@@ -477,7 +477,7 @@ function BadgesInner() {
                         <div>
                             <p className="font-black text-sm text-slate-800">Objectifs jour</p>
                             <p className="text-sm text-slate-500">
-                                Un "jour parfait" est un jour où tu as atteint TOUS tes objectifs du jour, hors Spiderhome. Chaque jour parfait est compté à vie — les paliers (10/20/30/40/50) se débloquent au fil du cumul. "Semaine parfaite" demande {SEUIL_SEMAINE} jours parfaits d'affilée (jours travaillés uniquement).
+                                Un "jour parfait" est un jour où tu as atteint au moins 80 % de tes objectifs du jour (ex. 4 sur 5), hors Spiderhome. Chaque jour parfait est compté à vie — les paliers (10/20/30/40/50) se débloquent au fil du cumul. "Semaine parfaite" demande {SEUIL_SEMAINE} jours parfaits d'affilée (jours travaillés uniquement).
                             </p>
                         </div>
                     </div>

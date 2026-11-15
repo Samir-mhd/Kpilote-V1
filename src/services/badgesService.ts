@@ -121,7 +121,7 @@ export const JOUR_PARFAIT_BADGES: Badge[] = PALIERS_JOURS_PARFAITS.map((seuil, i
     emoji: "🎯",
     de: JOUR_PARFAIT_COULEURS[i][0],
     a: JOUR_PARFAIT_COULEURS[i][1],
-    description: `${seuil} jours où tous les objectifs du jour (hors Spiderhome) ont été atteints`,
+    description: `${seuil} jours avec au moins 80 % des objectifs du jour atteints`,
 }));
 
 export const SEMAINE_PARFAITE_BADGE: Badge = {
@@ -130,7 +130,7 @@ export const SEMAINE_PARFAITE_BADGE: Badge = {
     emoji: "💯",
     de: "#ddd6fe",
     a: "#7c3aed",
-    description: `${SEUIL_SEMAINE} jours travaillés d'affilée avec tous les objectifs du jour atteints`,
+    description: `${SEUIL_SEMAINE} jours parfaits d'affilée (jours travaillés)`,
 };
 
 export type EtatBadges = {
@@ -268,15 +268,17 @@ async function getVentesParJourParProduit(conseillerId: string, debut: Date): Pr
     return map;
 }
 
-/** Vérifie si TOUS les objectifs du jour (hors Spiderhome) sont atteints maintenant, et
+/** Part des objectifs du jour à atteindre pour un "jour parfait". */
+export const SEUIL_JOUR_PARFAIT = 0.8;
+
+/** Vérifie si au moins 80 % des objectifs du jour (hors Spiderhome) sont atteints maintenant, et
  *  enregistre "jour parfait" pour aujourd'hui si c'est le cas (idempotent, upsert). */
-async function verifierJourParfaitAujourdhui(conseillerId: string): Promise<void> {
+export async function verifierJourParfaitAujourdhui(conseillerId: string): Promise<void> {
     const missions = await getMissionsReelles(conseillerId).catch(() => []);
-    const commerciales = missions.filter((m: any) => m.produit.toLowerCase() !== "spiderhome");
-    const totalObjectif = commerciales.reduce((t: number, m: any) => t + m.objectif, 0);
-    if (totalObjectif <= 0) return;
-    const parfait = commerciales.every((m: any) => m.objectif === 0 || m.realise >= m.objectif);
-    if (!parfait) return;
+    const avecObjectif = missions.filter((m: any) => m.produit.toLowerCase() !== "spiderhome" && m.objectif > 0);
+    if (avecObjectif.length === 0) return;
+    const atteints = avecObjectif.filter((m: any) => m.realise >= m.objectif).length;
+    if (atteints / avecObjectif.length < SEUIL_JOUR_PARFAIT) return;
 
     await supabase
         .from("conseiller_jours_parfaits")

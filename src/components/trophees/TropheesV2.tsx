@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { Info } from "lucide-react";
 import {
     Badge, EtatBadges, PALIERS_PRODUIT, TIER_LABELS, TIER_COULEURS, PRODUIT_BADGES,
-    BOX_BADGES, DEFI_BADGES, PRODUIT_STREAK_BADGES, PRODUITS_STREAK, JOUR_PARFAIT_BADGES, PALIERS_JOURS_PARFAITS,
+    BOX_BADGES, PRODUIT_STREAK_BADGES, PRODUITS_STREAK, JOUR_PARFAIT_BADGES, PALIERS_JOURS_PARFAITS,
     SEMAINE_PARFAITE_BADGE, SEUIL_SEMAINE, DEFI_JOUR_BADGES, PALIERS_DEFIS_JOUR, SERIE_DEFIS_JOUR,
 } from "@/services/badgesService";
 import { StreakInfo, STREAK_BADGES, GELS_PAR_MOIS } from "@/services/streakService";
 import { getDetenteursBadges, construireClassementTrophees } from "@/services/badgesManagerService";
 import { PRODUITS_ORDRE } from "@/utils/produits";
+import { CATEGORIES_MOIS, ClassementMois, calculerClassementMois, attribuerTropheesMoisPrecedent } from "@/services/tropheesMoisService";
 
 /**
  * Trophées repensés (variante &trophees=v2) : un tableau de progression plutôt qu'une vitrine.
@@ -25,6 +26,7 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
     const [effectif, setEffectif] = useState(0);
     const [rang, setRang] = useState(0);
     const [reglesOuvertes, setReglesOuvertes] = useState<string | null>(null);
+    const [courseMois, setCourseMois] = useState<ClassementMois | null>(null);
 
     useEffect(() => {
         Promise.all([getDetenteursBadges(), construireClassementTrophees()]).then(([parBadge, classement]) => {
@@ -32,16 +34,20 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
             setEffectif(classement.length);
             setRang(classement.findIndex((c) => c.id === conseillerId) + 1);
         }).catch(() => {});
+        // Titres du mois : attribue ceux du mois dernier (une seule fois pour toute l'équipe), puis course en direct.
+        const now = new Date();
+        attribuerTropheesMoisPrecedent().catch(() => {})
+            .then(() => calculerClassementMois(new Date(now.getFullYear(), now.getMonth(), 1)))
+            .then(setCourseMois).catch(() => {});
     }, [conseillerId]);
 
     const d = etat.debloques;
     const nouveau = (code: string) => etat.nouveaux.includes(code);
-    const victoires = etat.defisGagnes + etat.equipeGagnes;
 
     const familles: Famille[] = [
         {
             id: "serie", titre: "🔥 Série",
-            regles: "Au moins une vente (hors Spiderhome) chaque jour planifié. Repos, formation, congés et arrêts ne comptent pas. Un jour planifié sans vente casse la série, sauf si tu as un gel (1 par mois, utilisé automatiquement).",
+            regles: "Paliers 3, 7, 14, 30, 60 et 100 jours. Au moins une vente (hors Spiderhome) chaque jour planifié. Repos, formation, congés et arrêts ne comptent pas. Un jour planifié sans vente casse la série, sauf si tu as un gel (1 par mois, utilisé automatiquement).",
             items: STREAK_BADGES.map((s) => ({
                 badge: { code: s.code, label: s.label, emoji: s.emoji, de: s.de, a: s.a, description: `${s.seuil} jours d'affilée` },
                 obtenuLe: info.badgesObtenus[s.code], valeur: info.streakActuel, seuil: s.seuil,
@@ -61,7 +67,7 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
         },
         {
             id: "jours", titre: "🎯 Jours parfaits",
-            regles: "Un jour parfait = tous les objectifs du jour atteints (hors Spiderhome). Compté à vie. La semaine parfaite demande 5 jours parfaits travaillés d'affilée.",
+            regles: "Un jour parfait = au moins 80 % de tes objectifs du jour atteints (ex. 4 sur 5), hors Spiderhome. Compté à vie. La semaine parfaite demande 5 jours parfaits travaillés d'affilée.",
             items: [
                 ...PALIERS_JOURS_PARFAITS.map((seuil, i) => ({ badge: JOUR_PARFAIT_BADGES[i], obtenuLe: d[`jour_parfait_${seuil}`], valeur: etat.nbJoursParfaits, seuil, nouveau: nouveau(`jour_parfait_${seuil}`) })),
                 { badge: SEMAINE_PARFAITE_BADGE, obtenuLe: d[SEMAINE_PARFAITE_BADGE.code], valeur: etat.streakJoursParfaits, seuil: SEUIL_SEMAINE, nouveau: nouveau(SEMAINE_PARFAITE_BADGE.code) },
@@ -83,16 +89,6 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
             ],
         },
         {
-            id: "defis", titre: "⚔️ Défis & compétition",
-            regles: "Victoires en défis 1v1 et en défis d'équipe. « Invincible » : au moins 3 défis 1v1 sur un même mois, tous gagnés.",
-            items: [
-                { badge: DEFI_BADGES[0], obtenuLe: d["defi_premier_sang"], valeur: victoires, seuil: 1, nouveau: nouveau("defi_premier_sang") },
-                { badge: DEFI_BADGES[1], obtenuLe: d["defi_guerrier"], valeur: victoires, seuil: 5, nouveau: nouveau("defi_guerrier") },
-                { badge: DEFI_BADGES[2], obtenuLe: d["defi_invincible"], nouveau: nouveau("defi_invincible") },
-                { badge: DEFI_BADGES[3], obtenuLe: d["defi_esprit_equipe"], valeur: etat.equipeGagnes, seuil: 3, nouveau: nouveau("defi_esprit_equipe") },
-            ],
-        },
-        {
             id: "defisjour", titre: "🎯 Défis du jour",
             regles: "Le défi proposé chaque matin au Cerebro Check : accepte-le et réussis-le dans la journée. La série demande 3 défis remportés d'affilée.",
             items: [
@@ -109,6 +105,12 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
         .sort((a, b) => (b.valeur! / b.seuil!) - (a.valeur! / a.seuil!) || (a.seuil! - a.valeur!) - (b.seuil! - b.valeur!))
         .slice(0, 3);
     const derniers = [...obtenus].sort((a, b) => (b.obtenuLe! > a.obtenuLe! ? 1 : -1)).slice(0, 4);
+    const titresMois = Object.entries(d).filter(([code]) => code.startsWith("mois_"))
+        .map(([code, le]) => { const [, cat, mois] = code.split("_"); return { cat: CATEGORIES_MOIS.find((c) => c.id === cat), mois, le }; })
+        .filter((t) => t.cat)
+        .sort((a, b) => (b.mois > a.mois ? 1 : -1));
+    const nomMois = (m: string) => new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+    const joursRestantsMois = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate();
     const pct = tous.length > 0 ? Math.round((obtenus.length / tous.length) * 100) : 0;
     const fmtDate = (s: string) => new Date(s).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
 
@@ -125,7 +127,7 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
                             <div className="h-full rounded-full bg-gradient-to-r from-amber-300 to-orange-500 transition-[width] duration-700" style={{ width: `${pct}%` }} />
                         </div>
                         <p className="mt-2 text-sm font-semibold text-white/60">
-                            {pct} % de la collection{rang > 0 && <> · <span className="font-black text-white">{rang === 1 ? "👑 1er" : `${rang}ᵉ`}</span> de l&apos;équipe sur {effectif}</>}
+                            {pct} % de la collection{titresMois.length > 0 && <> · <span className="font-black text-amber-300">+{titresMois.length} titre{titresMois.length > 1 ? "s" : ""} du mois</span></>}{rang > 0 && <> · <span className="font-black text-white">{rang === 1 ? "👑 1er" : `${rang}ᵉ`}</span> de l&apos;équipe sur {effectif}</>}
                         </p>
                     </div>
                     <div className="rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10">
@@ -166,6 +168,48 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
                 </section>
             )}
 
+            {/* ── Trophées du mois ───────────────────────────────── */}
+            <section className="rounded-[24px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)]">
+                <div className="flex items-center justify-between gap-3">
+                    <h2 className="font-black text-slate-900">🗓️ Trophées du mois <span className="ml-1 text-sm font-bold text-slate-400">remis en jeu chaque mois</span></h2>
+                    <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold text-slate-500">{joursRestantsMois === 0 ? "Dernier jour !" : `Encore ${joursRestantsMois} j`}</span>
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    {CATEGORIES_MOIS.map((cat) => {
+                        const l = courseMois?.[cat.id] ?? [];
+                        const tete = l.length > 0 ? l.filter((x) => x.valeur === l[0].valeur) : [];
+                        const moi = l.find((x) => x.id === conseillerId);
+                        const enTete = tete.some((x) => x.id === conseillerId);
+                        const fmt = (v: number) => cat.unite === "%" ? `${v > 0 ? "+" : ""}${v} %` : `${v} ${cat.unite}`;
+                        return (
+                            <div key={cat.id} className={`rounded-2xl p-3 ${enTete ? "bg-amber-50 ring-2 ring-amber-300" : "bg-slate-50 ring-1 ring-slate-100"}`}>
+                                <div className="flex items-center gap-2">
+                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg" style={{ background: `linear-gradient(135deg, ${cat.de}, ${cat.a})` }} aria-hidden="true">{cat.emoji}</span>
+                                    <p className="font-black leading-tight text-slate-900">{cat.label}</p>
+                                </div>
+                                <p className="mt-1.5 text-[11px] font-semibold leading-snug text-slate-400">{cat.description}</p>
+                                <p className="mt-2 text-xs font-bold text-slate-600">
+                                    {!courseMois ? "…" : tete.length === 0 ? "Personne pour l'instant — à prendre !"
+                                        : enTete ? <span className="text-amber-700">👑 Tu es en tête ({fmt(l[0].valeur)})</span>
+                                        : <>En tête : <span className="font-black">{tete.map((x) => x.nom).join(", ")}</span> ({fmt(l[0].valeur)})</>}
+                                </p>
+                                {courseMois && !enTete && <p className="text-[11px] font-semibold text-slate-400">Toi : {moi ? fmt(moi.valeur) : "—"}</p>}
+                            </div>
+                        );
+                    })}
+                </div>
+                {titresMois.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        {titresMois.map((t) => (
+                            <span key={`${t.cat!.id}${t.mois}`} className="flex items-center gap-1.5 rounded-xl bg-white py-1 pl-1 pr-2.5 text-xs font-black text-slate-700 ring-1 ring-slate-200">
+                                <span className="flex h-6 w-6 items-center justify-center rounded-lg" style={{ background: `linear-gradient(135deg, ${t.cat!.de}, ${t.cat!.a})` }} aria-hidden="true">{t.cat!.emoji}</span>
+                                {t.cat!.label} · <span className="capitalize text-slate-400">{nomMois(t.mois)}</span>
+                            </span>
+                        ))}
+                    </div>
+                )}
+            </section>
+
             {/* ── Derniers débloqués ──────────────────────────────── */}
             {derniers.length > 0 && (
                 <section>
@@ -193,7 +237,7 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
                             </button>
                         </div>
                         {reglesOuvertes === f.id && <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">{f.regles}</p>}
-                        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                        <div className={`mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 ${f.items.length === 6 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
                             {f.items.map((i) => {
                                 const ok = !!i.obtenuLe;
                                 const nbDetenteurs = rarete[i.badge.code] ?? 0;

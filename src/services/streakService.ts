@@ -8,7 +8,7 @@ import { fetchToutesLesLignes } from "@/utils/supabasePaging";
 import { STATUTS_VENDEUR, estWeekend, jourStr, StatutJour } from "@/services/planningService";
 
 export const GELS_PAR_MOIS = 1;
-const PROFONDEUR_JOURS = 120;
+const PROFONDEUR_JOURS = 200; // couvre le palier 100 jours travaillés
 
 export type StreakBadge = {
     code: string;
@@ -24,6 +24,8 @@ export const STREAK_BADGES: StreakBadge[] = [
     { code: "streak_7",  seuil: 7,  label: "Braise",     emoji: "🔥", de: "#fdba74", a: "#ea580c" },
     { code: "streak_14", seuil: 14, label: "Feu ardent", emoji: "🔥", de: "#fca5a5", a: "#dc2626" },
     { code: "streak_30", seuil: 30, label: "Légende",    emoji: "👑", a: "#7c3aed", de: "#c4b5fd" },
+    { code: "streak_60", seuil: 60, label: "Inarrêtable", emoji: "⚡", de: "#a5f3fc", a: "#0891b2" },
+    { code: "streak_100", seuil: 100, label: "Centurion", emoji: "💎", de: "#fbcfe8", a: "#db2777" },
 ];
 
 export type StreakInfo = {

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 import { DefiJour, getDefiJour, repondreDefi, mesurerDefi, marquerDefiReussi } from "@/services/defisJourService";
-import { calculerBadgesConseiller } from "@/services/badgesService";
+import { calculerBadgesConseiller, verifierJourParfaitAujourdhui } from "@/services/badgesService";
 
 /* ─── Carte du Cerebro Check : accepter / refuser ─────────────────────────── */
 
@@ -64,8 +64,13 @@ export function DefiJourBandeau({ conseillerId, nom }: { conseillerId: string; n
     const [realise, setRealise] = useState(0);
     const [victoire, setVictoire] = useState(false);
     const defiRef = useRef<DefiJour | null>(null);
+    const derniereVerifJourParfait = useRef(0);
 
     async function rafraichir() {
+        if (Date.now() - derniereVerifJourParfait.current > 120_000) {
+            derniereVerifJourParfait.current = Date.now();
+            verifierJourParfaitAujourdhui(conseillerId).catch(() => {});
+        }
         const d = defiRef.current ?? await getDefiJour(conseillerId).catch(() => null);
         if (!d) return;
         defiRef.current = d;
