@@ -26,6 +26,19 @@ import BoxRaccordementTab from "@/components/variable/BoxRaccordementTab";
 import HistoriqueVariableTab from "@/components/variable/HistoriqueVariableTab";
 import { getContributionBoxMoisPaiement, nomMois, ContributionBoxMoisPaiement } from "@/services/boxRaccordement";
 import { getContributionForfait4PMoisPaiement, ContributionForfait4P } from "@/services/forfait4P";
+import VariableSynthese from "@/components/variable/VariableSynthese";
+import { CompositionVariable, DejaEnRoute } from "@/components/variable/VariableDetailV2";
+
+// Variante "v2" (&variable=v2) : champs de la déclaration triés par origine.
+const CHAMPS_AUTO: (keyof VenteConseiller)[] = ["forfait_free_serie", "forfait_free_max", "smartphones"];
+const CHAMPS_A_DECLARER: (keyof VenteConseiller)[] = [
+    "migration_2e_vers_free_serie", "migration_vers_free_max", "cross_sell_4p", "migration_adsl_fibre",
+    "actes_ast_box", "mcafee_499", "mcafee_699", "canal_option1", "canal_option2", "canal_option3",
+    "lead_box", "lead_forfait", "lead_coms_pro",
+];
+const LABEL_CHAMP: Record<string, string> = Object.fromEntries(
+    CATEGORIES_VENTES.flatMap((c) => c.champs.map((ch) => [ch.key, ch.label]))
+);
 
 // Le temps de prendre du recul sur le raccordement M+2, la saisie manuelle de la box reste
 // ouverte jusqu'à cette date — ensuite, seuls les raccordements alimentent la box.
@@ -35,6 +48,8 @@ function VariableInner() {
     const searchParams = useSearchParams();
     const conseillerId = searchParams.get("id") ?? "";
     const nomConseiller = searchParams.get("nom") ?? "";
+    const v2 = searchParams.get("variable") === "v2";
+    const [declarationOuverte, setDeclarationOuverte] = useState(false);
 
     const [ventes, setVentes] = useState<VenteConseiller>(VENTES_VIDES);
     const [boost, setBoost] = useState<BoostData>(BOOST_VIDE);
@@ -172,6 +187,42 @@ function VariableInner() {
         );
     }
 
+    // Contributions figées payées ce mois (box M+2, 4P, assurance M+1).
+    const lignesExtra = (() => {
+                            const nb4PBox = contributionBox?.nb4P ?? 0;
+                            const nb4PForfait = contributionForfait4P?.nb ?? 0;
+                            const nb4PTotal = nb4PBox + nb4PForfait;
+                            const montant4PTotal = (contributionBox?.prime4P ?? 0) + (contributionForfait4P?.montantTotal ?? 0);
+                            const nbRaccordees = contributionBox?.nbRaccordees ?? 0;
+                            return [
+                                {
+                                    label: `${nbRaccordees > 0 ? `${nbRaccordees} box raccordées` : "Box raccordées"} (${nomMois(moisVenteBoxPayee)}, figé)`,
+                                    montant: contributionBox?.primeBox ?? 0,
+                                },
+                                { label: `Boost individuel box (${nomMois(moisVenteBoxPayee)}, figé)`, montant: contributionBox?.boostIndividuel ?? 0 },
+                                {
+                                    label: `${(contributionBox?.nbMcafee ?? 0) > 0 ? `${contributionBox!.nbMcafee} McAfee` : "McAfee"} sur box (${nomMois(moisVenteBoxPayee)}, figé)`,
+                                    montant: contributionBox?.primeMcafee ?? 0,
+                                },
+                                { label: `Canal+ sur box (${nomMois(moisVenteBoxPayee)}, figé)`, montant: contributionBox?.primeCanal ?? 0 },
+                                {
+                                    label: nb4PTotal > 0
+                                        ? `${nb4PTotal} abonnés 4P en ${nomMois(moisVenteBoxPayee)} dont ${nb4PForfait} sur le forfait et ${nb4PBox} sur la box`
+                                        : "",
+                                    montant: montant4PTotal,
+                                },
+                                {
+                                    label: `Assurance Nouveau Mobile (${nomMois(moisVenteAssurance)})${(contributionAssurance?.nbNouveauMobile ?? 0) > 0 ? ` — ${contributionAssurance!.nbNouveauMobile}` : ""}`,
+                                    montant: contributionAssurance?.montantNouveauMobile ?? 0,
+                                },
+                                {
+                                    label: `Assurance Essentielle (${nomMois(moisVenteAssurance)})${(contributionAssurance?.nbEssentielle ?? 0) > 0 ? ` — ${contributionAssurance!.nbEssentielle}` : ""}`,
+                                    montant: contributionAssurance?.montantEssentielle ?? 0,
+                                },
+                            ];
+    })();
+    const totalExtra = lignesExtra.reduce((t, l) => t + l.montant, 0);
+
     return (
         <main className="space-y-7">
             {/* Hero */}
@@ -184,7 +235,7 @@ function VariableInner() {
                         <p className="text-xs font-black uppercase tracking-[0.4em] text-violet-400">Ma cagnotte</p>
                         <h1 className="mt-2 text-4xl font-black text-white">Ma variable du mois</h1>
                         <p className="mt-1 text-sm font-medium text-white/40">
-                            Saisis tes actes au fil du mois, le montant se met à jour tout seul.
+                            {v2 ? "Ce que tu as gagné, ce que tu peux encore gagner." : "Saisis tes actes au fil du mois, le montant se met à jour tout seul."}
                         </p>
                     </div>
                     <div className="flex flex-col items-end gap-3">
@@ -219,6 +270,112 @@ function VariableInner() {
                 <BoxRaccordementTab conseillerId={conseillerId} bareme={bareme} />
             ) : onglet === "historique" ? (
                 <HistoriqueVariableTab conseillerId={conseillerId} nomConseiller={nomConseiller} />
+            ) : v2 ? (
+                <div className="space-y-5">
+                    <VariableSynthese
+                        conseillerId={conseillerId}
+                        mois={mois}
+                        ventes={ventesAvecPresence}
+                        boost={boost}
+                        bareme={bareme}
+                        bonusManuels={bonusManuels}
+                        bonusVolumes={bonusVolumes}
+                        totalExtra={totalExtra}
+                    />
+                    <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr] lg:items-start">
+                        <CompositionVariable
+                            detail={detail}
+                            contributionBox={contributionBox}
+                            contributionForfait4P={contributionForfait4P}
+                            contributionAssurance={contributionAssurance}
+                            moisVenteBox={moisVenteBoxPayee}
+                            moisVenteAssurance={moisVenteAssurance}
+                        />
+                        <DejaEnRoute conseillerId={conseillerId} mois={mois} bareme={bareme} />
+                    </div>
+
+                    {/* ── Ma déclaration (repliée) ──────────────────────────── */}
+                    <section className="rounded-[24px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)] sm:p-6">
+                        <button onClick={() => setDeclarationOuverte((o) => !o)} className="flex w-full items-center justify-between gap-4 text-left" aria-expanded={declarationOuverte}>
+                            <div className="min-w-0">
+                                <h2 className="text-base font-black text-slate-900">✏️ Ma déclaration</h2>
+                                <p className="mt-0.5 text-xs font-semibold text-slate-500">
+                                    Rempli automatiquement : {ventes.forfait_free_serie} forfaits Free / Série · {ventes.forfait_free_max} Free Max · {ventes.smartphones} smartphones.
+                                    {" "}À compléter : migrations, AST, McAfee, Canal+, leads, notes, présence.
+                                </p>
+                            </div>
+                            <span className="shrink-0 rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white">
+                                {declarationOuverte ? "Masquer" : "Compléter / modifier"}
+                            </span>
+                        </button>
+
+                        {declarationOuverte && (
+                            <div className="mt-5 grid gap-4 xl:grid-cols-2">
+                                <CardShell>
+                                    <p className="mb-1 text-xs font-black uppercase tracking-widest text-violet-300">À déclarer</p>
+                                    <p className="mb-4 text-[11px] text-white/40">Ce qui ne se compte pas tout seul depuis l&apos;Accueil.</p>
+                                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                                        {CHAMPS_A_DECLARER.map((k) => (
+                                            <NumberField key={k} label={LABEL_CHAMP[k] ?? k} value={ventes[k]} onChange={(v) => updateVente(k, v)} />
+                                        ))}
+                                    </div>
+                                    {bonusManuels.some((b) => b.categorie && b.categorie !== "destockage" && b.categorie !== "satisfd") && (
+                                        <div className="mt-4 border-t border-white/10 pt-4">
+                                            <BonusManuelsInline
+                                                items={bonusManuels.filter((b) => b.categorie && b.categorie !== "destockage" && b.categorie !== "satisfd")}
+                                                mode="declaration"
+                                                volumes={bonusVolumes}
+                                                onVolumeChange={(id, v) => setBonusVolumes((prev) => ({ ...prev, [id]: v }))}
+                                            />
+                                        </div>
+                                    )}
+                                </CardShell>
+
+                                <div className="space-y-4">
+                                    <CardShell>
+                                        <p className="mb-1 text-xs font-black uppercase tracking-widest text-emerald-300">Rempli automatiquement</p>
+                                        <p className="mb-4 text-[11px] text-white/40">Mis à jour par tes déclarations sur l&apos;Accueil, modifiable si besoin. Box et assurances sont comptées à part (raccordements, ventes).</p>
+                                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                                            {CHAMPS_AUTO.map((k) => (
+                                                <NumberField key={k} label={LABEL_CHAMP[k] ?? k} value={ventes[k]} onChange={(v) => updateVente(k, v)} />
+                                            ))}
+                                        </div>
+                                    </CardShell>
+
+                                    <CardShell>
+                                        <p className="mb-4 text-xs font-black uppercase tracking-widest text-rose-300">Notes &amp; présence</p>
+                                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                                            <NumberField label="SatisFD individuelle (%)" value={ventes.note_satisfd_individuelle} onChange={(v) => updateVente("note_satisfd_individuelle", v)} />
+                                            <NumberField label="SatisFD AST individuelle (%)" value={ventes.note_satisfd_ast_individuelle} onChange={(v) => updateVente("note_satisfd_ast_individuelle", v)} />
+                                            <NumberField label="Taux de présence (%)" value={tauxPresencePct} onChange={setTauxPresencePct} />
+                                        </div>
+                                    </CardShell>
+
+                                    <CardShell>
+                                        <p className="mb-1 text-xs font-black uppercase tracking-widest text-cyan-300">Contexte boutique</p>
+                                        <p className="mb-4 text-[11px] text-white/40">Résultats de toute l&apos;équipe, communiqués par ton manager.</p>
+                                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                                            <NumberField label={`R/O box — ${nomMois(moisVenteBoxPayee)} (%)`} value={boost.ro_box_boutique} onChange={(v) => updateBoost("ro_box_boutique", v)} />
+                                            <NumberField label="R/O forfait (%)" value={boost.ro_forfait_boutique} onChange={(v) => updateBoost("ro_forfait_boutique", v)} />
+                                            <NumberField label="R/O smartphone (%)" value={boost.ro_smartphone_boutique} onChange={(v) => updateBoost("ro_smartphone_boutique", v)} />
+                                            <NumberField label="SatisFD collective (%)" value={ventes.note_satisfd_collective} onChange={(v) => updateVente("note_satisfd_collective", v)} />
+                                            <NumberField label="SatisFD AST collective (%)" value={ventes.note_satisfd_ast_collective} onChange={(v) => updateVente("note_satisfd_ast_collective", v)} />
+                                        </div>
+                                    </CardShell>
+                                </div>
+
+                                <div className="xl:col-span-2">
+                                    <BonusManuelsCard
+                                        items={bonusManuels.filter((b) => !b.categorie || b.categorie === "destockage")}
+                                        mode="declaration"
+                                        volumes={bonusVolumes}
+                                        onVolumeChange={(id, v) => setBonusVolumes((prev) => ({ ...prev, [id]: v }))}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </section>
+                </div>
             ) : (
             <div className="grid grid-cols-1 gap-7 lg:grid-cols-[1.3fr_1fr]">
                 {/* ── Formulaire ─────────────────────────────────────────────── */}
@@ -343,39 +500,7 @@ function VariableInner() {
                 <div className="lg:sticky lg:top-7 lg:self-start">
                     <DetailResultatsCard
                         detail={detail}
-                        extra={(() => {
-                            const nb4PBox = contributionBox?.nb4P ?? 0;
-                            const nb4PForfait = contributionForfait4P?.nb ?? 0;
-                            const nb4PTotal = nb4PBox + nb4PForfait;
-                            const montant4PTotal = (contributionBox?.prime4P ?? 0) + (contributionForfait4P?.montantTotal ?? 0);
-                            const nbRaccordees = contributionBox?.nbRaccordees ?? 0;
-                            return [
-                                {
-                                    label: `${nbRaccordees > 0 ? `${nbRaccordees} box raccordées` : "Box raccordées"} (${nomMois(moisVenteBoxPayee)}, figé)`,
-                                    montant: contributionBox?.primeBox ?? 0,
-                                },
-                                { label: `Boost individuel box (${nomMois(moisVenteBoxPayee)}, figé)`, montant: contributionBox?.boostIndividuel ?? 0 },
-                                {
-                                    label: `${(contributionBox?.nbMcafee ?? 0) > 0 ? `${contributionBox!.nbMcafee} McAfee` : "McAfee"} sur box (${nomMois(moisVenteBoxPayee)}, figé)`,
-                                    montant: contributionBox?.primeMcafee ?? 0,
-                                },
-                                { label: `Canal+ sur box (${nomMois(moisVenteBoxPayee)}, figé)`, montant: contributionBox?.primeCanal ?? 0 },
-                                {
-                                    label: nb4PTotal > 0
-                                        ? `${nb4PTotal} abonnés 4P en ${nomMois(moisVenteBoxPayee)} dont ${nb4PForfait} sur le forfait et ${nb4PBox} sur la box`
-                                        : "",
-                                    montant: montant4PTotal,
-                                },
-                                {
-                                    label: `Assurance Nouveau Mobile (${nomMois(moisVenteAssurance)})${(contributionAssurance?.nbNouveauMobile ?? 0) > 0 ? ` — ${contributionAssurance!.nbNouveauMobile}` : ""}`,
-                                    montant: contributionAssurance?.montantNouveauMobile ?? 0,
-                                },
-                                {
-                                    label: `Assurance Essentielle (${nomMois(moisVenteAssurance)})${(contributionAssurance?.nbEssentielle ?? 0) > 0 ? ` — ${contributionAssurance!.nbEssentielle}` : ""}`,
-                                    montant: contributionAssurance?.montantEssentielle ?? 0,
-                                },
-                            ];
-                        })()}
+                        extra={lignesExtra}
                     />
                 </div>
             </div>
