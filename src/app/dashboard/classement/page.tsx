@@ -12,6 +12,7 @@ import type { ProduitCode } from "@/utils/produits";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import PodiumTopPerformers from "@/components/dashboard/PodiumTopPerformers";
+import ClassementCourse from "@/components/classement/ClassementCourse";
 import { supabase } from "@/lib/supabase";
 import { getRealiseVentesComboParConseiller, getObjectifsComboParConseiller, RealiseVentesCombo } from "@/services/variableConseiller";
 import { GROUPES, GroupeId, COMBO_META, ComboCode } from "@/utils/classementGroupes";
@@ -28,6 +29,8 @@ const ONGLETS: { id: Periode | "trophees"; label: string }[] = [
 function ClassementInner() {
     const searchParams  = useSearchParams();
     const conseillerId  = searchParams.get("id") ?? "";
+    // Présentation "course" en test (comparaison) : /dashboard/classement?...&classement=v2
+    const vueCourse     = searchParams.get("classement") === "v2";
 
     const [periode, setPeriode]             = useState<Periode>("mois");
     const [classement, setClassement]       = useState<ConseillerStats[]>([]);
@@ -316,6 +319,21 @@ function ClassementInner() {
                 <div className="flex h-48 items-center justify-center">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
                 </div>
+            ) : vueCourse ? (
+                <ClassementCourse
+                    lignes={classement.map((c) => {
+                        const combo = comboPeriode[c.id] ?? COMBO_VIDE;
+                        const realise: Record<string, number> = { ...(c.produits as Record<string, number>), ...combo };
+                        const objectif: Record<string, number> = {};
+                        PRODUITS_CLASSEMENT.forEach((p) => { objectif[p.code] = getObjDynamic(c, p.key); });
+                        (Object.keys(COMBO_VIDE) as ComboCode[]).forEach((code) => { objectif[code] = getObjDynamicCombo(c.id, code); });
+                        return { id: c.id, nom: c.nom, realise, objectif };
+                    })}
+                    periode={periode}
+                    groupe={groupe}
+                    conseillerId={conseillerId}
+                    photos={photos}
+                />
             ) : (
                 <>
                     <PodiumTopPerformers classement={classement} conseillerId={conseillerId} periode={periode} />

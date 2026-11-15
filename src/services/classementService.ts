@@ -19,10 +19,14 @@ export type ConseillerStats = {
     moyenneArticles: number;
 };
 
+/** opts.avant : classement arrêté juste avant cette date (ex. minuit aujourd'hui = "hier soir"),
+ *  pour mesurer les mouvements de rang. */
 export async function construireClassementPeriode(
-    periode: Periode
+    periode: Periode,
+    opts?: { avant?: Date }
 ): Promise<ConseillerStats[]> {
     const debut = dateDebutPeriode(periode);
+    const avant = opts?.avant;
 
     const [consRes, objRes] = await Promise.all([
         supabase.from("conseillers").select("id, nom, profil_actif"),
@@ -36,14 +40,16 @@ export async function construireClassementPeriode(
     // ce qui faisait varier les totaux d'un appel à l'autre.
     let ventes: any[];
     try {
-        ventes = await fetchToutesLesLignes((from, to) =>
-            supabase
+        ventes = await fetchToutesLesLignes((from, to) => {
+            let requete = supabase
                 .from("ventes")
                 .select("conseiller_id, quantite, produits(code)")
-                .gte("created_at", debut)
+                .gte("created_at", debut);
+            if (avant) requete = requete.lt("created_at", avant.toISOString());
+            return requete
                 .order("created_at", { ascending: true })
-                .range(from, to)
-        );
+                .range(from, to);
+        });
     } catch (e: any) {
         // Fallback created_at absent
         if (e?.message?.includes("created_at")) {
@@ -110,15 +116,21 @@ export async function construireClassementPeriode(
 
     // McAfee Mobile et Assurance essentielle : actes commerciaux enregistrés hors table ventes
     // (variable_actes_jour) → ajoutés au total qui sert à classer.
-    const { debut: jourDebut, fin: jourFin } = joursPeriode(periode);
-    const combos = await getRealiseVentesComboParConseiller(jourDebut, jourFin).catch(() => ({} as Record<string, Record<string, number>>));
+    const { debut: jourDebut, fin: finPeriode } = joursPeriode(periode);
+    let jourFin = finPeriode;
+    if (avant) {
+        const veille = new Date(avant);
+        veille.setDate(veille.getDate() - 1);
+        jourFin = `${veille.getFullYear()}-${String(veille.getMonth() + 1).padStart(2, "0")}-${String(veille.getDate()).padStart(2, "0")}`;
+    }
+    const combos = jourFin < jourDebut ? {} : await getRealiseVentesComboParConseiller(jourDebut, jourFin).catch(() => ({} as Record<string, Record<string, number>>));
     map.forEach((row) => {
         const c = combos[row.id];
         if (c) COMBOS_DANS_TOTAL.forEach((code) => { row.total += c[code] ?? 0; });
     });
 
     // Moyenne d'articles par vente, sur la même période
-    const moyennes = await getMoyenneArticlesParConseiller([...map.keys()], debut).catch(() => ({} as Record<string, number>));
+    const moyennes = avant ? {} as Record<string, number> : await getMoyenneArticlesParConseiller([...map.keys()], debut).catch(() => ({} as Record<string, number>));
     map.forEach((row) => { row.moyenneArticles = moyennes[row.id] ?? 0; });
 
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
