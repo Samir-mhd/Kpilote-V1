@@ -7,6 +7,7 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import MorningCheck from "@/components/dashboard/MorningCheck";
 import CorrigerVentesJourCard from "@/components/dashboard/CorrigerVentesJourCard";
 import { PRODUITS_HORS_ACTES, ProduitCode } from "@/utils/produits";
+import MesStatsV2 from "@/components/stats/MesStatsV2";
 
 // Exclut les ajustements techniques (cerebro check, correction du jour) de l'affichage —
 // ils restent comptés dans les totaux réels, mais ne doivent pas polluer heatmap/timeline.
@@ -107,6 +108,8 @@ function StatsInner() {
     const searchParams  = useSearchParams();
     const conseillerId  = searchParams.get("id") ?? "";
     const nom           = searchParams.get("nom") ?? "Conseiller";
+    // Nouvelle version en test (comparaison) : /dashboard/stats?...&stats=v2
+    const v2            = searchParams.get("stats") === "v2";
 
     const [ventesAujourdhui, setVentesAujourdhui] = useState<Vente[]>([]);
     const [heatmap, setHeatmap]   = useState<number[][]>([]);
@@ -190,6 +193,24 @@ function StatsInner() {
         : insight.tendance < 0 ? TrendingDown
         : Minus;
 
+    // v2 : les outils de correction passent dans une section repliée, en bas.
+    function enveloppeOutils(contenu: React.ReactNode) {
+        if (!v2) return contenu;
+        return (
+            <details className="group rounded-[24px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)] sm:p-6">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+                    <span>
+                        <span className="block text-base font-black text-slate-900">🛠️ Outils</span>
+                        <span className="block text-xs font-semibold text-slate-400">Corriger mes ventes du jour · revoir mon Cerebro Check</span>
+                    </span>
+                    <span className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600 group-open:hidden">Ouvrir</span>
+                    <span className="hidden rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600 group-open:inline">Fermer</span>
+                </summary>
+                <div className="mt-5 space-y-5">{contenu}</div>
+            </details>
+        );
+    }
+
     return (
     <>
         <div className="space-y-7">
@@ -198,9 +219,12 @@ function StatsInner() {
             <div>
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-violet-600">Analytics</p>
                 <h1 className="mt-1 text-3xl font-black text-slate-900">Mes stats</h1>
-                <p className="mt-1 text-sm text-slate-400">Analyse de tes 30 derniers jours</p>
+                <p className="mt-1 text-sm text-slate-400">{v2 ? "Tes habitudes de vente, tes progrès et tes records" : "Analyse de tes 30 derniers jours"}</p>
             </div>
 
+            {v2 && <MesStatsV2 conseillerId={conseillerId} />}
+
+            {!v2 && (<>
             {/* ── KPI rapides ─────────────────────────────────── */}
             {insight && (
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -355,6 +379,9 @@ function StatsInner() {
                 </div>
             </div>
 
+            </>)}
+
+            {enveloppeOutils(<>
             {/* ── Corriger mes ventes du jour ───────────────────── */}
             {conseillerId && (
                 <CorrigerVentesJourCard
@@ -413,6 +440,8 @@ function StatsInner() {
                     )}
                 </div>
             )}
+
+            </>)}
 
             <style>{`
                 @keyframes fadeIn {
