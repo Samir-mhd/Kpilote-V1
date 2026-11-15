@@ -30,8 +30,9 @@ const ONGLETS: { id: Periode | "trophees"; label: string }[] = [
 function ClassementInner() {
     const searchParams  = useSearchParams();
     const conseillerId  = searchParams.get("id") ?? "";
-    // Présentation "course" en test (comparaison) : /dashboard/classement?...&classement=v2
-    const vueCourse     = searchParams.get("classement") === "v2";
+    // Classement par objectifs + onglet Podiums par défaut ; l'ancien tableau reste accessible
+    // quelque temps avec &classement=v1.
+    const vueCourse     = searchParams.get("classement") !== "v1";
 
     const [periode, setPeriode]             = useState<Periode>(() => (["jour", "semaine", "mois"].includes(searchParams.get("periode") ?? "") ? searchParams.get("periode") as Periode : "mois"));
     const [classement, setClassement]       = useState<ConseillerStats[]>([]);
