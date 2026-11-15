@@ -23,6 +23,7 @@ import {
 } from "@/services/variableConseiller";
 import { CATEGORIES_VENTES, NumberField, CardShell, BonusManuelsCard, BonusManuelsInline, DetailResultatsCard } from "@/components/variable/variableUi";
 import BoxRaccordementTab from "@/components/variable/BoxRaccordementTab";
+import BoxRaccordementTabV2 from "@/components/variable/BoxRaccordementTabV2";
 import HistoriqueVariableTab from "@/components/variable/HistoriqueVariableTab";
 import { getContributionBoxMoisPaiement, nomMois, ContributionBoxMoisPaiement } from "@/services/boxRaccordement";
 import { getContributionForfait4PMoisPaiement, ContributionForfait4P } from "@/services/forfait4P";
@@ -65,7 +66,7 @@ function VariableInner() {
     const [loading, setLoading] = useState(true);
     const [enregistre, setEnregistre] = useState(true);
     const [variableActivee, setVariableActivee] = useState(true);
-    const [onglet, setOnglet] = useState<"simulation" | "box" | "historique">("simulation");
+    const [onglet, setOnglet] = useState<"simulation" | "box" | "historique">(() => (searchParams.get("onglet") === "box" ? "box" : searchParams.get("onglet") === "historique" ? "historique" : "simulation"));
     const [contributionBox, setContributionBox] = useState<ContributionBoxMoisPaiement | null>(null);
     const [contributionForfait4P, setContributionForfait4P] = useState<ContributionForfait4P | null>(null);
     const [contributionAssurance, setContributionAssurance] = useState<ContributionAssurance | null>(null);
@@ -274,7 +275,9 @@ function VariableInner() {
             </div>
 
             {onglet === "box" ? (
-                <BoxRaccordementTab conseillerId={conseillerId} bareme={bareme} />
+                searchParams.get("box") === "v2"
+                    ? <BoxRaccordementTabV2 conseillerId={conseillerId} bareme={bareme} />
+                    : <BoxRaccordementTab conseillerId={conseillerId} bareme={bareme} />
             ) : onglet === "historique" ? (
                 <HistoriqueVariableTab conseillerId={conseillerId} nomConseiller={nomConseiller} />
             ) : v2 ? (
