@@ -21,6 +21,10 @@ export const PRODUITS_CLASSEMENT = PRODUITS_ORDRE.filter((p) => p.code !== "spid
  *  (pas des actes commerciaux au même titre que Box/Forfaits/etc.). */
 export const PRODUITS_HORS_TOTAL_CLASSEMENT: ProduitCode[] = ["avis_google", "recap_commercial"];
 
+/** Ventes combo comptées comme actes commerciaux dans les totaux (classement, actes du jour),
+ *  bien qu'enregistrées dans variable_actes_jour et pas dans la table ventes. Canal+ n'y est pas. */
+export const COMBOS_DANS_TOTAL = ["mcafee_mobile", "assurance_essentielle"] as const;
+
 /** Pas des actes commerciaux : à exclure de tout comptage "ventes/actes du jour" (Accueil, Mes
  *  stats...). Spiderhome (historisation), Avis Google et Récap commercial (suivis sans prime). */
 export const PRODUITS_HORS_ACTES: ProduitCode[] = ["spiderhome", "avis_google", "recap_commercial"];

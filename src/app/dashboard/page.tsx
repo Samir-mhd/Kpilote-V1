@@ -64,6 +64,8 @@ type MissionDashboard = {
     couleur: string;
     message: string;
     dernierJourSemaine?: boolean;
+    /** McAfee Mobile / Assurance essentielle : comptés dans les actes du jour, sans carte. */
+    sansCarte?: boolean;
 };
 
 /** Date locale au format YYYY-MM-DD (pas UTC — important pour les fuseaux horaires). */
@@ -225,7 +227,7 @@ export default function Dashboard() {
 
     async function chargerMissions() {
         if (!conseillerId) return;
-        const data = await getMissionsReelles(conseillerId);
+        const data = await getMissionsReelles(conseillerId, true);
         setMissions(data);
 
         // Borne de départ = heure du cerebro check (après validation), pas minuit
@@ -831,7 +833,7 @@ export default function Dashboard() {
 
     // Cartes objectifs — partagées par les deux mises en page (seul l'affichage change en compact).
     function cartesMissions(compact: boolean) {
-        return ordonnerAccueil(missions).map((mission) => (
+        return ordonnerAccueil(missions.filter((m) => !m.sansCarte)).map((mission) => (
             <MissionCard
                 key={mission.produit}
                 compact={compact}

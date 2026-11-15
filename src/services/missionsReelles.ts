@@ -1,13 +1,13 @@
 import { getObjectifsMensuels } from "@/services/objectifs";
 import { getVentesDuJour, getVentesDuMois, getVentesDepuisLundi } from "@/services/stats";
-import { getJoursTravail, getJoursTravailPlage } from "@/services/planningService";
+import { getJoursTravail, getJoursTravailPlage, jourStr } from "@/services/planningService";
 import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
 import { getCoeffRecapCommercial } from "@/services/recapCommercialConfig";
 import { getCoeffAvisGoogle } from "@/services/avisGoogleConfig";
 import { getRealiseVentesComboMoisCourant, getRealiseVentesCombo, RealiseVentesCombo } from "@/services/variableConseiller";
 import { calculerObjectifs, EtatObjectif } from "@/engine/objectifEngine";
 import { periodeSemaineEffective } from "@/utils/periodes";
-import { PRODUITS_ORDRE, type ProduitCode } from "@/utils/produits";
+import { PRODUITS_ORDRE, COMBOS_DANS_TOTAL, type ProduitCode } from "@/utils/produits";
 import { supabase } from "@/lib/supabase";
 
 /** McAfee Mobile, Assurance essentielle, Canal+ : pas de ligne dans `ventes` (déclarés via les
@@ -136,21 +136,28 @@ async function calcul(
  *   restants de la semaine. Spiderhome garde son propre calcul auto (hors de cette cascade).
  * - realise = ventes d'AUJOURD'HUI uniquement → repart à 0 chaque matin
  */
-export async function getMissionsReelles(conseillerId: string) {
+/** avecCombos : ajoute McAfee Mobile et Assurance essentielle (marqués sansCarte) pour qu'ils
+ *  comptent dans les totaux "actes du jour" de l'Accueil, sans avoir de carte. */
+export async function getMissionsReelles(conseillerId: string, avecCombos = false) {
     const now   = new Date();
     const annee = now.getFullYear();
     const mois  = now.getMonth() + 1;
     // Semaine tronquée aux bornes du mois : ne chevauche jamais un changement de mois.
     const { debut, fin } = periodeSemaineEffective(now);
 
-    const [resultats, ventesJour, objSemaineParConseiller, ventesSemaine, joursRestantsSemaine, planifieAujourdhui] = await Promise.all([
-        // McAfee Mobile / Assurance essentielle / Canal+ : visibles uniquement sur la vue Objectifs, jamais sur l'Accueil.
-        calcul(conseillerId, annee, mois, getVentesDuMois, CODES_VENTES_COMBO),
+    const aujourdhuiStr = jourStr(now);
+    const debutSemaineStr = jourStr(debut);
+    const [resultats, ventesJour, objSemaineParConseiller, ventesSemaine, joursRestantsSemaine, planifieAujourdhui, comboJour, comboSemaine] = await Promise.all([
+        // Ventes combo : jamais de carte sur l'Accueil. Avec avecCombos, McAfee Mobile et Assurance
+        // essentielle sont calculés (pour les totaux) ; Canal+ reste toujours exclu.
+        calcul(conseillerId, annee, mois, getVentesDuMois, avecCombos ? ["canal_plus"] : CODES_VENTES_COMBO),
         getVentesDuJour(conseillerId),
         getObjectifsSemaineFiges([conseillerId], debut, fin),
         getVentesDepuisLundi(conseillerId, debut),
         getJoursTravailPlage(conseillerId, now, fin), // jours planifiés restants de la semaine, aujourd'hui inclus
         getJoursTravailPlage(conseillerId, now, now), // 0 si off / formation / congés aujourd'hui
+        avecCombos ? getRealiseVentesCombo(conseillerId, aujourdhuiStr, aujourdhuiStr).catch(() => null) : Promise.resolve(null),
+        avecCombos ? getRealiseVentesCombo(conseillerId, debutSemaineStr, aujourdhuiStr).catch(() => null) : Promise.resolve(null),
     ]);
     // Pas planifié aujourd'hui : aucun objectif du jour, le reste se répartit sur les prochains jours planifiés.
     const travailleAujourdhui = planifieAujourdhui > 0;
@@ -168,6 +175,10 @@ export async function getMissionsReelles(conseillerId: string) {
         const p = Array.isArray(v.produits) ? v.produits[0] : v.produits;
         if (p?.code) realiseSemaine[p.code] = (realiseSemaine[p.code] ?? 0) + (v.quantite ?? 1);
     });
+
+    // Ventes combo : réalisé lu dans variable_actes_jour (pas de ligne dans la table ventes).
+    if (comboJour) COMBOS_DANS_TOTAL.forEach((c) => { realiseJour[c] = comboJour[c] ?? 0; });
+    if (comboSemaine) COMBOS_DANS_TOTAL.forEach((c) => { realiseSemaine[c] = comboSemaine[c] ?? 0; });
 
     const objSemaine = objSemaineParConseiller[conseillerId] ?? {};
 
@@ -200,6 +211,7 @@ export async function getMissionsReelles(conseillerId: string) {
             // Reste de la semaine figée entièrement compressé sur aujourd'hui — le jour suivant
             // appartient à une autre semaine figée (recalcul indépendant), pas de lissage possible.
             dernierJourSemaine: joursRestantsSemaine === 1,
+            sansCarte: (COMBOS_DANS_TOTAL as readonly string[]).includes(code),
         };
     });
 }

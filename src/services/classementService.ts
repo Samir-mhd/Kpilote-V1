@@ -3,8 +3,9 @@
  * Utilisé par manager/classement et dashboard/classement.
  */
 import { supabase } from "@/lib/supabase";
-import { PRODUITS_ORDRE, PRODUITS_HORS_TOTAL_CLASSEMENT, ProduitCode } from "@/utils/produits";
-import { Periode, dateDebutPeriode } from "@/utils/periodes";
+import { PRODUITS_ORDRE, PRODUITS_HORS_TOTAL_CLASSEMENT, COMBOS_DANS_TOTAL, ProduitCode } from "@/utils/produits";
+import { Periode, dateDebutPeriode, joursPeriode } from "@/utils/periodes";
+import { getRealiseVentesComboParConseiller } from "@/services/variableConseiller";
 import { fetchToutesLesLignes } from "@/utils/supabasePaging";
 import { getMoyenneArticlesParConseiller } from "@/services/ventesTransactions";
 import { getObjectifsAvisGoogleMois } from "@/services/avisGoogleConfig";
@@ -105,6 +106,15 @@ export async function construireClassementPeriode(
     const avisGoogleMois = await getObjectifsAvisGoogleMois([...map.keys()]).catch(() => ({} as Record<string, number>));
     map.forEach((row) => {
         if (avisGoogleMois[row.id] !== undefined) row.objectifs.avis_google = avisGoogleMois[row.id];
+    });
+
+    // McAfee Mobile et Assurance essentielle : actes commerciaux enregistrés hors table ventes
+    // (variable_actes_jour) → ajoutés au total qui sert à classer.
+    const { debut: jourDebut, fin: jourFin } = joursPeriode(periode);
+    const combos = await getRealiseVentesComboParConseiller(jourDebut, jourFin).catch(() => ({} as Record<string, Record<string, number>>));
+    map.forEach((row) => {
+        const c = combos[row.id];
+        if (c) COMBOS_DANS_TOTAL.forEach((code) => { row.total += c[code] ?? 0; });
     });
 
     // Moyenne d'articles par vente, sur la même période

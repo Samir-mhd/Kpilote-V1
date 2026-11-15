@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { PRODUITS_CLASSEMENT, PRODUITS_HORS_TOTAL_CLASSEMENT } from "@/utils/produits";
+import { PRODUITS_CLASSEMENT, PRODUITS_HORS_TOTAL_CLASSEMENT, COMBOS_DANS_TOTAL } from "@/utils/produits";
 import { Periode, PERIODE_LABELS, couleurTaux, periodeSemaineEffective, joursPeriode } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 import { construireClassementTrophees, ConseillerTrophees } from "@/services/badgesManagerService";
@@ -353,10 +353,12 @@ function ClassementInner() {
                                 <tbody>
                                     {classement.map((c, idx) => {
                                         const isMoi   = c.id === conseillerId;
-                                        // Même périmètre que c.total (classementService) : exclut Avis Google du calcul de taux.
+                                        // Même périmètre que c.total (classementService) : exclut Avis Google / Récap Co,
+                                        // inclut McAfee Mobile et Assurance essentielle.
                                         const totalObj = PRODUITS_CLASSEMENT
                                             .filter((p) => !PRODUITS_HORS_TOTAL_CLASSEMENT.includes(p.code))
-                                            .reduce((t, p) => t + getObjDynamic(c, p.key), 0);
+                                            .reduce((t, p) => t + getObjDynamic(c, p.key), 0)
+                                            + COMBOS_DANS_TOTAL.reduce((t, code) => t + getObjDynamicCombo(c.id, code), 0);
                                         const taux    = totalObj > 0 ? Math.round((c.total / totalObj) * 100) : 0;
                                         const ct      = couleurTaux(c.total, totalObj);
                                         return (
