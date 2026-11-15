@@ -303,7 +303,7 @@ function ProfilInner() {
 
 function ProfilAiguillage() {
     const searchParams = useSearchParams();
-    if (searchParams.get("profil") === "v2") {
+    if (searchParams.get("profil") !== "v1") {
         return <ProfilV2 conseillerId={searchParams.get("id") ?? ""} nom={searchParams.get("nom") ?? "Conseiller"} />;
     }
     return <ProfilInner />;
