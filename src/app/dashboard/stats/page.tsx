@@ -108,8 +108,8 @@ function StatsInner() {
     const searchParams  = useSearchParams();
     const conseillerId  = searchParams.get("id") ?? "";
     const nom           = searchParams.get("nom") ?? "Conseiller";
-    // Nouvelle version en test (comparaison) : /dashboard/stats?...&stats=v2
-    const v2            = searchParams.get("stats") === "v2";
+    // Nouvelle version par défaut ; l'ancienne reste accessible quelque temps avec &stats=v1.
+    const v2            = searchParams.get("stats") !== "v1";
 
     const [ventesAujourdhui, setVentesAujourdhui] = useState<Vente[]>([]);
     const [heatmap, setHeatmap]   = useState<number[][]>([]);

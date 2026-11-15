@@ -34,8 +34,10 @@ const PRODUITS: { code: string; label: string; emoji: string }[] = [
 // Comptés dans les actes (comme le classement). Canal+ : affiché par produit, hors total d'actes.
 const COMBOS = ["mcafee_mobile", "assurance_essentielle"] as const;
 const COMBOS_TOUS: string[] = ["mcafee_mobile", "assurance_essentielle", "canal_plus"];
-// Comparaison avec l'équipe ramenée à 10 jours travaillés (lisible même pour les ventes rares).
-const BASE_JOURS = 10;
+// Moyenne par jour travaillé ; sous 1, deux décimales pour que les ventes rares ne tombent pas à 0,0.
+function fmtMoy(n: number) {
+    return n.toLocaleString("fr-FR", { minimumFractionDigits: n < 1 && n > 0 ? 2 : 1, maximumFractionDigits: n < 1 ? 2 : 1 });
+}
 
 function jourLocal(d: Date) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -163,7 +165,7 @@ export default function MesStatsV2({ conseillerId }: { conseillerId: string }) {
         // Seuls les conseillers qui ont un objectif sur ce produit (ex. pas de profil Téléphone exclu).
         const concernes = d.equipe.filter((c) => (d.joursEquipe[c.id] ?? 0) > 0 && objectifDe(c, p.code) > 0);
         if (!concernes.some((c) => c.id === conseillerId)) return null;
-        const parJ = concernes.map((c) => ({ id: c.id, v: (valeurDe(c, p.code) / (d.joursEquipe[c.id] || 1)) * BASE_JOURS })).sort((a, b) => b.v - a.v);
+        const parJ = concernes.map((c) => ({ id: c.id, v: valeurDe(c, p.code) / (d.joursEquipe[c.id] || 1) })).sort((a, b) => b.v - a.v);
         const mien = parJ.find((x) => x.id === conseillerId)!;
         const autres = parJ.filter((x) => x.id !== conseillerId);
         const moyenne = autres.length ? autres.reduce((t, x) => t + x.v, 0) / autres.length : 0;
@@ -295,14 +297,14 @@ export default function MesStatsV2({ conseillerId }: { conseillerId: string }) {
                 {/* ── 3. Moi vs l'équipe ───────────────────────────────── */}
                 <section className="rounded-[24px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)] sm:p-6">
                     <h2 className="text-base font-black text-slate-900">Toi vs l&apos;équipe</h2>
-                    <p className="text-xs font-semibold text-slate-400">Ce mois-ci · ventes pour {BASE_JOURS} jours travaillés · conseillers ayant l&apos;objectif</p>
+                    <p className="text-xs font-semibold text-slate-400">Ce mois-ci · moyenne par jour travaillé · conseillers ayant l&apos;objectif</p>
                     <ul className="mt-3 divide-y divide-slate-100">
                         {versusEquipe.map((l) => (
                             <li key={l.code} className="flex items-center gap-3 py-2">
                                 <span className="w-6 text-center" aria-hidden="true">{l.emoji}</span>
                                 <span className="flex-1 text-sm text-slate-700">{l.label}</span>
-                                <span className="text-xs tabular-nums text-slate-400">équipe {fmt1(l.moyenne)}</span>
-                                <span className="w-10 text-right text-sm font-black tabular-nums text-slate-900">{fmt1(l.mien)}</span>
+                                <span className="text-xs tabular-nums text-slate-400">équipe {fmtMoy(l.moyenne)}</span>
+                                <span className="w-10 text-right text-sm font-black tabular-nums text-slate-900">{fmtMoy(l.mien)}</span>
                                 <span className={`w-36 shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-center text-[11px] font-black ${
                                     l.statut === "fort" ? "bg-emerald-100 text-emerald-700" : l.statut === "faible" ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"
                                 }`}>
