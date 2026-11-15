@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState, CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
+import TropheesV2 from "@/components/trophees/TropheesV2";
 import { calculerStreak, STREAK_BADGES, GELS_PAR_MOIS, StreakInfo } from "@/services/streakService";
 import {
     calculerBadgesConseiller, PALIERS_PRODUIT, TIER_LABELS, TIER_COULEURS,
@@ -137,6 +138,7 @@ function CarteMaitriseProduit({ code, volume, index = 0, estNouveau = false }: {
 function BadgesInner() {
     const searchParams = useSearchParams();
     const conseillerId = searchParams.get("id") ?? "";
+    const v2 = searchParams.get("trophees") === "v2";
 
     const [info, setInfo] = useState<StreakInfo | null>(null);
     const [etat, setEtat] = useState<EtatBadges | null>(null);
@@ -222,6 +224,7 @@ function BadgesInner() {
                 <h1 className="mt-1 text-3xl font-black text-slate-900">Trophées</h1>
             </div>
 
+            {v2 ? <TropheesV2 conseillerId={conseillerId} info={info} etat={etat} /> : <>
             {/* ── Hero streak ─────────────────────────────────────────────────── */}
             <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-orange-500 via-red-500 to-rose-600 p-8 text-white shadow-[0_12px_48px_rgba(220,38,38,.35)]">
                 <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
@@ -480,6 +483,8 @@ function BadgesInner() {
                     </div>
                 </div>
             </div>
+
+            </>}
 
             <style>{CELEB_KEYFRAMES}</style>
         </div>
