@@ -72,7 +72,7 @@ export function CompositionVariable({
             ],
         },
         {
-            id: "options", emoji: "📺", titre: "McAfee & Canal+", provenance: "options", lignes: [
+            id: "options", emoji: "📺", titre: "McAfee & Canal+", provenance: `vendus en ${nomMois(moisVenteBox)}`, lignes: [
                 { label: `McAfee sur box${cb?.nbMcafee ? ` — ${cb.nbMcafee}` : ""}`, montant: cb?.primeMcafee ?? 0 },
                 { label: "Canal+ sur box", montant: cb?.primeCanal ?? 0 },
                 { label: "McAfee (déclaré)", montant: detail.prime_mcafee },
