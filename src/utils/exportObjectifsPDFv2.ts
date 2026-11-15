@@ -36,7 +36,6 @@ export function exporterObjectifsPDFv2(opts: {
 }): void {
     const { titre, periode, groupes, lignes, boutique, note } = opts;
     const cols = groupes.flatMap((g) => g.colonnes.map((c) => ({ ...c, couleur: g.couleur })));
-    const total = (code: string) => lignes.reduce((t, l) => t + (l.valeurs[code] ?? 0), 0);
     const dateGen = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 
     const enteteGroupes = groupes.map((g) =>
@@ -52,8 +51,7 @@ export function exporterObjectifsPDFv2(opts: {
         return `<tr><td class="nom"><div class="nc">${avatar(l.nom, l.photoUrl)}<span>${esc(l.nom.split(" ")[0])}</span></div></td><td class="jours">${l.jours}</td>${cells}</tr>`;
     }).join("");
 
-    const totalHTML = `<tr class="tot"><td class="nom lbl">Total équipe</td><td class="jours">${lignes.reduce((t, l) => t + l.jours, 0)}</td>${cols.map((c, i) => `<td class="num${i > 0 && cols[i - 1].couleur !== c.couleur ? " sep" : ""}">${total(c.code)}</td>`).join("")}</tr>`;
-    const boutiqueHTML = boutique ? `<tr class="btq"><td class="nom lbl">Objectif boutique</td><td></td>${cols.map((c, i) => `<td class="num${i > 0 && cols[i - 1].couleur !== c.couleur ? " sep" : ""}">${boutique[c.code] ?? "—"}</td>`).join("")}</tr>` : "";
+    const boutiqueHTML = boutique ? `<tr class="tot btq"><td class="nom lbl">Objectif boutique</td><td></td>${cols.map((c, i) => `<td class="num${i > 0 && cols[i - 1].couleur !== c.couleur ? " sep" : ""}">${boutique[c.code] ?? "—"}</td>`).join("")}</tr>` : "";
 
     const html = `<!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8"><title>${esc(titre)} — KPILOTE</title>
@@ -98,7 +96,7 @@ export function exporterObjectifsPDFv2(opts: {
       <tr><th class="left" rowspan="2">Conseiller</th><th class="left" rowspan="2" style="text-align:center">Jours</th>${enteteGroupes}</tr>
       <tr>${enteteCols}</tr>
     </thead>
-    <tbody>${lignesHTML}${totalHTML}${boutiqueHTML}</tbody>
+    <tbody>${lignesHTML}${boutiqueHTML}</tbody>
   </table>
   <div class="pied"><span>${esc(note ?? "")}</span><span>Généré le ${dateGen}</span></div>
   <script>window.onload=function(){window.print()}</script>

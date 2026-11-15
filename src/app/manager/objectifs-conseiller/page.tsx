@@ -33,7 +33,6 @@ const GROUPES_V2: { titre: string; codes: string[]; teinte: string; couleur: str
 const AUTO_V2 = [
     { code: "avis_google", label: "Avis", emoji: "⭐" },
     { code: "recap_commercial", label: "Récap", emoji: "📋" },
-    { code: "spiderhome", label: "Spider", emoji: "🏠" },
 ];
 const COURT: Record<string, string> = {
     box: "Box", forfaits: "Forfaits", telephones: "Tél.", mcafee: "McAfee", assurance: "Assu.",
