@@ -105,7 +105,7 @@ export default function DashboardV2() {
 
     const kpis: { titre: string; r: RO; sous?: React.ReactNode }[] = [
         { titre: "Aujourd'hui", r: actes.jour, sous: enBoutique.length === 0 ? "Personne n'est planifié aujourd'hui" : `${enBoutique.length} en boutique` },
-        { titre: "Semaine", r: actes.semaine, sous: "objectif figé lundi, selon le planning" },
+        { titre: "Semaine", r: actes.semaine, sous: "objectif boutique décliné selon le planning" },
         {
             titre: "Mois", r: actes.mois,
             sous: actes.projectionMois !== null
@@ -239,7 +239,7 @@ export default function DashboardV2() {
                         </tbody>
                     </table>
                 </div>
-                <p className="mt-2 text-[11px] text-slate-400">Objectifs = somme des objectifs de chaque conseiller (les mêmes que sur leur Accueil). Un produit sans objectif ni vente ce mois n&apos;apparaît pas.</p>
+                <p className="mt-2 text-[11px] text-slate-400">Mois = objectifs boutique (matrice). Semaine et jour = ce qu&apos;il reste à faire, réparti selon les jours planifiés de l&apos;équipe. Les objectifs individuels (ligne de chaque conseiller) restent ceux de leur Accueil.</p>
             </section>
 
             {/* ── Fil + défis ───────────────────────────────────────── */}

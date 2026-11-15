@@ -13,6 +13,7 @@ import { PRODUITS_CLASSEMENT, PRODUITS_HORS_TOTAL_CLASSEMENT, COMBOS_DANS_TOTAL,
 import { periodeSemaineEffective, joursPeriode } from "@/utils/periodes";
 import { COMBO_META, ComboCode } from "@/utils/classementGroupes";
 import { getCoeffRecapCommercial } from "@/services/recapCommercialConfig";
+import { getObjectifsEquipeMois } from "@/services/objectifsEquipe";
 
 const CODES_COMBO = Object.keys(COMBO_META) as ComboCode[];
 const COMBO_VIDE: RealiseVentesCombo = { mcafee_mobile: 0, assurance_essentielle: 0, canal_plus: 0 };
@@ -63,7 +64,8 @@ export async function chargerCockpit(): Promise<Cockpit> {
     const parId = (l: ConseillerStats[]) => new Map(l.map((c) => [c.id, c]));
     const mJ = parId(jour), mS = parId(semaine);
 
-    const [figes, restantsSemaine, planifAuj, ecoules, restantsMois, planning, ventesAuj, defis, coeffRecap, joursMoisTotal, joursSemaineTotal] = await Promise.all([
+    const debutSemDansMois = semDebut > debutMois ? semDebut : debutMois;
+    const [figes, restantsSemaine, planifAuj, ecoules, restantsMois, planning, ventesAuj, defis, coeffRecap, joursMoisTotal, joursSemaineTotal, objBoutique, joursLundiFinMois] = await Promise.all([
         getObjectifsSemaineFiges(ids, semDebut, semFin).catch(() => ({} as Record<string, Record<string, number>>)),
         getJoursTravailPlageTous(ids, auj, semFin).catch(() => ({} as Record<string, number>)),
         getJoursTravailPlageTous(ids, auj, auj).catch(() => ({} as Record<string, number>)),
@@ -75,7 +77,13 @@ export async function chargerCockpit(): Promise<Cockpit> {
         getCoeffRecapCommercial().catch(() => 0),
         getJoursTravailPlageTous(ids, debutMois, finMois).catch(() => ({} as Record<string, number>)),
         getJoursTravailPlageTous(ids, semDebut, semFin).catch(() => ({} as Record<string, number>)),
+        getObjectifsEquipeMois().catch(() => ({} as Record<string, number>)),
+        getJoursTravailPlageTous(ids, debutSemDansMois, finMois).catch(() => ({} as Record<string, number>)),
     ]);
+    const tot = (r: Record<string, number>) => ids.reduce((t, id) => t + (r[id] ?? 0), 0);
+    // Jours-conseiller planifiés (somme sur l'équipe) : base de la déclinaison semaine / jour.
+    const jcLundiFinMois = tot(joursLundiFinMois), jcSemaine = tot(joursSemaineTotal);
+    const jcRestantsSemaine = tot(restantsSemaine), jcAujourdhui = tot(planifAuj);
 
     // Réalisé / objectif d'un conseiller sur un code, pour chaque période.
     function realise(cid: string, code: string, periode: "jour" | "semaine" | "mois"): number {
@@ -110,20 +118,34 @@ export async function chargerCockpit(): Promise<Cockpit> {
         ...CODES_COMBO.map((c) => ({ code: c as string, label: COMBO_META[c].label, emoji: COMBO_META[c].emoji })),
     ];
     const periodes = ["jour", "semaine", "mois"] as const;
+    const realiseEquipe = (code: string, per: "jour" | "semaine" | "mois") => ids.reduce((t, id) => t + realise(id, code, per), 0);
+
+    // Objectifs ÉQUIPE : objectif boutique du mois (fixé par le manager via la matrice, pas la
+    // somme des objectifs individuels, volontairement surévaluée), décliné comme pour un conseiller
+    // mais en jours-conseiller planifiés :
+    // - semaine = (objectif mois − réalisé avant lundi) ÷ jours-conseiller lundi→fin du mois × jours-conseiller de la semaine
+    // - jour    = (objectif semaine − réalisé de la semaine avant aujourd'hui) ÷ jours-conseiller restants de la semaine × jours-conseiller aujourd'hui
+    function objectifEquipe(code: string, per: "jour" | "semaine" | "mois"): number {
+        const objMois = objBoutique[code] ?? 0;
+        if (per === "mois") return objMois;
+        const avantLundi = Math.max(realiseEquipe(code, "mois") - realiseEquipe(code, "semaine"), 0);
+        const semaine = jcLundiFinMois > 0 ? Math.ceil(Math.max(objMois - avantLundi, 0) / jcLundiFinMois * jcSemaine) : 0;
+        if (per === "semaine") return semaine;
+        if (jcAujourdhui === 0) return 0;
+        const avantAuj = Math.max(realiseEquipe(code, "semaine") - realiseEquipe(code, "jour"), 0);
+        return jcRestantsSemaine > 0 ? Math.ceil(Math.max(semaine - avantAuj, 0) / jcRestantsSemaine * jcAujourdhui) : 0;
+    }
+
     const produits: LigneProduit[] = codes.map((p) => {
         const ligne = { ...p, actes: estActe(p.code) } as LigneProduit;
-        periodes.forEach((per) => {
-            ligne[per] = {
-                realise: ids.reduce((t, id) => t + realise(id, p.code, per), 0),
-                objectif: ids.reduce((t, id) => t + objectif(id, p.code, per), 0),
-            };
-        });
+        periodes.forEach((per) => { ligne[per] = { realise: realiseEquipe(p.code, per), objectif: objectifEquipe(p.code, per) }; });
         return ligne;
     }).filter((l) => l.mois.objectif > 0 || l.mois.realise > 0); // produit sans objectif ni vente : masqué
 
     const actesDe = (cid: string, per: "jour" | "semaine" | "mois") => codes.filter((p) => estActe(p.code))
         .reduce((t, p) => ({ realise: t.realise + realise(cid, p.code, per), objectif: t.objectif + objectif(cid, p.code, per) }), { realise: 0, objectif: 0 });
-    const somme = (per: "jour" | "semaine" | "mois") => ids.reduce((t, id) => { const a = actesDe(id, per); return { realise: t.realise + a.realise, objectif: t.objectif + a.objectif }; }, { realise: 0, objectif: 0 });
+    const somme = (per: "jour" | "semaine" | "mois") => produits.filter((p) => p.actes)
+        .reduce((t, p) => ({ realise: t.realise + p[per].realise, objectif: t.objectif + p[per].objectif }), { realise: 0, objectif: 0 });
 
     // Projection fin de mois, par conseiller : rythme = actes avant aujourd'hui ÷ jours planifiés
     // écoulés ; on ajoute ce rythme pour chaque jour planifié restant (aujourd'hui compte au moins
