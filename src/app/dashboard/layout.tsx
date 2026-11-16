@@ -4,8 +4,9 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import {
-    Home, BarChart3, Swords, Trophy, User, LineChart, Euro, Award, Menu, X,
+    Home, BarChart3, Swords, Trophy, User, LineChart, Euro, Award, Menu, X, Moon,
 } from "lucide-react";
+import ValiderJourneeModal from "@/components/dashboard/ValiderJourneeModal";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { getPhotoUrl } from "@/services/photoService";
 import { readTheme, applyTheme } from "@/components/dashboard/ThemePicker";
@@ -21,6 +22,7 @@ const menus = [
     { label: "Challenges",    href: "/dashboard/challenges",    Icon: Swords },
     { label: "Trophées",      href: "/dashboard/badges",        Icon: Award },
     { label: "Profil",        href: "/dashboard/profil",        Icon: User },
+    { label: "Bilan du soir", href: "/dashboard/bilan",         Icon: Moon },
 ];
 
 // Sidebar isolée pour que son useSearchParams soit wrappé dans Suspense
@@ -35,6 +37,7 @@ function SidebarInner() {
     const qs = id ? `?id=${id}&nom=${encodeURIComponent(nom)}${repliable ? "" : "&layout=v1"}` : "";
     const [ouvert, setOuvert] = useState(false);
     const [compact, setCompact] = useState(false);
+    const [validation, setValidation] = useState(false);
     useEffect(() => { setOuvert(false); setCompact(lireMenuCompact()); }, [pathname]);
     useEffect(() => {
         if (!ouvert) return;
@@ -71,8 +74,22 @@ function SidebarInner() {
         ? `fixed inset-y-0 left-0 z-50 flex h-screen w-[260px] flex-col bg-slate-950 px-5 py-7 text-white transition-transform duration-300 ${ouvert ? "translate-x-0 shadow-[8px_0_40px_rgba(0,0,0,.35)]" : "-translate-x-full"}`
         : "sticky top-0 flex h-screen w-[245px] flex-col bg-slate-950 px-5 py-7 text-white";
 
+    const boutonValider = id ? (
+        <button
+            onClick={() => { setOuvert(false); setValidation(true); }}
+            className="mb-1.5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2 text-xs font-black text-white transition-all hover:brightness-110 active:scale-[0.98]"
+        >
+            🌙 Valider ma journée
+        </button>
+    ) : null;
+    const modalValidation = validation && id ? (
+        <ValiderJourneeModal conseillerId={id} nom={nom} qs={qs} onClose={() => setValidation(false)} />
+    ) : null;
+
     if (repliable && compact) {
         return (
+            <>
+            {modalValidation}
             <MenuCompact
                 ouvert={ouvert}
                 setOuvert={setOuvert}
@@ -81,18 +98,23 @@ function SidebarInner() {
                     return { label, href: `${href}${qs}`, icon: <Icon size={16} strokeWidth={active ? 2.5 : 2} />, active };
                 })}
                 pied={
+                    <>
+                    {boutonValider}
                     <div className="flex items-center gap-2 py-1">
                         <PhotoAvatar nom={nom} photoUrl={photoUrl} size={26} />
                         <p className="min-w-0 flex-1 truncate text-xs font-black text-white">{nom}</p>
                         <Link href="/choix" className="shrink-0 text-[11px] text-slate-500 hover:text-slate-300">Changer</Link>
                     </div>
+                    </>
                 }
             />
+            </>
         );
     }
 
     return (
         <>
+        {modalValidation}
         {repliable && (
             <>
                 <button
@@ -148,6 +170,7 @@ function SidebarInner() {
             </nav>
 
             <div className="mt-auto rounded-2xl bg-white/5 p-4">
+                {boutonValider}
                 <div className="flex items-center gap-3">
                     <PhotoAvatar nom={nom} photoUrl={photoUrl} size={34} />
                     <div className="min-w-0">
