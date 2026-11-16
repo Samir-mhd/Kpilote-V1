@@ -23,33 +23,68 @@ export default function BilanSoirPage() {
     const [perfs, setPerfs] = useState<PerfBilan[] | null>(null);
     const carte = useRef<HTMLDivElement>(null);
     const [etat, setEtat] = useState<"" | "en_cours" | "copie" | "partage" | "telecharge" | "erreur">("");
+    const image = useRef<Promise<Blob> | null>(null);
     useEffect(() => { getBilanSoir().then(setPerfs).catch(() => setPerfs([])); }, []);
 
+    /** Génère l'image de la carte (max 20 s, pour ne jamais rester bloqué). */
+    function genererImage(): Promise<Blob> {
+        const node = carte.current;
+        if (!node) return Promise.reject(new Error("carte absente"));
+        const rendu = toBlob(node, { pixelRatio: 2, cacheBust: true }).then((b) => { if (!b) throw new Error("image vide"); return b; });
+        const limite = new Promise<Blob>((_, ko) => setTimeout(() => ko(new Error("trop long")), 20000));
+        return Promise.race([rendu, limite]);
+    }
+    // Image préparée dès que la carte est affichée : le clic est instantané (le navigateur
+    // refuse la copie si elle arrive trop longtemps après le clic).
+    useEffect(() => {
+        if (!perfs) return;
+        const t = setTimeout(() => {
+            const p = genererImage();
+            p.catch(() => { if (image.current === p) image.current = null; });
+            image.current = p;
+        }, 700);
+        return () => clearTimeout(t);
+    }, [perfs]);
+
+    function telecharger(blob: Blob) {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `bilan-${new Date().toISOString().slice(0, 10)}.png`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        setEtat("telecharge");
+    }
+
     /** PC : copie l'image (Ctrl+V dans Teams). Téléphone : menu Partager (Teams, WhatsApp…).
-     *  En dernier recours : téléchargement du PNG. */
-    async function copierImage() {
-        if (!carte.current) return;
+     *  Si la copie est refusée par le navigateur : téléchargement du PNG. */
+    async function partager() {
+        if (etat === "en_cours") return;
         setEtat("en_cours");
+        const blobP = image.current ?? genererImage();
+        image.current = blobP;
+        const mobile = window.matchMedia("(pointer: coarse)").matches;
         try {
-            const blob = await toBlob(carte.current, { pixelRatio: 2, cacheBust: true });
-            if (!blob) throw new Error("image vide");
+            if (!mobile && navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
+                try {
+                    // Appel immédiat (dans le clic), l'image peut encore être en préparation.
+                    await navigator.clipboard.write([new ClipboardItem({ "image/png": blobP })]);
+                    setEtat("copie");
+                    return;
+                } catch {
+                    telecharger(await blobP);
+                    return;
+                }
+            }
+            const blob = await blobP;
             const fichier = new File([blob], `bilan-${new Date().toISOString().slice(0, 10)}.png`, { type: "image/png" });
-            const mobile = window.matchMedia("(pointer: coarse)").matches;
-            if (mobile && navigator.canShare?.({ files: [fichier] })) {
+            if (navigator.canShare?.({ files: [fichier] })) {
                 await navigator.share({ files: [fichier], title: "Bilan du soir" });
                 setEtat("partage");
-            } else if (navigator.clipboard && typeof ClipboardItem !== "undefined") {
-                await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-                setEtat("copie");
             } else {
-                const a = document.createElement("a");
-                a.href = URL.createObjectURL(blob);
-                a.download = fichier.name;
-                a.click();
-                URL.revokeObjectURL(a.href);
-                setEtat("telecharge");
+                telecharger(blob);
             }
         } catch (e) {
+            image.current = null;
             setEtat((e as Error)?.name === "AbortError" ? "" : "erreur");
         }
     }
@@ -72,19 +107,20 @@ export default function BilanSoirPage() {
         <div className="flex flex-col items-center gap-4 pb-10">
             <div className="flex w-full max-w-[560px] flex-col items-center gap-1.5">
                 <button
-                    onClick={copierImage}
+                    onClick={partager}
                     disabled={etat === "en_cours"}
                     className="w-full rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 py-3.5 text-sm font-black text-white shadow-[0_10px_30px_rgba(124,58,237,.35)] transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
                 >
-                    {etat === "en_cours" ? "Préparation de l'image…" : "📋 Copier l'image pour Teams"}
+                    {etat === "en_cours" ? "Préparation…" : "Partager"}
                 </button>
-                <p className={`text-xs font-bold ${etat === "erreur" ? "text-rose-600" : "text-slate-500"}`}>
-                    {etat === "copie" ? "✓ Image copiée : colle-la dans Teams avec Ctrl+V."
-                        : etat === "partage" ? "✓ Image partagée."
-                        : etat === "telecharge" ? "✓ Image téléchargée : ajoute-la dans Teams."
-                        : etat === "erreur" ? "Impossible de créer l'image, réessaie."
-                        : "Sur téléphone, le bouton ouvre le menu Partager."}
-                </p>
+                {etat && etat !== "en_cours" && (
+                    <p className={`text-xs font-bold ${etat === "erreur" ? "text-rose-600" : "text-slate-500"}`}>
+                        {etat === "copie" ? "✓ Image copiée : colle-la dans Teams avec Ctrl+V."
+                            : etat === "partage" ? "✓ Image partagée."
+                            : etat === "telecharge" ? "✓ Image téléchargée : glisse-la dans Teams."
+                            : "Impossible de créer l'image, réessaie."}
+                    </p>
+                )}
             </div>
             <div ref={carte} className="w-full max-w-[560px] overflow-hidden rounded-[32px] bg-[#07060d] text-white shadow-2xl">
                 {/* Équipe */}
