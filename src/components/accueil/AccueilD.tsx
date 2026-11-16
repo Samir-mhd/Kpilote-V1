@@ -10,7 +10,11 @@ import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 /** Proposition D — mélange B + C : ambiance sombre « vitrine » et titre « Chaque vente compte. »,
  *  priorité aux conseillers (connexion en un clic sur sa photo), espace manager en haut à droite. */
 
-type Conseiller = { id: string; nom: string; avatar?: string | null; profil_actif?: boolean | null };
+type Conseiller = { id: string; nom: string; avatar?: string | null; profil_actif?: boolean | null; last_check_date?: string | null };
+
+function jourLocal(d = new Date()): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export default function AccueilD() {
     const [equipe, setEquipe] = useState<Conseiller[] | null>(null);
@@ -28,7 +32,11 @@ export default function AccueilD() {
 
     const brute = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
     const date = brute.charAt(0).toUpperCase() + brute.slice(1);
-    const nbBoutique = equipe ? equipe.filter((c) => (planifies[c.id] ?? 0) > 0).length : 0;
+    // "En boutique" seulement une fois le Cerebro Check du jour validé ; avant : "Planifié aujourd'hui".
+    const aujourdhui = jourLocal();
+    const estPlanifie = (c: Conseiller) => (planifies[c.id] ?? 0) > 0;
+    const estArrive = (c: Conseiller) => estPlanifie(c) && c.last_check_date === aujourdhui;
+    const nbBoutique = equipe ? equipe.filter(estArrive).length : 0;
 
     return (
         <main className="relative min-h-screen overflow-hidden bg-[#07060d] px-5 py-7 sm:px-10">
@@ -62,23 +70,26 @@ export default function AccueilD() {
                         ? Array.from({ length: 8 }, (_, i) => <div key={i} className="h-48 animate-pulse rounded-[28px] bg-white/[0.05]" />)
                         : equipe.map((c) => {
                             const photo = c.avatar && (c.avatar.startsWith("http") || c.avatar.startsWith("data:")) ? c.avatar : null;
-                            const present = (planifies[c.id] ?? 0) > 0;
+                            const planifie = estPlanifie(c);
+                            const present = estArrive(c);
                             return (
                                 <Link
                                     key={c.id}
                                     href={`/dashboard?nom=${encodeURIComponent(c.nom)}&id=${c.id}`}
-                                    className="group relative flex flex-col items-center overflow-hidden rounded-[28px] bg-white/[0.05] p-6 ring-1 ring-white/10 backdrop-blur-xl transition-all hover:-translate-y-1.5 hover:bg-white/[0.09] hover:ring-white/25"
+                                    className={`group relative flex flex-col items-center overflow-hidden rounded-[28px] bg-white/[0.05] p-6 ring-1 ring-white/10 backdrop-blur-xl transition-all hover:-translate-y-1.5 hover:bg-white/[0.09] hover:ring-white/25 ${planifie ? "" : "scale-[0.97] opacity-45 blur-[0.6px] hover:scale-100 hover:opacity-100 hover:blur-0"}`}
                                 >
                                     <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br from-fuchsia-500 to-orange-400 opacity-0 blur-3xl transition-opacity group-hover:opacity-40" />
                                     <div className="relative">
-                                        <div className={`overflow-hidden rounded-full ring-4 transition-all ${present ? "ring-emerald-400/40 group-hover:ring-emerald-400/70" : "ring-white/10 group-hover:ring-white/25"}`}>
+                                        <div className={`overflow-hidden rounded-full ring-4 transition-all ${present ? "ring-emerald-400/40 group-hover:ring-emerald-400/70" : planifie ? "ring-violet-400/30 group-hover:ring-violet-400/60" : "ring-white/10 group-hover:ring-white/25"}`}>
                                             <PhotoAvatar nom={c.nom} photoUrl={photo} size={84} />
                                         </div>
-                                        <span className={`absolute bottom-1 right-1 h-4 w-4 rounded-full ring-[3px] ring-[#07060d] ${present ? "bg-emerald-400" : "bg-slate-500"}`} aria-hidden="true" />
+                                        <span className={`absolute bottom-1 right-1 h-4 w-4 rounded-full ring-[3px] ring-[#07060d] ${present ? "bg-emerald-400" : planifie ? "bg-violet-400" : "bg-slate-500"}`} aria-hidden="true" />
                                     </div>
                                     <p className="relative mt-4 text-xl font-black text-white">{c.nom.split(" ")[0]}</p>
-                                    <p className={`relative text-xs font-bold ${present ? "text-emerald-300" : "text-white/40"}`}>
-                                        {present ? "En boutique" : `Pas ${accord(genres[c.id], "planifié", "planifiée")}`}
+                                    <p className={`relative text-xs font-bold ${present ? "text-emerald-300" : planifie ? "text-violet-300" : "text-white/40"}`}>
+                                        {present ? "En boutique"
+                                            : planifie ? `${accord(genres[c.id], "Planifié", "Planifiée")} aujourd'hui`
+                                            : `Pas ${accord(genres[c.id], "planifié", "planifiée")}`}
                                     </p>
                                 </Link>
                             );
