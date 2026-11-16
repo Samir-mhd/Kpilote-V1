@@ -3,19 +3,47 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
-import { DefiJour, getDefiJour, repondreDefi, mesurerDefi, marquerDefiReussi } from "@/services/defisJourService";
+import { DefiJour, getDefiJour, repondreDefi, mesurerDefi, marquerDefiReussi, changerDefi, itemsDefiPerso, definirDefiPerso, libelleDefi } from "@/services/defisJourService";
 import { calculerBadgesConseiller, verifierJourParfaitAujourdhui } from "@/services/badgesService";
 
 /* ─── Carte du Cerebro Check : accepter / refuser ─────────────────────────── */
 
 export function DefiJourChoix({ defi, onChange }: { defi: DefiJour; onChange: (d: DefiJour) => void }) {
     const [envoi, setEnvoi] = useState(false);
+    // Parcours : base → (Pas aujourd'hui) question "choisis ton défi ?" → liste des items → nombre.
+    const [etape, setEtape] = useState<"base" | "question" | "liste" | "nombre">("base");
+    const [items, setItems] = useState<{ code: string; nom: string; suggestion: number }[] | null>(null);
+    const [item, setItem] = useState<{ code: string; nom: string; suggestion: number } | null>(null);
+    const [nombre, setNombre] = useState(1);
+    const [rien, setRien] = useState(false);
 
     async function repondre(statut: "accepte" | "refuse") {
         setEnvoi(true);
         try {
             await repondreDefi(defi.id, statut);
             onChange({ ...defi, statut });
+            setEtape("base");
+        } finally { setEnvoi(false); }
+    }
+    async function changer() {
+        setEnvoi(true);
+        setRien(false);
+        try {
+            const nouveau = await changerDefi(defi);
+            if (nouveau) onChange(nouveau); else setRien(true);
+        } catch { setRien(true); } finally { setEnvoi(false); }
+    }
+    async function ouvrirListe() {
+        setEtape("liste");
+        if (!items) setItems(await itemsDefiPerso(defi.conseillerId).catch(() => []));
+    }
+    async function validerPerso() {
+        if (!item) return;
+        setEnvoi(true);
+        try {
+            const d = await definirDefiPerso(defi, item.code, nombre);
+            if (d) onChange(d);
+            setEtape("base");
         } finally { setEnvoi(false); }
     }
 
@@ -28,6 +56,63 @@ export function DefiJourChoix({ defi, onChange }: { defi: DefiJour; onChange: (d
         );
     }
 
+    // ── Choisir son propre défi ──
+    if (etape === "question") {
+        return (
+            <div className="rounded-2xl bg-white/[0.05] p-4 ring-1 ring-white/10">
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-violet-300">🎯 Ton défi, ton choix</p>
+                <p className="mt-1 text-lg font-black text-white">Tu veux te fixer ton propre défi du jour ?</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                    <button onClick={ouvrirListe} className="flex-1 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-violet-700 transition-all active:scale-[0.97]">Oui, je choisis 💪</button>
+                    <button onClick={() => repondre("refuse")} disabled={envoi} className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white/70 hover:bg-white/15 disabled:opacity-60">Non, pas de défi aujourd&apos;hui</button>
+                </div>
+            </div>
+        );
+    }
+    if (etape === "liste") {
+        return (
+            <div className="rounded-2xl bg-white/[0.05] p-4 ring-1 ring-white/10">
+                <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-violet-300">🎯 Choisis ton défi</p>
+                    <button onClick={() => setEtape(defi.statut === "refuse" ? "base" : "question")} className="text-xs font-bold text-white/50 hover:text-white">← Retour</button>
+                </div>
+                {!items ? (
+                    <div className="mt-3 h-24 animate-pulse rounded-xl bg-white/[0.06]" />
+                ) : (
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {items.map((it) => (
+                            <button
+                                key={it.code}
+                                onClick={() => { setItem(it); setNombre(it.suggestion); setEtape("nombre"); }}
+                                className="rounded-xl bg-white/[0.07] px-3 py-3 text-left text-sm font-black text-white ring-1 ring-white/10 transition-all hover:bg-white/[0.14] active:scale-[0.97]"
+                            >
+                                {it.nom}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    }
+    if (etape === "nombre" && item) {
+        return (
+            <div className="rounded-2xl bg-gradient-to-r from-violet-600/25 to-fuchsia-600/25 p-4 ring-1 ring-violet-400/30">
+                <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-violet-300">🎯 Combien aujourd&apos;hui ?</p>
+                    <button onClick={() => setEtape("liste")} className="text-xs font-bold text-white/50 hover:text-white">← Autre item</button>
+                </div>
+                <div className="mt-3 flex items-center justify-center gap-4">
+                    <button onClick={() => setNombre((n) => Math.max(1, n - 1))} aria-label="Moins" className="h-12 w-12 rounded-xl bg-white/10 text-2xl font-black text-white hover:bg-white/15">−</button>
+                    <p className="min-w-[8rem] text-center text-2xl font-black text-white">{libelleDefi(item.code, nombre)}</p>
+                    <button onClick={() => setNombre((n) => Math.min(50, n + 1))} aria-label="Plus" className="h-12 w-12 rounded-xl bg-white/10 text-2xl font-black text-white hover:bg-white/15">+</button>
+                </div>
+                <button onClick={validerPerso} disabled={envoi} className="mt-4 w-full rounded-xl bg-white px-4 py-2.5 text-sm font-black text-violet-700 transition-all active:scale-[0.97] disabled:opacity-60">
+                    Je relève ce défi 💪
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div className={`rounded-2xl p-4 ring-1 ${defi.statut === "refuse" ? "bg-white/[0.05] ring-white/10" : "bg-gradient-to-r from-violet-600/25 to-fuchsia-600/25 ring-violet-400/30"}`}>
             <p className="text-[11px] font-black uppercase tracking-[0.2em] text-violet-300">
@@ -35,14 +120,20 @@ export function DefiJourChoix({ defi, onChange }: { defi: DefiJour; onChange: (d
             </p>
             <p className="mt-1 text-2xl font-black text-white">{defi.libelle} <span className="text-base font-bold text-white/50">aujourd&apos;hui</span></p>
             {defi.statut === "propose" && (
-                <div className="mt-3 flex gap-2">
-                    <button onClick={() => repondre("accepte")} disabled={envoi} className="flex-1 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-violet-700 transition-all active:scale-[0.97] disabled:opacity-60">
-                        Je relève le défi 💪
-                    </button>
-                    <button onClick={() => repondre("refuse")} disabled={envoi} className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white/70 transition-all hover:bg-white/15 disabled:opacity-60">
-                        Pas aujourd&apos;hui
-                    </button>
-                </div>
+                <>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        <button onClick={() => repondre("accepte")} disabled={envoi} className="flex-1 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-violet-700 transition-all active:scale-[0.97] disabled:opacity-60">
+                            Je relève le défi 💪
+                        </button>
+                        <button onClick={changer} disabled={envoi} className="rounded-xl bg-white/15 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-white/20 disabled:opacity-60">
+                            🔄 Changer de défi
+                        </button>
+                        <button onClick={() => setEtape("question")} disabled={envoi} className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white/70 transition-all hover:bg-white/15 disabled:opacity-60">
+                            Pas aujourd&apos;hui
+                        </button>
+                    </div>
+                    {rien && <p className="mt-2 text-xs text-white/50">Pas d&apos;autre défi possible aujourd&apos;hui.</p>}
+                </>
             )}
             {defi.statut === "accepte" && (
                 <p className="mt-2 text-sm font-bold text-emerald-300">✓ Défi accepté — suis ta progression sur l&apos;Accueil.</p>
@@ -51,6 +142,8 @@ export function DefiJourChoix({ defi, onChange }: { defi: DefiJour; onChange: (d
                 <p className="mt-2 text-xs text-white/50">
                     Pas de défi aujourd&apos;hui, c&apos;est ta priorité.{" "}
                     <button onClick={() => repondre("accepte")} disabled={envoi} className="font-black text-violet-300 underline-offset-2 hover:underline">Finalement, je le relève</button>
+                    {" · "}
+                    <button onClick={ouvrirListe} disabled={envoi} className="font-black text-violet-300 underline-offset-2 hover:underline">Je choisis mon défi</button>
                 </p>
             )}
         </div>

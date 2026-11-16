@@ -64,7 +64,30 @@ function graine(texte: string): number {
     return (h >>> 0) / 4294967296;
 }
 
-async function choisirDefi(conseillerId: string): Promise<Candidat | null> {
+/** Nom lisible d'un item de défi (singulier), pour la liste "choisis ton défi". */
+export function nomItem(code: string): string {
+    const n = NOMS[code]?.[0] ?? code;
+    return n.charAt(0).toUpperCase() + n.slice(1);
+}
+export function libelleDefi(code: string, n: number): string { return libelle(code, n); }
+function typeDe(code: string): DefiJour["type"] {
+    return code === "vente_combo" ? "vente_combo" : code === "assurance_essentielle" || code === "mcafee_mobile" ? "combo" : "produit";
+}
+
+/** Tirage pondéré (aléatoire, ou déterministe si `graineTexte` est fourni). */
+function tirer(candidats: Candidat[], graineTexte?: string): Candidat | null {
+    if (candidats.length === 0) return null;
+    const totalPoids = candidats.reduce((t, c) => t + c.poids, 0);
+    let tirage = (graineTexte ? graine(graineTexte) : Math.random()) * totalPoids;
+    for (const c of candidats) {
+        tirage -= c.poids;
+        if (tirage <= 0) return c;
+    }
+    return candidats[candidats.length - 1];
+}
+
+/** Défis possibles aujourd'hui : produits avec un objectif du jour (+1), combos, vente combo. */
+async function candidatsDefi(conseillerId: string): Promise<Candidat[]> {
     const now = new Date();
     const [missionsJour, missionsMois, jt, transactions] = await Promise.all([
         getMissionsReelles(conseillerId, true),
@@ -98,15 +121,49 @@ async function choisirDefi(conseillerId: string): Promise<Candidat | null> {
     const moyenneCombos = jt.travailles > 0 ? nbCombos / jt.travailles : 0;
     const cibleCombo = Math.max(1, Math.round(moyenneCombos) + 1);
     candidats.push({ type: "vente_combo", code: "vente_combo", libelle: libelle("vente_combo", cibleCombo), cible: cibleCombo, poids: 1.5 });
+    return candidats;
+}
 
-    if (candidats.length === 0) return null;
-    const totalPoids = candidats.reduce((t, c) => t + c.poids, 0);
-    let tirage = graine(`${conseillerId}|${jourDuJour()}`) * totalPoids;
-    for (const c of candidats) {
-        tirage -= c.poids;
-        if (tirage <= 0) return c;
-    }
-    return candidats[candidats.length - 1];
+async function choisirDefi(conseillerId: string): Promise<Candidat | null> {
+    return tirer(await candidatsDefi(conseillerId), `${conseillerId}|${jourDuJour()}`);
+}
+
+/** "Changer de défi" : nouveau tirage parmi les autres défis possibles (pas le même item). */
+export async function changerDefi(defi: DefiJour): Promise<DefiJour | null> {
+    const autres = (await candidatsDefi(defi.conseillerId)).filter((c) => c.code !== defi.code);
+    const choix = tirer(autres);
+    if (!choix) return null;
+    const { error } = await supabase.from("defis_jour")
+        .update({ type: choix.type, code: choix.code, libelle: choix.libelle, cible: choix.cible })
+        .eq("id", defi.id).eq("statut", "propose");
+    if (error) throw error;
+    return getDefiJour(defi.conseillerId, defi.jour);
+}
+
+/** Tous les items que le conseiller peut se fixer comme défi, avec un nombre suggéré
+ *  (objectif du jour + 1, sinon 1). Produits non concernés (objectif 0 et aucune vente) exclus. */
+export async function itemsDefiPerso(conseillerId: string): Promise<{ code: string; nom: string; suggestion: number }[]> {
+    const [missions, candidats] = await Promise.all([
+        getMissionsReelles(conseillerId, true).catch(() => []),
+        candidatsDefi(conseillerId).catch(() => [] as Candidat[]),
+    ]);
+    const items = (missions as { produit: string; objectif: number }[])
+        .map((m) => ({ code: codeDepuisNom(m.produit), objectif: m.objectif }))
+        .filter((m) => m.code in NOMS && m.code !== "vente_combo")
+        .map((m) => ({ code: m.code, nom: nomItem(m.code), suggestion: Math.max(1, m.objectif + 1) }));
+    const combo = candidats.find((c) => c.code === "vente_combo");
+    items.push({ code: "vente_combo", nom: nomItem("vente_combo"), suggestion: combo?.cible ?? 1 });
+    return items;
+}
+
+/** Défi choisi par le conseiller lui-même : remplace le défi proposé et l'accepte. */
+export async function definirDefiPerso(defi: DefiJour, code: string, cible: number): Promise<DefiJour | null> {
+    const n = Math.max(1, Math.round(cible));
+    const { error } = await supabase.from("defis_jour")
+        .update({ type: typeDe(code), code, libelle: libelle(code, n), cible: n, statut: "accepte" })
+        .eq("id", defi.id).in("statut", ["propose", "refuse"]);
+    if (error) throw error;
+    return getDefiJour(defi.conseillerId, defi.jour);
 }
 
 /** Défi du jour existant, ou en crée un (seulement si le conseiller est planifié aujourd'hui). */
