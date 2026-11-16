@@ -16,9 +16,9 @@ export function lireMenuCompact(): boolean {
     try {
         const p = new URLSearchParams(window.location.search).get("menu");
         if (p === "v2" || p === "v1") sessionStorage.setItem(CLE, p);
-        return sessionStorage.getItem(CLE) === "v2";
+        return sessionStorage.getItem(CLE) !== "v1";
     } catch {
-        return new URLSearchParams(window.location.search).get("menu") === "v2";
+        return new URLSearchParams(window.location.search).get("menu") !== "v1";
     }
 }
 

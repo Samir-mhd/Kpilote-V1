@@ -123,153 +123,110 @@ export default function ManagerMorningCheck({ onValidated }: { onValidated: () =
     const totalJours = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const jourActuel = now.getDate();
     const avanceMois = Math.round((jourActuel / totalJours) * 100);
+    const modifies   = items.filter(it => it.ventes !== (originalVentes[it.code] ?? 0)).length;
+    const nbEnAvance = items.filter(it => it.objectif > 0 && it.ventes / it.objectif >= avanceMois / 100).length;
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: "#060612" }}>
-
-            <div className="pointer-events-none fixed -top-40 -left-40 h-[500px] w-[500px] rounded-full bg-violet-700/20 blur-[120px]" />
+            <div className="pointer-events-none fixed -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-violet-700/20 blur-[120px]" />
             <div className="pointer-events-none fixed -bottom-40 -right-40 h-[500px] w-[500px] rounded-full bg-fuchsia-600/15 blur-[120px]" />
 
             <div
-                className="relative mx-auto w-full max-w-2xl px-6 py-12 transition-all duration-700"
+                className="relative mx-auto w-full max-w-3xl px-5 py-8 transition-all duration-700 sm:py-10"
                 style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(28px)" }}
             >
-                {/* Logo */}
-                <div className="mb-10 flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-sm font-black text-white">K</div>
-                    <span className="text-xs font-black uppercase tracking-[0.3em] text-white/40">KPILOTE MANAGER</span>
-                </div>
-
-                <h1 className="text-5xl font-black leading-tight text-white">
-                    Bonjour<br />
-                    <span className="bg-gradient-to-r from-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
-                        {NOM_MANAGER}
-                    </span>{" "}👋
-                </h1>
-
-                <div className="mt-4 flex items-center gap-3">
-                    <p className="text-sm font-semibold text-white/40">{dateLabel}</p>
-                    <span className="text-white/15">·</span>
-                    <p className="font-mono text-sm text-white/25">{heure}</p>
-                    <span className="text-white/15">·</span>
-                    <p className="text-sm text-white/25">Jour {jourActuel}/{totalJours} du mois</p>
-                </div>
-
-                {/* ── Cerebro Check ─────────────────────────────────────────── */}
-                <div className="mt-10">
-                    <p className="mb-1 text-xs font-black uppercase tracking-[0.3em] text-violet-400">
-                        Cerebro Check Boutique
-                    </p>
-                    <p className="mb-6 text-xs text-white/30">
-                        Vérifie les totaux équipe avant de démarrer — ajuste si les chiffres ne correspondent pas à la réalité.
-                    </p>
-
-                    {/* Avancement mois */}
-                    <div className="mb-6 rounded-2xl border border-white/8 bg-white/4 px-5 py-4">
-                        <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-bold text-white/40">Avancement du mois</p>
-                            <p className="text-xs font-black text-white/60">{avanceMois}%</p>
-                        </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-                            <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500"
-                                style={{ width: `${avanceMois}%` }} />
-                        </div>
+                {/* ── En-tête (même structure que le check conseiller) ── */}
+                <div className="flex items-center gap-4">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-3xl font-black text-white shadow-[0_10px_30px_rgba(139,92,246,.45)] sm:h-24 sm:w-24">K</div>
+                    <div className="min-w-0">
+                        <p className="text-xs font-black uppercase tracking-[0.3em] text-violet-400">Cerebro Check boutique</p>
+                        <h1 className="text-3xl font-black leading-tight text-white sm:text-4xl">
+                            Bonjour <span className="bg-gradient-to-r from-violet-300 to-fuchsia-300 bg-clip-text text-transparent">{NOM_MANAGER}</span> 👋
+                        </h1>
+                        <p className="mt-1 text-sm font-semibold text-white/45">{dateLabel} · {heure}</p>
                     </div>
-
-                    {loading ? (
-                        <div className="flex justify-center py-12">
-                            <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-500 border-t-transparent" />
-                        </div>
-                    ) : items.length === 0 ? (
-                        <div className="rounded-2xl border border-white/8 bg-white/4 p-8 text-center">
-                            <p className="text-white/40 text-sm">Aucun objectif boutique configuré.</p>
-                            <p className="mt-1 text-xs text-white/20">Configurer dans Manager → Matrice objectifs.</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            {items.map((item) => {
-                                const taux     = item.objectif > 0 ? Math.min(Math.round((item.ventes / item.objectif) * 100), 100) : 0;
-                                const enAvance = item.objectif > 0 && (item.ventes / item.objectif) >= (avanceMois / 100);
-                                const modifie  = item.ventes !== (originalVentes[item.code] ?? 0);
-                                return (
-                                    <div key={item.code}
-                                        className={`group rounded-[20px] border bg-white/4 p-5 transition-all ${
-                                            modifie
-                                                ? "border-violet-500/40 bg-violet-500/5"
-                                                : "border-white/8 hover:border-violet-500/20 hover:bg-violet-500/5"
-                                        }`}
-                                    >
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div>
-                                                <p className="text-xl">{item.emoji}</p>
-                                                <p className="mt-1 text-xs font-bold uppercase tracking-[0.2em] text-white/35">{item.label}</p>
-                                            </div>
-                                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
-                                                enAvance
-                                                    ? "bg-emerald-500/15 text-emerald-300"
-                                                    : "bg-red-500/15 text-red-300"
-                                            }`}>
-                                                {enAvance ? "✓ En avance" : "⚠ En retard"}
-                                            </span>
-                                        </div>
-
-                                        {/* Contrôle +/- */}
-                                        <div className="flex items-center justify-between gap-3">
-                                            <button
-                                                onClick={() => adjust(item.code, -1)}
-                                                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-lg font-black text-white/50 transition-all hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 active:scale-90"
-                                            >
-                                                −
-                                            </button>
-
-                                            <div className="text-center">
-                                                <p className="text-4xl font-black tabular-nums text-white">{item.ventes}</p>
-                                                <p className="text-xs text-white/20">/ {item.objectif}</p>
-                                            </div>
-
-                                            <button
-                                                onClick={() => adjust(item.code, +1)}
-                                                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-lg font-black text-white/50 transition-all hover:border-violet-500/40 hover:bg-violet-500/10 hover:text-violet-300 active:scale-90"
-                                            >
-                                                +
-                                            </button>
-                                        </div>
-
-                                        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
-                                            <div className={`h-full rounded-full transition-all ${
-                                                enAvance ? "bg-emerald-500" : "bg-amber-500"
-                                            }`} style={{ width: `${taux}%` }} />
-                                        </div>
-                                        <p className="mt-1.5 text-[10px] text-white/20">{taux}% de l'objectif mensuel</p>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
                 </div>
 
-                {/* ── CTA ─────────────────────────────────────────────────── */}
-                {!loading && (
-                    <button
-                        onClick={handleValider}
-                        disabled={saving}
-                        className="group relative mt-6 w-full overflow-hidden rounded-[20px] border border-violet-500/20 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 px-7 py-6 text-left transition-all duration-300 hover:border-violet-500/50 hover:from-violet-600/30 hover:to-fuchsia-600/30 active:scale-[0.98] disabled:opacity-50"
-                    >
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-[0.25em] text-violet-400/70">Base vérifiée</p>
-                                <p className="mt-1 text-xl font-black text-white">
-                                    {saving ? "Enregistrement…" : "Démarrer la journée"}
+                {loading ? (
+                    <div className="flex justify-center py-20">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-500 border-t-transparent" />
+                    </div>
+                ) : (
+                    <>
+                        {/* ── Briefing ── */}
+                        <div className="mt-7 grid gap-3 sm:grid-cols-2">
+                            <div className="rounded-2xl bg-white/[0.05] p-4 ring-1 ring-white/10">
+                                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">Avancement du mois</p>
+                                <p className="mt-1 text-white">
+                                    <span className="text-3xl font-black tabular-nums">{avanceMois}%</span>
+                                    <span className="ml-1 text-sm font-bold text-white/50">jour {jourActuel}/{totalJours}</span>
                                 </p>
+                                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                                    <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500" style={{ width: `${avanceMois}%` }} />
+                                </div>
                             </div>
-                            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white shadow-[0_4px_20px_rgba(124,58,237,.4)] transition-transform duration-300 group-hover:scale-110">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M5 12h14M12 5l7 7-7 7" />
-                                </svg>
+                            <div className="rounded-2xl bg-white/[0.05] p-4 ring-1 ring-white/10">
+                                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">Produits dans le rythme</p>
+                                <p className="mt-1 text-white">
+                                    <span className="text-3xl font-black tabular-nums">{nbEnAvance}</span>
+                                    <span className="ml-1 text-sm font-bold text-white/50">sur {items.length}</span>
+                                </p>
+                                <p className="mt-1 text-xs text-white/40">Par rapport à l&apos;avancement du mois.</p>
                             </div>
                         </div>
-                        <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/5 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-                    </button>
+
+                        {/* ── Vérification des chiffres ── */}
+                        <div className="mt-7 rounded-2xl bg-white/[0.04] p-4 ring-1 ring-white/10 sm:p-5">
+                            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                <p className="text-sm font-black text-white">Les totaux boutique du mois sont-ils justes ?</p>
+                                <p className="text-xs text-white/40">Corrige seulement si besoin.</p>
+                            </div>
+                            {items.length === 0 ? (
+                                <p className="mt-3 text-sm text-white/50">Aucun objectif boutique configuré (Manager → Matrice objectifs).</p>
+                            ) : (
+                                <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+                                    {items.map((it) => {
+                                        const ecart    = it.ventes - (originalVentes[it.code] ?? 0);
+                                        const enAvance = it.objectif > 0 && it.ventes / it.objectif >= avanceMois / 100;
+                                        return (
+                                            <li key={it.code} className={`flex items-center gap-3 rounded-xl px-3 py-2 ${ecart !== 0 ? "bg-amber-400/10 ring-1 ring-amber-300/30" : "bg-white/[0.03]"}`}>
+                                                <span className="w-5 text-center" aria-hidden="true">{it.emoji}</span>
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block truncate text-sm font-bold text-white/80">{it.label}</span>
+                                                    <span className={`block text-[11px] font-bold ${enAvance ? "text-emerald-300/80" : "text-rose-300/80"}`}>
+                                                        {enAvance ? "✓ Dans le rythme" : "⚠ En retard"} · obj. {it.objectif}
+                                                    </span>
+                                                </span>
+                                                {ecart !== 0 && <span className="text-[11px] font-black text-amber-300">{ecart > 0 ? `+${ecart}` : ecart}</span>}
+                                                <button onClick={() => adjust(it.code, -1)} aria-label={`Retirer 1 ${it.label}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-base font-black text-white/60 ring-1 ring-white/10 active:scale-90">−</button>
+                                                <span className="w-9 text-center text-lg font-black tabular-nums text-white">{it.ventes}</span>
+                                                <button onClick={() => adjust(it.code, +1)} aria-label={`Ajouter 1 ${it.label}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-base font-black text-white/60 ring-1 ring-white/10 active:scale-90">+</button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+                        </div>
+
+                        {/* ── Démarrer ── */}
+                        <button
+                            onClick={handleValider}
+                            disabled={saving}
+                            className="group mt-6 flex w-full items-center justify-between rounded-[20px] bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-5 text-left shadow-[0_12px_40px_rgba(124,58,237,.45)] transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+                        >
+                            <span>
+                                <span className="block text-xs font-bold uppercase tracking-[0.25em] text-white/70">
+                                    {modifies > 0 ? `${modifies} correction${modifies > 1 ? "s" : ""} à enregistrer` : "Tout est bon"}
+                                </span>
+                                <span className="mt-0.5 block text-xl font-black text-white">
+                                    {saving ? "Enregistrement…" : modifies > 0 ? "Enregistrer et démarrer" : "Démarrer la journée"}
+                                </span>
+                            </span>
+                            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-white transition-transform group-hover:translate-x-1">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+                            </span>
+                        </button>
+                    </>
                 )}
             </div>
         </div>
