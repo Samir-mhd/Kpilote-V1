@@ -146,6 +146,15 @@ export async function getLastCheckDate(conseillerId: string): Promise<string | n
     return data.last_check_date ?? null;
 }
 
+/** Fin de journée validée par le conseiller (« Valider ma journée ») → « Déconnecté » sur la page
+ *  d'accueil. Colonne conseillers.journee_validee_date (sql/journee_validee.sql) : si elle n'existe
+ *  pas encore, l'erreur est ignorée (la validation et la déconnexion fonctionnent quand même). */
+export async function marquerJourneeValidee(conseillerId: string): Promise<void> {
+    try {
+        await supabase.from("conseillers").update({ journee_validee_date: dateLocale() }).eq("id", conseillerId);
+    } catch { /* colonne absente : sans effet */ }
+}
+
 /** Marque le check du matin comme fait aujourd'hui (persisté en base, multi-appareils). */
 export async function marquerCheckFait(conseillerId: string): Promise<void> {
     await supabase

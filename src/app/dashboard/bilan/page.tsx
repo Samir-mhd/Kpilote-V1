@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toBlob } from "html-to-image";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { getBilanSoir, PerfBilan, CODES_ACTES_BILAN, CODES_SUIVI_BILAN } from "@/services/bilanSoirService";
 
@@ -20,7 +21,38 @@ function dateLongue() {
 
 export default function BilanSoirPage() {
     const [perfs, setPerfs] = useState<PerfBilan[] | null>(null);
+    const carte = useRef<HTMLDivElement>(null);
+    const [etat, setEtat] = useState<"" | "en_cours" | "copie" | "partage" | "telecharge" | "erreur">("");
     useEffect(() => { getBilanSoir().then(setPerfs).catch(() => setPerfs([])); }, []);
+
+    /** PC : copie l'image (Ctrl+V dans Teams). Téléphone : menu Partager (Teams, WhatsApp…).
+     *  En dernier recours : téléchargement du PNG. */
+    async function copierImage() {
+        if (!carte.current) return;
+        setEtat("en_cours");
+        try {
+            const blob = await toBlob(carte.current, { pixelRatio: 2, cacheBust: true });
+            if (!blob) throw new Error("image vide");
+            const fichier = new File([blob], `bilan-${new Date().toISOString().slice(0, 10)}.png`, { type: "image/png" });
+            const mobile = window.matchMedia("(pointer: coarse)").matches;
+            if (mobile && navigator.canShare?.({ files: [fichier] })) {
+                await navigator.share({ files: [fichier], title: "Bilan du soir" });
+                setEtat("partage");
+            } else if (navigator.clipboard && typeof ClipboardItem !== "undefined") {
+                await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+                setEtat("copie");
+            } else {
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = fichier.name;
+                a.click();
+                URL.revokeObjectURL(a.href);
+                setEtat("telecharge");
+            }
+        } catch (e) {
+            setEtat((e as Error)?.name === "AbortError" ? "" : "erreur");
+        }
+    }
 
     if (!perfs) {
         return (
@@ -37,8 +69,24 @@ export default function BilanSoirPage() {
     const defis = perfs.filter((p) => p.defi);
 
     return (
-        <div className="flex justify-center pb-10">
-            <div className="w-full max-w-[560px] overflow-hidden rounded-[32px] bg-[#07060d] text-white shadow-2xl">
+        <div className="flex flex-col items-center gap-4 pb-10">
+            <div className="flex w-full max-w-[560px] flex-col items-center gap-1.5">
+                <button
+                    onClick={copierImage}
+                    disabled={etat === "en_cours"}
+                    className="w-full rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 py-3.5 text-sm font-black text-white shadow-[0_10px_30px_rgba(124,58,237,.35)] transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+                >
+                    {etat === "en_cours" ? "Préparation de l'image…" : "📋 Copier l'image pour Teams"}
+                </button>
+                <p className={`text-xs font-bold ${etat === "erreur" ? "text-rose-600" : "text-slate-500"}`}>
+                    {etat === "copie" ? "✓ Image copiée : colle-la dans Teams avec Ctrl+V."
+                        : etat === "partage" ? "✓ Image partagée."
+                        : etat === "telecharge" ? "✓ Image téléchargée : ajoute-la dans Teams."
+                        : etat === "erreur" ? "Impossible de créer l'image, réessaie."
+                        : "Sur téléphone, le bouton ouvre le menu Partager."}
+                </p>
+            </div>
+            <div ref={carte} className="w-full max-w-[560px] overflow-hidden rounded-[32px] bg-[#07060d] text-white shadow-2xl">
                 {/* Équipe */}
                 <div className="relative px-5 pb-6 pt-7 text-center sm:px-7">
                     <div className="pointer-events-none absolute -top-24 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-gradient-to-br from-violet-600/50 via-fuchsia-600/30 to-transparent blur-3xl" />

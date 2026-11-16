@@ -10,7 +10,7 @@ import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 /** Proposition D — mélange B + C : ambiance sombre « vitrine » et titre « Chaque vente compte. »,
  *  priorité aux conseillers (connexion en un clic sur sa photo), espace manager en haut à droite. */
 
-type Conseiller = { id: string; nom: string; avatar?: string | null; profil_actif?: boolean | null; last_check_date?: string | null };
+type Conseiller = { id: string; nom: string; avatar?: string | null; profil_actif?: boolean | null; last_check_date?: string | null; journee_validee_date?: string | null };
 
 function jourLocal(d = new Date()): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -35,7 +35,9 @@ export default function AccueilD() {
     // "En boutique" seulement une fois le Cerebro Check du jour validé ; avant : "Planifié aujourd'hui".
     const aujourdhui = jourLocal();
     const estPlanifie = (c: Conseiller) => (planifies[c.id] ?? 0) > 0;
-    const estArrive = (c: Conseiller) => estPlanifie(c) && c.last_check_date === aujourdhui;
+    // Journée validée ("Valider ma journée") → "Déconnecté(e)", pastille rouge.
+    const estParti = (c: Conseiller) => c.journee_validee_date === aujourdhui;
+    const estArrive = (c: Conseiller) => estPlanifie(c) && c.last_check_date === aujourdhui && !estParti(c);
     const nbBoutique = equipe ? equipe.filter(estArrive).length : 0;
 
     return (
@@ -72,6 +74,7 @@ export default function AccueilD() {
                             const photo = c.avatar && (c.avatar.startsWith("http") || c.avatar.startsWith("data:")) ? c.avatar : null;
                             const planifie = estPlanifie(c);
                             const present = estArrive(c);
+                            const parti = estParti(c);
                             return (
                                 <Link
                                     key={c.id}
@@ -80,14 +83,15 @@ export default function AccueilD() {
                                 >
                                     <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br from-fuchsia-500 to-orange-400 opacity-0 blur-3xl transition-opacity group-hover:opacity-40" />
                                     <div className="relative">
-                                        <div className={`overflow-hidden rounded-full ring-4 transition-all ${present ? "ring-emerald-400/40 group-hover:ring-emerald-400/70" : planifie ? "ring-violet-400/30 group-hover:ring-violet-400/60" : "ring-white/10 group-hover:ring-white/25"}`}>
+                                        <div className={`overflow-hidden rounded-full ring-4 transition-all ${parti ? "ring-rose-500/35 group-hover:ring-rose-500/60" : present ? "ring-emerald-400/40 group-hover:ring-emerald-400/70" : planifie ? "ring-violet-400/30 group-hover:ring-violet-400/60" : "ring-white/10 group-hover:ring-white/25"}`}>
                                             <PhotoAvatar nom={c.nom} photoUrl={photo} size={84} />
                                         </div>
-                                        <span className={`absolute bottom-1 right-1 h-4 w-4 rounded-full ring-[3px] ring-[#07060d] ${present ? "bg-emerald-400" : planifie ? "bg-violet-400" : "bg-slate-500"}`} aria-hidden="true" />
+                                        <span className={`absolute bottom-1 right-1 h-4 w-4 rounded-full ring-[3px] ring-[#07060d] ${parti ? "bg-rose-500" : present ? "bg-emerald-400" : planifie ? "bg-violet-400" : "bg-slate-500"}`} aria-hidden="true" />
                                     </div>
                                     <p className="relative mt-4 text-xl font-black text-white">{c.nom.split(" ")[0]}</p>
-                                    <p className={`relative text-xs font-bold ${present ? "text-emerald-300" : planifie ? "text-violet-300" : "text-white/40"}`}>
-                                        {present ? "En boutique"
+                                    <p className={`relative text-xs font-bold ${parti ? "text-rose-300" : present ? "text-emerald-300" : planifie ? "text-violet-300" : "text-white/40"}`}>
+                                        {parti ? accord(genres[c.id], "Déconnecté", "Déconnectée")
+                                            : present ? "En boutique"
                                             : planifie ? `${accord(genres[c.id], "Planifié", "Planifiée")} aujourd'hui`
                                             : `Pas ${accord(genres[c.id], "planifié", "planifiée")}`}
                                     </p>

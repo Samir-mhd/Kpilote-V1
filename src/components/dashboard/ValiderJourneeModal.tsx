@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getMissionsReelles, codeDepuisNom } from "@/services/missionsReelles";
 import { CODES_ACTES_BILAN, CODES_SUIVI_BILAN } from "@/services/bilanSoirService";
+import { marquerJourneeValidee } from "@/services/resetService";
 
 const EMOJI: Record<string, string> = { box: "📦", forfaits: "📱", telephones: "📲", mcafee: "🛡️", assurance: "✅", avis_google: "⭐", recap_commercial: "📋", mcafee_mobile: "📶", assurance_essentielle: "🧩" };
 const CODES = [...CODES_ACTES_BILAN, ...CODES_SUIVI_BILAN] as string[];
@@ -13,6 +14,7 @@ const CODES = [...CODES_ACTES_BILAN, ...CODES_SUIVI_BILAN] as string[];
 export default function ValiderJourneeModal({ conseillerId, nom, qs, onClose }: { conseillerId: string; nom: string; qs: string; onClose: () => void }) {
     const router = useRouter();
     const [lignes, setLignes] = useState<{ code: string; label: string; n: number }[] | null>(null);
+    const [envoi, setEnvoi] = useState(false);
 
     useEffect(() => {
         getMissionsReelles(conseillerId, true)
@@ -44,8 +46,8 @@ export default function ValiderJourneeModal({ conseillerId, nom, qs, onClose }: 
                     </ul>
                 )}
                 <p className="mt-3 text-center text-sm text-white/60"><b className="text-white">{actes} actes</b> aujourd&apos;hui</p>
-                <button onClick={() => router.push("/")} className="mt-4 w-full rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 py-3.5 font-black transition-all active:scale-[0.98]">
-                    ✓ C&apos;est bon, je valide et me déconnecte
+                <button onClick={async () => { setEnvoi(true); await marquerJourneeValidee(conseillerId); router.push("/"); }} disabled={envoi} className="mt-4 w-full rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 py-3.5 font-black transition-all active:scale-[0.98]">
+                    {envoi ? "Déconnexion…" : "✓ C'est bon, je valide et me déconnecte"}
                 </button>
                 <button onClick={() => { onClose(); router.push(`/dashboard${qs}`); }} className="mt-2 w-full rounded-2xl bg-white/10 py-3 text-sm font-bold text-white/70 hover:bg-white/15">
                     Non, je corrige d&apos;abord
