@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 import KPIIcon from "@/components/ui/KPIIcon";
 import ManagerAuthGate from "@/components/manager/ManagerAuthGate";
+import MenuCompact, { lireMenuCompact } from "@/components/ui/MenuCompact";
 
 const menu = [
     {
@@ -70,7 +71,8 @@ export default function ManagerLayout({
     // accessible avec ?layout=v1.
     const [repliable, setRepliable] = useState(true);
     const [ouvert, setOuvert] = useState(false);
-    useEffect(() => { setRepliable(new URLSearchParams(window.location.search).get("layout") !== "v1"); }, [pathname]);
+    const [compact, setCompact] = useState(false);
+    useEffect(() => { setRepliable(new URLSearchParams(window.location.search).get("layout") !== "v1"); setCompact(lireMenuCompact()); }, [pathname]);
     useEffect(() => { setOuvert(false); }, [pathname]);
     useEffect(() => {
         if (!ouvert) return;
@@ -87,7 +89,21 @@ export default function ManagerLayout({
         <ManagerAuthGate>
         <div className="flex min-h-screen bg-slate-50">
 
-            {repliable && (
+            {repliable && compact && (
+                <MenuCompact
+                    ouvert={ouvert}
+                    setOuvert={setOuvert}
+                    items={menu.map((item) => ({
+                        label: item.label,
+                        href: item.href,
+                        icon: <KPIIcon name={item.icon} size={16} />,
+                        active: pathname === item.href || pathname.startsWith(`${item.href}/`),
+                    }))}
+                    pied={<Link href="/" className="block rounded-lg px-1.5 py-1.5 text-xs text-slate-500 hover:text-slate-300">← Accueil KPILOTE</Link>}
+                />
+            )}
+
+            {repliable && !compact && (
                 <>
                     <button
                         onClick={() => setOuvert(true)}
@@ -103,7 +119,7 @@ export default function ManagerLayout({
                 </>
             )}
 
-            <aside className={classeAside} aria-hidden={repliable && !ouvert}>
+            {!(repliable && compact) && <aside className={classeAside} aria-hidden={repliable && !ouvert}>
                 {repliable && (
                     <button
                         onClick={() => setOuvert(false)}
@@ -156,7 +172,7 @@ export default function ManagerLayout({
                     Version Bêta
                 </div>
 
-            </aside>
+            </aside>}
 
             <main className="flex-1 overflow-y-auto">
                 <div className={`mx-auto py-7 ${repliable ? "max-w-7xl pl-20 pr-6" : "max-w-6xl px-6"}`}>

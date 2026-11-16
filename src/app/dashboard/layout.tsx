@@ -10,6 +10,7 @@ import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { getPhotoUrl } from "@/services/photoService";
 import { readTheme, applyTheme } from "@/components/dashboard/ThemePicker";
 import { supabase } from "@/lib/supabase";
+import MenuCompact, { lireMenuCompact } from "@/components/ui/MenuCompact";
 
 const menus = [
     { label: "Accueil",       href: "/dashboard",              Icon: Home },
@@ -33,7 +34,8 @@ function SidebarInner() {
     const repliable = params.get("layout") !== "v1";
     const qs = id ? `?id=${id}&nom=${encodeURIComponent(nom)}${repliable ? "" : "&layout=v1"}` : "";
     const [ouvert, setOuvert] = useState(false);
-    useEffect(() => { setOuvert(false); }, [pathname]);
+    const [compact, setCompact] = useState(false);
+    useEffect(() => { setOuvert(false); setCompact(lireMenuCompact()); }, [pathname]);
     useEffect(() => {
         if (!ouvert) return;
         const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOuvert(false); };
@@ -68,6 +70,26 @@ function SidebarInner() {
     const classeAside = repliable
         ? `fixed inset-y-0 left-0 z-50 flex h-screen w-[260px] flex-col bg-slate-950 px-5 py-7 text-white transition-transform duration-300 ${ouvert ? "translate-x-0 shadow-[8px_0_40px_rgba(0,0,0,.35)]" : "-translate-x-full"}`
         : "sticky top-0 flex h-screen w-[245px] flex-col bg-slate-950 px-5 py-7 text-white";
+
+    if (repliable && compact) {
+        return (
+            <MenuCompact
+                ouvert={ouvert}
+                setOuvert={setOuvert}
+                items={menusAffiches.map(({ label, href, Icon }) => {
+                    const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+                    return { label, href: `${href}${qs}`, icon: <Icon size={16} strokeWidth={active ? 2.5 : 2} />, active };
+                })}
+                pied={
+                    <div className="flex items-center gap-2 py-1">
+                        <PhotoAvatar nom={nom} photoUrl={photoUrl} size={26} />
+                        <p className="min-w-0 flex-1 truncate text-xs font-black text-white">{nom}</p>
+                        <Link href="/choix" className="shrink-0 text-[11px] text-slate-500 hover:text-slate-300">Changer</Link>
+                    </div>
+                }
+            />
+        );
+    }
 
     return (
         <>
