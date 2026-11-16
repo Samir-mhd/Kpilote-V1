@@ -4,23 +4,9 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { Menu, X } from "lucide-react";
 
-/** Menu compact (test, ?menu=v2) : petit panneau flottant ancré sous le bouton,
- *  au lieu du tiroir pleine hauteur. */
+/** Menu (conseiller et manager) : petit panneau flottant ancré sous le bouton ☰. */
 
 export type ItemMenuCompact = { label: string; href: string; icon: React.ReactNode; active: boolean };
-
-const CLE = "kpilote-menu";
-
-/** Lit ?menu=v2 / ?menu=v1 et le mémorise pour la session (les liens du menu ne portent pas le paramètre). */
-export function lireMenuCompact(): boolean {
-    try {
-        const p = new URLSearchParams(window.location.search).get("menu");
-        if (p === "v2" || p === "v1") sessionStorage.setItem(CLE, p);
-        return sessionStorage.getItem(CLE) !== "v1";
-    } catch {
-        return new URLSearchParams(window.location.search).get("menu") !== "v1";
-    }
-}
 
 type Props = {
     items: ItemMenuCompact[];

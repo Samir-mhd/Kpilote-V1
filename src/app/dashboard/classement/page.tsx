@@ -2,8 +2,8 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { PRODUITS_CLASSEMENT, PRODUITS_HORS_TOTAL_CLASSEMENT, COMBOS_DANS_TOTAL } from "@/utils/produits";
-import { Periode, PERIODE_LABELS, couleurTaux, periodeSemaineEffective, joursPeriode } from "@/utils/periodes";
+import { PRODUITS_CLASSEMENT } from "@/utils/produits";
+import { Periode, PERIODE_LABELS, periodeSemaineEffective, joursPeriode } from "@/utils/periodes";
 import { construireClassementPeriode, ConseillerStats } from "@/services/classementService";
 import { construireClassementTrophees, ConseillerTrophees } from "@/services/badgesManagerService";
 import { getObjectifsSemaineFiges } from "@/services/objectifsSemaineFiges";
@@ -11,12 +11,11 @@ import { getJoursTravailPlageTous } from "@/services/planningService";
 import type { ProduitCode } from "@/utils/produits";
 import { getPhotosByIds } from "@/services/photoService";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
-import PodiumTopPerformers from "@/components/dashboard/PodiumTopPerformers";
 import ClassementCourse from "@/components/classement/ClassementCourse";
 import PodiumsThematiques from "@/components/classement/PodiumsThematiques";
 import { supabase } from "@/lib/supabase";
 import { getRealiseVentesComboParConseiller, getObjectifsComboParConseiller, RealiseVentesCombo } from "@/services/variableConseiller";
-import { GROUPES, GroupeId, COMBO_META, ComboCode } from "@/utils/classementGroupes";
+import { GROUPES, GroupeId, ComboCode } from "@/utils/classementGroupes";
 
 const medals = ["🥇", "🥈", "🥉"];
 const COMBO_VIDE: RealiseVentesCombo = { mcafee_mobile: 0, assurance_essentielle: 0, canal_plus: 0 };
@@ -30,9 +29,6 @@ const ONGLETS: { id: Periode | "trophees"; label: string }[] = [
 function ClassementInner() {
     const searchParams  = useSearchParams();
     const conseillerId  = searchParams.get("id") ?? "";
-    // Classement par objectifs + onglet Podiums par défaut ; l'ancien tableau reste accessible
-    // quelque temps avec &classement=v1.
-    const vueCourse     = searchParams.get("classement") !== "v1";
 
     const [periode, setPeriode]             = useState<Periode>(() => (["jour", "semaine", "mois"].includes(searchParams.get("periode") ?? "") ? searchParams.get("periode") as Periode : "mois"));
     const [classement, setClassement]       = useState<ConseillerStats[]>([]);
@@ -46,11 +42,9 @@ function ClassementInner() {
     const [maj, setMaj]                     = useState("");
 
     const [ongletTrophees, setOngletTrophees] = useState(false);
-    // Onglet "Podiums" (variante &classement=v2) : plusieurs podiums thématiques.
-    const [ongletPodiums, setOngletPodiums]   = useState(() => vueCourse && searchParams.get("onglet") === "podiums");
-    const onglets: { id: Periode | "trophees" | "podiums"; label: string }[] = vueCourse
-        ? [...ONGLETS.slice(0, 3), { id: "podiums", label: "🏅 Podiums" }, ...ONGLETS.slice(3)]
-        : ONGLETS;
+    // Onglet "Podiums" : plusieurs podiums thématiques.
+    const [ongletPodiums, setOngletPodiums]   = useState(() => searchParams.get("onglet") === "podiums");
+    const onglets: { id: Periode | "trophees" | "podiums"; label: string }[] = [...ONGLETS.slice(0, 3), { id: "podiums", label: "🏅 Podiums" }, ...ONGLETS.slice(3)];
     const [trophees, setTrophees]             = useState<ConseillerTrophees[]>([]);
     const [photosTrophees, setPhotosTrophees] = useState<Record<string, string | null>>({});
     const [loadingTrophees, setLoadingTrophees] = useState(true);
@@ -202,14 +196,6 @@ function ClassementInner() {
     const monRangTrophees = trophees.findIndex(c => c.id === conseillerId) + 1;
 
     const groupeActif = GROUPES.find((g) => g.id === groupe) ?? GROUPES[0];
-    const produitsGroupeCourant = PRODUITS_CLASSEMENT.filter((p) => groupeActif.codesCore.includes(p.code));
-    const comboGroupeCourant = groupeActif.codesCombo;
-
-    function sousTotalGroupe(c: ConseillerStats): number {
-        const combo = comboPeriode[c.id] ?? COMBO_VIDE;
-        return produitsGroupeCourant.reduce((t, p) => t + (c.produits[p.key] ?? 0), 0)
-            + comboGroupeCourant.reduce((t, code) => t + (combo[code] ?? 0), 0);
-    }
 
     return (
         <div className="space-y-8">
@@ -331,7 +317,7 @@ function ClassementInner() {
                 <div className="flex h-48 items-center justify-center">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
                 </div>
-            ) : vueCourse ? (
+            ) : (
                 <ClassementCourse
                     lignes={classement.map((c) => {
                         const combo = comboPeriode[c.id] ?? COMBO_VIDE;
@@ -346,163 +332,6 @@ function ClassementInner() {
                     conseillerId={conseillerId}
                     photos={photos}
                 />
-            ) : (
-                <>
-                    <PodiumTopPerformers classement={classement} conseillerId={conseillerId} periode={periode} />
-
-                    {/* Tableau détaillé style manager équipe */}
-                    <div className="overflow-hidden rounded-[24px] bg-white shadow-[0_4px_24px_rgba(15,23,42,.07)]">
-                        <div className="px-7 pt-7 pb-3 flex items-center justify-between">
-                            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Classement détaillé — {PERIODE_LABELS[periode]}</p>
-                            <div className="flex items-center gap-3 text-xs text-slate-300">
-                                <span className="text-emerald-600 font-bold">● ≥ obj.</span>
-                                <span className="text-amber-500 font-bold">● ≥ 50%</span>
-                                <span className="text-red-500 font-bold">● {"< 50%"}</span>
-                            </div>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[560px] border-separate border-spacing-y-1.5">
-                                <thead>
-                                    <tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-300">
-                                        <th className="px-4 pb-2">#</th>
-                                        <th className="px-4 pb-2">Conseiller</th>
-                                        {produitsGroupeCourant.map(p => (
-                                            <th key={p.code} className="px-2 pb-2 text-center">{p.emoji} {p.label}</th>
-                                        ))}
-                                        {comboGroupeCourant.map(code => (
-                                            <th key={code} className="px-2 pb-2 text-center">{COMBO_META[code].emoji} {COMBO_META[code].label}</th>
-                                        ))}
-                                        <th className="px-2 pb-2 text-center" title={`Somme des colonnes "${groupeActif.label}"`}>Sous-total</th>
-                                        {groupe === "core" && (
-                                            <th className="px-2 pb-2 text-center" title="Nombre d'articles par vente">NAP</th>
-                                        )}
-                                        <th className="px-4 pb-2 text-right">Total général</th>
-                                        <th className="px-5 pb-2 text-right">Taux</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {classement.map((c, idx) => {
-                                        const isMoi   = c.id === conseillerId;
-                                        // Même périmètre que c.total (classementService) : exclut Avis Google / Récap Co,
-                                        // inclut McAfee Mobile et Assurance essentielle.
-                                        const totalObj = PRODUITS_CLASSEMENT
-                                            .filter((p) => !PRODUITS_HORS_TOTAL_CLASSEMENT.includes(p.code))
-                                            .reduce((t, p) => t + getObjDynamic(c, p.key), 0)
-                                            + COMBOS_DANS_TOTAL.reduce((t, code) => t + getObjDynamicCombo(c.id, code), 0);
-                                        const taux    = totalObj > 0 ? Math.round((c.total / totalObj) * 100) : 0;
-                                        const ct      = couleurTaux(c.total, totalObj);
-                                        return (
-                                            <tr key={c.id} className={`${isMoi ? "bg-green-50/70" : "bg-slate-50 hover:bg-slate-100"} transition-colors`}>
-                                                <td className="rounded-l-2xl px-4 py-3">
-                                                    {idx < 3 ? <span className="text-xl">{medals[idx]}</span> : <span className="text-sm font-black text-slate-400">{idx + 1}</span>}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="overflow-hidden rounded-full flex-shrink-0">
-                                                            <PhotoAvatar nom={c.nom} photoUrl={photos[c.id]} size={36} />
-                                                        </div>
-                                                        <span className={`font-black text-sm ${isMoi ? "text-green-700" : "text-slate-800"}`}>
-                                                            {c.nom} {isMoi && <span className="text-xs font-semibold text-green-500">(moi)</span>}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                {produitsGroupeCourant.map(p => {
-                                                    const val = c.produits[p.key];
-                                                    const obj = getObjDynamic(c, p.key);
-                                                    const col = couleurTaux(val, obj);
-                                                    // Taux de placement, à côté du compteur (pas une colonne) : assurance / téléphones,
-                                                    // McAfee / box (le McAfee se vend avec une box, pas un téléphone).
-                                                    const telephones = c.produits.telephones ?? 0;
-                                                    const box = c.produits.box ?? 0;
-                                                    const tauxPlacement =
-                                                        p.key === "assurance" && telephones > 0 ? Math.round((val / telephones) * 100)
-                                                        : p.key === "mcafee" && box > 0 ? Math.round((val / box) * 100)
-                                                        : null;
-                                                    return (
-                                                        <td key={p.code} className="px-2 py-3 text-center">
-                                                            <div>
-                                                                <div className="flex items-center justify-center gap-1">
-                                                                    <div className={`inline-flex h-8 min-w-[40px] items-center justify-center rounded-xl px-2 text-sm font-black ${col.bg} ${col.text} border ${col.border}`}>
-                                                                        {val}
-                                                                    </div>
-                                                                    {tauxPlacement !== null && (
-                                                                        <span
-                                                                            className={`text-[11px] font-black ${tauxPlacement >= 24 ? "text-emerald-600" : "text-red-500"}`}
-                                                                            title={`Taux de placement ${p.label} / ${p.key === "mcafee" ? "box" : "téléphones"}`}
-                                                                        >
-                                                                            {tauxPlacement}%
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                {obj > 0 && (
-                                                                    <>
-                                                                        <div className="mx-auto mt-1 h-1 w-12 overflow-hidden rounded-full bg-slate-200">
-                                                                            <div className={`h-full rounded-full ${col.bar}`} style={{ width: `${Math.min(val / obj * 100, 100)}%` }} />
-                                                                        </div>
-                                                                        <p className={`text-[10px] ${col.text} opacity-70`}>{obj}</p>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    );
-                                                })}
-                                                {comboGroupeCourant.map(code => {
-                                                    const combo = comboPeriode[c.id] ?? COMBO_VIDE;
-                                                    const val = combo[code] ?? 0;
-                                                    const obj = getObjDynamicCombo(c.id, code);
-                                                    const col = couleurTaux(val, obj);
-                                                    return (
-                                                        <td key={code} className="px-2 py-3 text-center">
-                                                            <div>
-                                                                <div className={`mx-auto inline-flex h-8 min-w-[40px] items-center justify-center rounded-xl px-2 text-sm font-black ${col.bg} ${col.text} border ${col.border}`}>
-                                                                    {val}
-                                                                </div>
-                                                                {obj > 0 && (
-                                                                    <>
-                                                                        <div className="mx-auto mt-1 h-1 w-12 overflow-hidden rounded-full bg-slate-200">
-                                                                            <div className={`h-full rounded-full ${col.bar}`} style={{ width: `${Math.min(val / obj * 100, 100)}%` }} />
-                                                                        </div>
-                                                                        <p className={`text-[10px] ${col.text} opacity-70`}>{obj}</p>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    );
-                                                })}
-                                                <td className="px-2 py-3 text-center">
-                                                    <span className="text-sm font-black text-violet-600">{sousTotalGroupe(c)}</span>
-                                                </td>
-                                                {groupe === "core" && (
-                                                    <td className="px-2 py-3 text-center">
-                                                        <span className="text-sm font-black text-teal-600">{c.moyenneArticles.toFixed(2)}</span>
-                                                    </td>
-                                                )}
-                                                <td className="px-4 py-3 text-right">
-                                                    <p className={`text-lg font-black ${isMoi ? "text-green-700" : "text-slate-800"}`}>{c.total}</p>
-                                                </td>
-                                                <td className="rounded-r-2xl px-5 py-3 text-right">
-                                                    <div className="flex flex-col items-end gap-1">
-                                                        <span className={`text-sm font-black ${ct.text}`}>{taux}%</span>
-                                                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-200">
-                                                            <div className={`h-full rounded-full ${ct.bar}`} style={{ width: `${Math.min(taux, 100)}%` }} />
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div className="px-7 pb-5 pt-2 text-xs text-slate-300">
-                            {periode === "jour"
-                                ? "Objectif du jour en rythme dynamique — recalé sur l'objectif de la semaine figé"
-                                : periode === "semaine"
-                                ? "Objectif de la semaine figé depuis lundi — ne change pas selon l'avancement"
-                                : "Objectif mensuel fixé par le manager"}
-                        </div>
-                    </div>
-                </>
             )}
         </div>
     );

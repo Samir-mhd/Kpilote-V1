@@ -1,14 +1,9 @@
 "use client";
 
-import { Suspense } from "react";
-import Link from "next/link";
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import HeroHeader from "@/components/dashboard/HeroHeader";
 import HeroCompact from "@/components/dashboard/HeroCompact";
-import StatsBar from "@/components/dashboard/StatsBar";
-import MorningCheck from "@/components/dashboard/MorningCheck";
 import MorningCheckV2 from "@/components/dashboard/MorningCheckV2";
 import { DefiJourBandeau } from "@/components/dashboard/DefiJour";
 import { getJoursTravailPlage } from "@/services/planningService";
@@ -26,11 +21,10 @@ import {
     accepterChallenge,
     refuserChallenge,
 } from "@/services/challengeRepository";
-import { chargerChallenge, formatTempsRestant, ChallengeDashboard } from "@/services/challengeService";
+import { chargerChallenge, ChallengeDashboard } from "@/services/challengeService";
 import { useAvatarEtat } from "@/hooks/useAvatarEtat";
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 import TeamFeed from "@/components/dashboard/TeamFeed";
-import CagnotteJourCard from "@/components/dashboard/CagnotteJourCard";
 import AutresActesCard from "@/components/dashboard/AutresActesCard";
 import CorrectionsAccueil from "@/components/dashboard/CorrectionsAccueil";
 import ComboVenteModal, { ComboSelection } from "@/components/dashboard/ComboVenteModal";
@@ -101,11 +95,7 @@ export default function Dashboard() {
     const searchParams = useSearchParams();
     const nom = searchParams.get("nom") || "Conseiller";
     const conseillerId = searchParams.get("id") || "";
-    // Nouvelle mise en page par défaut ; l'ancienne reste accessible quelque temps avec &layout=v1.
-    const layoutV2 = searchParams.get("layout") !== "v1";
-    // Cerebro Check repensé (briefing + défi du jour) par défaut ; l'ancien avec &cerebro=v1.
-    // &apercuCheck=1 l'affiche même s'il est déjà validé aujourd'hui.
-    const cerebroV2 = searchParams.get("cerebro") !== "v1";
+    // &apercuCheck=1 affiche le Cerebro Check même s'il est déjà validé aujourd'hui.
     const [apercuCheck, setApercuCheck] = useState(searchParams.get("apercuCheck") === "1");
     // Planifié aujourd'hui ? (sinon pas de relance d'inactivité dans l'en-tête)
     const [travailleAujourdhui, setTravailleAujourdhui] = useState(true);
@@ -453,7 +443,7 @@ export default function Dashboard() {
     }
 
     if (!morningCheckValidated || apercuCheck) {
-        const Check = cerebroV2 ? MorningCheckV2 : MorningCheck;
+        const Check = MorningCheckV2;
         return (
             <Check
                 nom={nom}
@@ -890,7 +880,7 @@ export default function Dashboard() {
     }
 
     return (
-        <div className={layoutV2 ? "space-y-6" : "space-y-8"}>
+        <div className="space-y-6">
 
             {/* ── Overlay résultat challenge (gagné / perdu) ────────────── */}
             {challengeResult && (
@@ -1073,7 +1063,7 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {layoutV2 ? (
+            {(
                 <HeroCompact
                     nom={nom}
                     avatarEtat={avatarEtat}
@@ -1087,20 +1077,10 @@ export default function Dashboard() {
                     travailleAujourdhui={travailleAujourdhui}
                     genre={genre}
                 />
-            ) : (
-                <HeroHeader
-                    nom={nom}
-                    message={heroMessage}
-                    coachMessage={coachMessage}
-                    progression={tauxGlobal}
-                    rang={rang}
-                    avatarEtat={avatarEtat}
-                    genre={genre}
-                />
             )}
 
             {/* ── Défi du jour (accepté → progression, refusé → priorité du jour) ── */}
-            {cerebroV2 && conseillerId && <DefiJourBandeau conseillerId={conseillerId} nom={nom} />}
+            {conseillerId && <DefiJourBandeau conseillerId={conseillerId} nom={nom} />}
 
             {/* ── Invitations défi reçues ──────────────────────────────── */}
             {invitations.map((inv) => (
@@ -1224,7 +1204,7 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {layoutV2 ? (
+            {(
                 <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
                     <section className="xl:col-span-2">
                         {/* Vente combo mise en avant : le moyen le plus rapide de tout déclarer */}
@@ -1266,83 +1246,6 @@ export default function Dashboard() {
                         <TeamFeed conseillerId={conseillerId} condense />
                     </aside>
                 </div>
-            ) : (
-            <>
-            {variableActivee ? (
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-                    <div className="lg:col-span-2">
-                        <StatsBar
-                            ventes={realiseGlobal}
-                            objectif={objectifGlobal}
-                            taux={tauxGlobal}
-                            rang={rang}
-                        />
-                    </div>
-                    <CagnotteJourCard total={cagnotteTotal} hier={cagnotteHier} flash={cagnotteFlash} />
-                </div>
-            ) : (
-                <StatsBar
-                    ventes={realiseGlobal}
-                    objectif={objectifGlobal}
-                    taux={tauxGlobal}
-                    rang={rang}
-                />
-            )}
-
-            {prochainBadge && (
-                <Link
-                    href={`/dashboard/badges?id=${conseillerId}&nom=${encodeURIComponent(nom)}`}
-                    className="flex items-center gap-4 rounded-[24px] border border-amber-100 bg-gradient-to-r from-amber-50 to-orange-50 p-4 transition-all hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_8px_24px_rgba(217,119,6,.14)]"
-                >
-                    <div
-                        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-3xl"
-                        style={{ background: `linear-gradient(135deg, ${prochainBadge.badge.de}, ${prochainBadge.badge.a})` }}
-                    >
-                        {prochainBadge.badge.emoji}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600">🏆 Prochain trophée</p>
-                        <p className="truncate font-black text-slate-800">{prochainBadge.badge.label}</p>
-                        <p className="text-xs font-semibold text-slate-400">
-                            Encore {prochainBadge.restant} pour le débloquer
-                        </p>
-                    </div>
-                    <span className="shrink-0 text-lg text-slate-300">›</span>
-                </Link>
-            )}
-
-            <TeamFeed conseillerId={conseillerId} />
-
-            <section>
-                <div className="flex items-end justify-between mb-5">
-                    <div>
-                        <p className="text-xs font-bold uppercase tracking-[0.25em] text-green-600">
-                            Mission du jour
-                        </p>
-                        <h2 className="mt-1 text-2xl font-black text-slate-900">Tes objectifs</h2>
-                    </div>
-                </div>
-
-                <button
-                    onClick={() => (variableActivee ? setComboOuvert(true) : setComboSansVarianteOuvert(true))}
-                    className="group relative mb-5 flex w-full items-center gap-6 overflow-hidden rounded-[28px] border-2 border-amber-300 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-8 text-left shadow-[0_8px_24px_rgba(217,119,6,.12)] transition-all hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-[0_16px_40px_rgba(217,119,6,.25)]"
-                >
-                    <div className="pointer-events-none absolute -top-10 -right-10 h-40 w-40 rounded-full bg-amber-300/25 blur-3xl" />
-                    <span className="relative shrink-0 text-6xl leading-none">📱💻🛡️✅💪🎉</span>
-                    <span className="relative flex-1">
-                        <span className="block text-2xl font-black text-amber-700">Vente combo</span>
-                        <span className="mt-1 block text-sm font-semibold text-amber-600">Box + forfait + assurance + tout d&apos;un coup</span>
-                    </span>
-                    <span className="relative hidden shrink-0 items-center justify-center rounded-full bg-amber-400 text-white shadow-[0_4px_16px_rgba(217,119,6,.35)] transition-transform group-hover:translate-x-1 sm:flex h-12 w-12 text-2xl">
-                        →
-                    </span>
-                </button>
-
-                <div className="grid gap-5 sm:grid-cols-2">
-                    {cartesMissions(false)}
-                </div>
-            </section>
-            </>
             )}
 
             {comboOuvert && (

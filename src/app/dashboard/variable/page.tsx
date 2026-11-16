@@ -21,8 +21,8 @@ import {
     getContributionAssuranceMoisAffiche,
     ContributionAssurance,
 } from "@/services/variableConseiller";
-import { CATEGORIES_VENTES, NumberField, CardShell, BonusManuelsCard, BonusManuelsInline, DetailResultatsCard } from "@/components/variable/variableUi";
-import BoxRaccordementTab from "@/components/variable/BoxRaccordementTab";
+import { CATEGORIES_VENTES, NumberField, CardShell, BonusManuelsCard, BonusManuelsInline } from "@/components/variable/variableUi";
+
 import BoxRaccordementTabV2 from "@/components/variable/BoxRaccordementTabV2";
 import HistoriqueVariableTab from "@/components/variable/HistoriqueVariableTab";
 import { getContributionBoxMoisPaiement, nomMois, ContributionBoxMoisPaiement } from "@/services/boxRaccordement";
@@ -50,8 +50,6 @@ function VariableInner() {
     const searchParams = useSearchParams();
     const conseillerId = searchParams.get("id") ?? "";
     const nomConseiller = searchParams.get("nom") ?? "";
-    // Nouvelle présentation par défaut ; l'ancienne reste accessible quelque temps avec &variable=v1.
-    const v2 = searchParams.get("variable") !== "v1";
     const [declarationOuverte, setDeclarationOuverte] = useState(false);
     // Contexte boutique (R/O, notes collectives) saisi par le manager → lecture seule ici.
     const [contexteManager, setContexteManager] = useState(false);
@@ -243,7 +241,7 @@ function VariableInner() {
                         <p className="text-xs font-black uppercase tracking-[0.4em] text-violet-400">Ma cagnotte</p>
                         <h1 className="mt-2 text-4xl font-black text-white">Ma variable du mois</h1>
                         <p className="mt-1 text-sm font-medium text-white/40">
-                            {v2 ? "Ce que tu as gagné, ce que tu peux encore gagner." : "Saisis tes actes au fil du mois, le montant se met à jour tout seul."}
+                            Ce que tu as gagné, ce que tu peux encore gagner.
                         </p>
                     </div>
                     <div className="flex flex-col items-end gap-3">
@@ -275,12 +273,10 @@ function VariableInner() {
             </div>
 
             {onglet === "box" ? (
-                searchParams.get("box") !== "v1" // "Mes box" simplifié par défaut ; ancienne vue avec &box=v1
-                    ? <BoxRaccordementTabV2 conseillerId={conseillerId} bareme={bareme} />
-                    : <BoxRaccordementTab conseillerId={conseillerId} bareme={bareme} />
+                <BoxRaccordementTabV2 conseillerId={conseillerId} bareme={bareme} />
             ) : onglet === "historique" ? (
                 <HistoriqueVariableTab conseillerId={conseillerId} nomConseiller={nomConseiller} />
-            ) : v2 ? (
+            ) : (
                 <div className="space-y-5">
                     <VariableSynthese
                         conseillerId={conseillerId}
@@ -386,138 +382,6 @@ function VariableInner() {
                         )}
                     </section>
                 </div>
-            ) : (
-            <div className="grid grid-cols-1 gap-7 lg:grid-cols-[1.3fr_1fr]">
-                {/* ── Formulaire ─────────────────────────────────────────────── */}
-                <div className="space-y-6">
-                    {CATEGORIES_VENTES.map((cat) => {
-                        const champsAssurance = new Set(["assurance_nouveau_mobile", "assurance_essentielle"]);
-                        const champVerrouilleKey = (key: string) =>
-                            (cat.categorieKey === "box" && boxVerrouille) || champsAssurance.has(key);
-                        const aChampAssurance = cat.champs.some((c) => champsAssurance.has(c.key));
-                        return (
-                        <CardShell key={cat.titre}>
-                            <p className={`mb-4 text-xs font-black uppercase tracking-widest ${cat.accent}`}>
-                                {cat.titre}
-                            </p>
-                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                                {cat.champs.map((c) => (
-                                    <NumberField
-                                        key={c.key}
-                                        label={c.label}
-                                        value={ventes[c.key]}
-                                        onChange={(v) => updateVente(c.key, v)}
-                                        readOnly={champVerrouilleKey(c.key)}
-                                    />
-                                ))}
-                            </div>
-                            {cat.categorieKey === "box" && boxVerrouille && (
-                                <p className="mt-3 text-[11px] text-white/30">
-                                    🔒 Depuis le 01/09/2026, la box n'est plus déclarée ici — elle est alimentée automatiquement par tes raccordements (onglet "📦 Mes box").
-                                </p>
-                            )}
-                            {aChampAssurance && (
-                                <p className="mt-3 text-[11px] text-white/30">
-                                    🔒 L&apos;assurance n&apos;est plus déclarée ici — elle est comptée automatiquement à partir de tes ventes (voir le détail à droite).
-                                </p>
-                            )}
-                            {bonusManuels.some((b) => b.categorie === cat.categorieKey) && (
-                                <div className="mt-4 border-t border-white/10 pt-4">
-                                    <BonusManuelsInline
-                                        items={bonusManuels.filter((b) => b.categorie === cat.categorieKey)}
-                                        mode="declaration"
-                                        volumes={bonusVolumes}
-                                        onVolumeChange={(id, v) => setBonusVolumes((prev) => ({ ...prev, [id]: v }))}
-                                    />
-                                </div>
-                            )}
-                        </CardShell>
-                        );
-                    })}
-
-                    {/* Satisfaction & présence */}
-                    <CardShell>
-                        <p className="mb-4 text-xs font-black uppercase tracking-widest text-rose-400">
-                            Satisfaction & présence
-                        </p>
-                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                            <NumberField
-                                label="Note SatisFD individuelle (%)"
-                                value={ventes.note_satisfd_individuelle}
-                                onChange={(v) => updateVente("note_satisfd_individuelle", v)}
-                            />
-                            <NumberField
-                                label="Note SatisFD AST individuelle (%)"
-                                value={ventes.note_satisfd_ast_individuelle}
-                                onChange={(v) => updateVente("note_satisfd_ast_individuelle", v)}
-                            />
-                            <NumberField
-                                label="Note SatisFD collective (%)"
-                                value={ventes.note_satisfd_collective}
-                                onChange={(v) => updateVente("note_satisfd_collective", v)}
-                                readOnly={contexteManager}
-                            />
-                            <NumberField
-                                label="Note SatisFD AST collective (%)"
-                                value={ventes.note_satisfd_ast_collective}
-                                onChange={(v) => updateVente("note_satisfd_ast_collective", v)}
-                                readOnly={contexteManager}
-                            />
-                            <NumberField
-                                label={presenceAuto ? "Présence (%) · selon ton planning" : "Taux de présence (%)"}
-                                value={tauxPresencePct}
-                                onChange={setTauxPresencePct}
-                                readOnly={presenceAuto}
-                            />
-                        </div>
-                        {bonusManuels.some((b) => b.categorie === "satisfd") && (
-                            <div className="mt-4 border-t border-white/10 pt-4">
-                                <BonusManuelsInline
-                                    items={bonusManuels.filter((b) => b.categorie === "satisfd")}
-                                    mode="declaration"
-                                    volumes={bonusVolumes}
-                                    onVolumeChange={(id, v) => setBonusVolumes((prev) => ({ ...prev, [id]: v }))}
-                                />
-                            </div>
-                        )}
-                    </CardShell>
-
-                    {/* Contexte boutique */}
-                    <CardShell>
-                        <p className="mb-4 text-xs font-black uppercase tracking-widest text-cyan-400">
-                            Contexte boutique (R/O du mois)
-                        </p>
-                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                            <NumberField
-                                label={`R/O box boutique — ${nomMois(moisVenteBoxPayee)} (%)`}
-                                value={boost.ro_box_boutique}
-                                onChange={(v) => updateBoost("ro_box_boutique", v)}
-                                readOnly={contexteManager}
-                            />
-                            <NumberField label="R/O forfait boutique (%)" value={boost.ro_forfait_boutique} onChange={(v) => updateBoost("ro_forfait_boutique", v)} readOnly={contexteManager} />
-                            <NumberField label="R/O smartphone boutique (%)" value={boost.ro_smartphone_boutique} onChange={(v) => updateBoost("ro_smartphone_boutique", v)} readOnly={contexteManager} />
-                        </div>
-                        <p className="mt-2 text-[11px] text-white/30">
-                            Les box sont payées à M+2 : le boost collectif box de ce mois se base sur le R/O du mois où elles ont été vendues ({nomMois(moisVenteBoxPayee)}), pas sur le R/O de ce mois-ci.
-                        </p>
-                    </CardShell>
-
-                    <BonusManuelsCard
-                        items={bonusManuels.filter((b) => !b.categorie || b.categorie === "destockage")}
-                        mode="declaration"
-                        volumes={bonusVolumes}
-                        onVolumeChange={(id, v) => setBonusVolumes((prev) => ({ ...prev, [id]: v }))}
-                    />
-                </div>
-
-                {/* ── Résultats ──────────────────────────────────────────────── */}
-                <div className="lg:sticky lg:top-7 lg:self-start">
-                    <DetailResultatsCard
-                        detail={detail}
-                        extra={lignesExtra}
-                    />
-                </div>
-            </div>
             )}
         </main>
     );
