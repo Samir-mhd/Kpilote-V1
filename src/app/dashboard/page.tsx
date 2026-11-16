@@ -20,7 +20,7 @@ import { getMissionsReelles } from "@/services/missionsReelles";
 import { construireClassementPeriode } from "@/services/classementService";
 import { analyserDashboard } from "@/engine/contextEngine";
 import { supabase } from "@/lib/supabase";
-import { checkForceActive, clearForceCheck, getLastCheckDate, marquerCheckFait } from "@/services/resetService";
+import { checkForceActive, clearForceCheck, getLastCheckDate, marquerCheckFait, enregistrerComboSansVariable } from "@/services/resetService";
 import {
     getInvitationsPendantes,
     accepterChallenge,
@@ -846,6 +846,14 @@ export default function Dashboard() {
         if (s.telephone) await handleSale("Téléphones");
         if (s.mcafee) await handleSale("McAfee");
         if (s.assurance) await handleSale("Assurance");
+        // McAfee Mobile / Canal+ : pas de ligne "ventes", enregistrés comme les ventes combo
+        // (variable_actes_jour à 0 €). McAfee Mobile compte comme un article, pas Canal+.
+        if (conseillerId && s.mcafeeMobile) {
+            await enregistrerComboSansVariable(conseillerId, "mcafee_mobile").catch(() => {});
+            transactionArticlesRef.current += 1;
+        }
+        if (conseillerId && s.canal) await enregistrerComboSansVariable(conseillerId, "canal_plus").catch(() => {});
+        if (s.mcafeeMobile || s.canal) { await chargerMissions(); await chargerRang(); }
         flushTransactionArticles();
         setCoachMessage("🎁 Vente combo enregistrée — bien joué !");
     }
@@ -1348,6 +1356,8 @@ export default function Dashboard() {
 
             {comboSansVarianteOuvert && (
                 <ComboSansVarianteModal
+                    // Assurance proposée seulement si le conseiller en a (ex. Pauline : non).
+                    masquer={missions.some((m) => produitCode(m.produit) === "assurance") ? [] : ["assurance"]}
                     onClose={() => setComboSansVarianteOuvert(false)}
                     onValider={soumettreComboSansVariante}
                 />

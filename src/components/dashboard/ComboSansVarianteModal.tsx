@@ -7,11 +7,13 @@ export type ComboSansVarianteSelection = {
     forfait: boolean;
     telephone: boolean;
     mcafee: boolean;
+    mcafeeMobile: boolean;
     assurance: boolean;
+    canal: boolean;
 };
 
 const SELECTION_VIDE: ComboSansVarianteSelection = {
-    box: false, forfait: false, telephone: false, mcafee: false, assurance: false,
+    box: false, forfait: false, telephone: false, mcafee: false, mcafeeMobile: false, assurance: false, canal: false,
 };
 
 const ITEMS: { cle: keyof ComboSansVarianteSelection; label: string; emoji: string }[] = [
@@ -19,19 +21,24 @@ const ITEMS: { cle: keyof ComboSansVarianteSelection; label: string; emoji: stri
     { cle: "forfait", label: "Forfait", emoji: "📱" },
     { cle: "telephone", label: "Téléphone", emoji: "📲" },
     { cle: "mcafee", label: "McAfee", emoji: "🛡️" },
+    { cle: "mcafeeMobile", label: "McAfee Mobile", emoji: "📶" },
     { cle: "assurance", label: "Assurance", emoji: "✅" },
+    { cle: "canal", label: "Canal+", emoji: "📺" },
 ];
 
 type Props = {
     onClose: () => void;
     onValider: (selection: ComboSansVarianteSelection) => Promise<void>;
+    /** Items à ne pas proposer (ex. Assurance pour un conseiller qui n'en vend pas). */
+    masquer?: (keyof ComboSansVarianteSelection)[];
 };
 
-export default function ComboSansVarianteModal({ onClose, onValider }: Props) {
+export default function ComboSansVarianteModal({ onClose, onValider, masquer = [] }: Props) {
     const [s, setS] = useState<ComboSansVarianteSelection>(SELECTION_VIDE);
     const [enCours, setEnCours] = useState(false);
+    const items = ITEMS.filter((i) => !masquer.includes(i.cle));
 
-    const rienSelectionne = !s.box && !s.forfait && !s.telephone && !s.mcafee && !s.assurance;
+    const rienSelectionne = !Object.values(s).some(Boolean);
 
     async function valider() {
         if (rienSelectionne || enCours) return;
@@ -51,13 +58,13 @@ export default function ComboSansVarianteModal({ onClose, onValider }: Props) {
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="mb-4 flex items-center justify-between">
-                    <h3 className="text-lg font-black text-white">📱💻🛡️✅ Vente combo</h3>
+                    <h3 className="text-lg font-black text-white">🎁 Vente combo</h3>
                     <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/60 hover:bg-white/20">✕</button>
                 </div>
                 <p className="mb-5 text-xs text-white/40">Coche tout ce qui fait partie de cette même vente.</p>
 
                 <div className="space-y-2">
-                    {ITEMS.map((item) => (
+                    {items.map((item) => (
                         <button
                             key={item.cle}
                             onClick={() => setS((p) => ({ ...p, [item.cle]: !p[item.cle] }))}

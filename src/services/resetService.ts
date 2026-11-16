@@ -263,6 +263,28 @@ export async function resetAllCheckDates(): Promise<void> {
 export type CodeComboCheck = "mcafee_mobile" | "assurance_essentielle" | "canal_plus";
 const LABEL_CANAL_CHECK = "Canal+ Option 2"; // libellé compté comme Canal+ (options 2 et 3)
 
+/**
+ * Conseiller sans variable (ex. Pauline) : enregistre une vente McAfee Mobile ou Canal+ du jour,
+ * à 0 €, au même format que les actes variables — comptée partout (classement, défi, stats)
+ * comme les autres ventes combo.
+ */
+export async function enregistrerComboSansVariable(conseillerId: string, code: "mcafee_mobile" | "canal_plus"): Promise<void> {
+    const d = new Date();
+    const jour = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const base = { conseiller_id: conseillerId, jour, montant: 0, quantite: 1 };
+    let ligne: Record<string, unknown>;
+    if (code === "mcafee_mobile") {
+        const { data: bonus } = await supabase.from("variable_bonus_manuels").select("id, label").eq("categorie", "autres_primes");
+        const id = (bonus ?? []).find((b: { label: string }) => b.label.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes("mcafee"))?.id;
+        if (!id) throw new Error("Bonus McAfee Mobile introuvable");
+        ligne = { ...base, label: "McAfee Mobile", bonus_manuel_id: id };
+    } else {
+        ligne = { ...base, label: LABEL_CANAL_CHECK };
+    }
+    const { error } = await supabase.from("variable_actes_jour").insert(ligne);
+    if (error) throw new Error(error.message ?? "Erreur enregistrement vente combo");
+}
+
 export async function ajusterCheckCerebroCombos(
     conseillerId: string,
     desiredTotals: Partial<Record<CodeComboCheck, number>>
