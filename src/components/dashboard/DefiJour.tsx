@@ -12,8 +12,8 @@ export function DefiJourChoix({ defi, onChange }: { defi: DefiJour; onChange: (d
     const [envoi, setEnvoi] = useState(false);
     // Parcours : base → (Pas aujourd'hui) question "choisis ton défi ?" → liste des items → nombre.
     const [etape, setEtape] = useState<"base" | "question" | "liste" | "nombre">("base");
-    const [items, setItems] = useState<{ code: string; nom: string; suggestion: number }[] | null>(null);
-    const [item, setItem] = useState<{ code: string; nom: string; suggestion: number } | null>(null);
+    const [items, setItems] = useState<{ code: string; nom: string; suggestion: number; minimum: number }[] | null>(null);
+    const [item, setItem] = useState<{ code: string; nom: string; suggestion: number; minimum: number } | null>(null);
     const [nombre, setNombre] = useState(1);
     const [rien, setRien] = useState(false);
 
@@ -102,10 +102,11 @@ export function DefiJourChoix({ defi, onChange }: { defi: DefiJour; onChange: (d
                     <button onClick={() => setEtape("liste")} className="text-xs font-bold text-white/50 hover:text-white">← Autre item</button>
                 </div>
                 <div className="mt-3 flex items-center justify-center gap-4">
-                    <button onClick={() => setNombre((n) => Math.max(1, n - 1))} aria-label="Moins" className="h-12 w-12 rounded-xl bg-white/10 text-2xl font-black text-white hover:bg-white/15">−</button>
+                    <button onClick={() => setNombre((n) => Math.max(item.minimum, n - 1))} disabled={nombre <= item.minimum} aria-label="Moins" className="h-12 w-12 rounded-xl bg-white/10 text-2xl font-black text-white hover:bg-white/15 disabled:opacity-30">−</button>
                     <p className="min-w-[8rem] text-center text-2xl font-black text-white">{libelleDefi(item.code, nombre)}</p>
                     <button onClick={() => setNombre((n) => Math.min(50, n + 1))} aria-label="Plus" className="h-12 w-12 rounded-xl bg-white/10 text-2xl font-black text-white hover:bg-white/15">+</button>
                 </div>
+                {item.minimum > 1 && <p className="mt-2 text-center text-[11px] font-bold text-white/45">Au moins ton objectif du jour : {item.minimum}</p>}
                 <button onClick={validerPerso} disabled={envoi} className="mt-4 w-full rounded-xl bg-white px-4 py-2.5 text-sm font-black text-violet-700 transition-all active:scale-[0.97] disabled:opacity-60">
                     Je relève ce défi 💪
                 </button>

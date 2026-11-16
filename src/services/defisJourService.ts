@@ -74,6 +74,19 @@ function typeDe(code: string): DefiJour["type"] {
     return code === "vente_combo" ? "vente_combo" : code === "assurance_essentielle" || code === "mcafee_mobile" ? "combo" : "produit";
 }
 
+/**
+ * Nombre demandé pour un défi produit :
+ * - basé sur ce que le conseiller fait réellement (sa moyenne par jour travaillé + 1),
+ *   et non sur l'objectif de rattrapage ;
+ * - produit rare (moins d'1 par jour en moyenne) : pas de +1, on reste sur l'objectif ;
+ * - jamais en dessous de l'objectif du jour (égal ou supérieur).
+ */
+function cibleDefi(objectifJour: number, moyenneJour: number | undefined): number {
+    const obj = Math.max(1, Math.ceil(objectifJour));
+    if (moyenneJour === undefined || moyenneJour < 1) return obj;
+    return Math.max(obj, Math.round(moyenneJour) + 1);
+}
+
 /** Tirage pondéré (aléatoire, ou déterministe si `graineTexte` est fourni). */
 function tirer(candidats: Candidat[], graineTexte?: string): Candidat | null {
     if (candidats.length === 0) return null;
@@ -100,20 +113,25 @@ async function candidatsDefi(conseillerId: string): Promise<Candidat[]> {
 
     const total = jt.travailles + jt.restants;
     const partEcoulee = total > 0 ? jt.travailles / total : 0;
-    // Retard sur le rythme du mois (0 = dans les temps, 1 = rien de fait) → produit plus probable.
+    // Retard sur le rythme du mois (0 = dans les temps, 1 = rien de fait) → produit un peu plus
+    // probable (bonus adouci : 2 fois plus de chances au maximum).
     const retard: Record<string, number> = {};
+    // Moyenne réelle du conseiller par jour travaillé ce mois.
+    const moyenne: Record<string, number> = {};
     missionsMois.forEach((m) => {
+        const code = codeDepuisNom(m.produit);
         const attendu = m.objectifMensuel * partEcoulee;
-        retard[codeDepuisNom(m.produit)] = attendu > 0 ? Math.max(0, Math.min(1, (attendu - m.realise) / attendu)) : 0;
+        retard[code] = attendu > 0 ? Math.max(0, Math.min(1, (attendu - m.realise) / attendu)) : 0;
+        if (jt.travailles > 0) moyenne[code] = m.realise / jt.travailles;
     });
 
     const candidats: Candidat[] = [];
     (missionsJour as { produit: string; objectif: number }[]).forEach((m) => {
         const code = codeDepuisNom(m.produit);
         if (!(code in NOMS) || m.objectif <= 0) return;
-        const cible = m.objectif + 1;
+        const cible = cibleDefi(m.objectif, moyenne[code]);
         const type: DefiJour["type"] = code === "assurance_essentielle" || code === "mcafee_mobile" ? "combo" : "produit";
-        candidats.push({ type, code, libelle: libelle(code, cible), cible, poids: 1 + 3 * (retard[code] ?? 0) });
+        candidats.push({ type, code, libelle: libelle(code, cible), cible, poids: 1 + (retard[code] ?? 0) });
     });
 
     // Vente combo (2 articles et +) : moyenne du mois par jour travaillé, +1.
@@ -140,9 +158,10 @@ export async function changerDefi(defi: DefiJour): Promise<DefiJour | null> {
     return getDefiJour(defi.conseillerId, defi.jour);
 }
 
-/** Tous les items que le conseiller peut se fixer comme défi, avec un nombre suggéré
- *  (objectif du jour + 1, sinon 1). Produits non concernés (objectif 0 et aucune vente) exclus. */
-export async function itemsDefiPerso(conseillerId: string): Promise<{ code: string; nom: string; suggestion: number }[]> {
+/** Tous les items que le conseiller peut se fixer comme défi, avec un nombre suggéré (même calcul
+ *  que le défi automatique) et un minimum (l'objectif du jour : jamais en dessous).
+ *  Produits non concernés (objectif 0 et aucune vente) exclus. */
+export async function itemsDefiPerso(conseillerId: string): Promise<{ code: string; nom: string; suggestion: number; minimum: number }[]> {
     const [missions, candidats] = await Promise.all([
         getMissionsReelles(conseillerId, true).catch(() => []),
         candidatsDefi(conseillerId).catch(() => [] as Candidat[]),
@@ -150,9 +169,13 @@ export async function itemsDefiPerso(conseillerId: string): Promise<{ code: stri
     const items = (missions as { produit: string; objectif: number }[])
         .map((m) => ({ code: codeDepuisNom(m.produit), objectif: m.objectif }))
         .filter((m) => m.code in NOMS && m.code !== "vente_combo")
-        .map((m) => ({ code: m.code, nom: nomItem(m.code), suggestion: Math.max(1, m.objectif + 1) }));
+        .map((m) => {
+            const minimum = Math.max(1, Math.ceil(m.objectif));
+            const auto = candidats.find((c) => c.code === m.code)?.cible;
+            return { code: m.code, nom: nomItem(m.code), suggestion: Math.max(minimum, auto ?? minimum), minimum };
+        });
     const combo = candidats.find((c) => c.code === "vente_combo");
-    items.push({ code: "vente_combo", nom: nomItem("vente_combo"), suggestion: combo?.cible ?? 1 });
+    items.push({ code: "vente_combo", nom: nomItem("vente_combo"), suggestion: combo?.cible ?? 1, minimum: 1 });
     return items;
 }
 
