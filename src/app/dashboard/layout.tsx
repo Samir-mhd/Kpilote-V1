@@ -103,7 +103,7 @@ function SidebarInner() {
                     <div className="flex items-center gap-2 py-1">
                         <PhotoAvatar nom={nom} photoUrl={photoUrl} size={26} />
                         <p className="min-w-0 flex-1 truncate text-xs font-black text-white">{nom}</p>
-                        <Link href="/choix" className="shrink-0 text-[11px] text-slate-500 hover:text-slate-300">Changer</Link>
+                        <Link href="/" className="shrink-0 text-[11px] text-slate-500 hover:text-slate-300">Changer</Link>
                     </div>
                     </>
                 }
@@ -178,7 +178,7 @@ function SidebarInner() {
                         <p className="text-xs text-slate-400">Conseiller</p>
                     </div>
                 </div>
-                <Link href="/choix" className="mt-3 block text-xs text-slate-500 hover:text-slate-300 transition-colors">
+                <Link href="/" className="mt-3 block text-xs text-slate-500 hover:text-slate-300 transition-colors">
                     ← Changer de conseiller
                 </Link>
             </div>
