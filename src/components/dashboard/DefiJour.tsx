@@ -123,13 +123,13 @@ export function DefiJourChoix({ defi, onChange }: { defi: DefiJour; onChange: (d
             {defi.statut === "propose" && (
                 <>
                     <div className="mt-3 flex flex-wrap gap-2">
-                        <button onClick={() => repondre("accepte")} disabled={envoi} className="flex-1 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-violet-700 transition-all active:scale-[0.97] disabled:opacity-60">
+                        <button onClick={() => repondre("accepte")} disabled={envoi} className="w-full rounded-xl bg-white px-4 py-2.5 text-sm font-black text-violet-700 transition-all active:scale-[0.97] disabled:opacity-60">
                             Je relève le défi 💪
                         </button>
-                        <button onClick={changer} disabled={envoi} className="rounded-xl bg-white/15 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-white/20 disabled:opacity-60">
+                        <button onClick={changer} disabled={envoi} className="flex-1 rounded-xl bg-white/15 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-white/20 disabled:opacity-60">
                             🔄 Changer de défi
                         </button>
-                        <button onClick={() => setEtape("question")} disabled={envoi} className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white/70 transition-all hover:bg-white/15 disabled:opacity-60">
+                        <button onClick={() => setEtape("question")} disabled={envoi} className="flex-1 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white/70 transition-all hover:bg-white/15 disabled:opacity-60">
                             Pas aujourd&apos;hui
                         </button>
                     </div>

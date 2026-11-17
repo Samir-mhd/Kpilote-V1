@@ -13,6 +13,7 @@ import { getFichesBoxRaccordement, estPerdue, estDisparu, dateLimite } from "@/s
 import { PRODUITS_ORDRE } from "@/utils/produits";
 import { getOuCreerDefiJour, DefiJour } from "@/services/defisJourService";
 import { DefiJourChoix } from "@/components/dashboard/DefiJour";
+import { getTableauBordMatin, TableauBordMatin, CODES_ACTES_MATIN } from "@/services/tableauBordMatinService";
 
 /**
  * Cerebro Check repensé (variante &cerebro=v2) : un briefing du matin (dernière journée, position,
@@ -63,6 +64,7 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
     const [loading, setLoading] = useState(true);
     const [enregistrement, setEnregistrement] = useState(false);
     const [defi, setDefi] = useState<DefiJour | null>(null);
+    const [tableau, setTableau] = useState<TableauBordMatin | null>(null);
 
     const now = new Date();
     const jourNom = JOURS[now.getDay()];
@@ -84,9 +86,14 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
             getActesParJour(jourLocal(ilYa7), jourLocal(hier)).catch(() => ({} as Record<string, Record<string, number>>)),
             getFichesBoxRaccordement(conseillerId).catch(() => []),
             modeCorrection ? Promise.resolve(null) : getOuCreerDefiJour(conseillerId).catch(() => null),
-        ]).then(async ([missions, missionsJour, planifie, classement, actesParJour, fiches, defiJour]) => {
+            modeCorrection ? Promise.resolve(null) : getTableauBordMatin(conseillerId).catch(() => null),
+        ]).then(async ([missions, missionsJour, planifie, classement, actesParJour, fiches, defiJour, tableauMatin]) => {
             setDefi(defiJour);
-            const charges = missions.map((m) => ({ produit: m.produit, code: codeDepuisNom(m.produit), valeur: m.realise }));
+            setTableau(tableauMatin);
+            const ordre = [...PRODUITS_ORDRE.map((p) => p.code as string), ...Object.keys(COMBO_META)];
+            const rangCode = (c: string) => { const i = ordre.indexOf(c); return i === -1 ? 99 : i; };
+            const charges = missions.map((m) => ({ produit: m.produit, code: codeDepuisNom(m.produit), valeur: m.realise }))
+                .sort((a, b) => rangCode(a.code) - rangCode(b.code));
             setItems(charges);
             setOriginaux(charges);
 
@@ -115,7 +122,7 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
                 effectif: classement.length,
                 objectifsJour: (missionsJour as { produit: string; objectif: number }[])
                     .map((m) => ({ produit: m.produit, code: codeDepuisNom(m.produit), objectif: m.objectif }))
-                    .filter((m) => m.objectif > 0),
+                    .filter((m) => m.objectif > 0 && m.code !== "spiderhome"),
                 boxUrgentes,
             });
         }).finally(() => setLoading(false));
@@ -150,14 +157,69 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
         setTimeout(onValidated, 80);
     }
 
-    const derniereLabel = briefing?.derniere
-        ? (() => {
-            const [y, m, d] = briefing.derniere.jour.split("-").map(Number);
-            const date = new Date(y, m - 1, d);
-            const hier = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-            return jourLocal(date) === jourLocal(hier) ? "Hier" : `${JOURS[date.getDay()].charAt(0).toUpperCase()}${JOURS[date.getDay()].slice(1)} ${d}`;
-        })()
-        : "";
+    // ── Mini tableau de bord : hier, 10 derniers jours, à relancer ──
+    const veille = tableau?.veille ?? null;
+    const libJour = (k: string) => {
+        const [y, m, d] = k.split("-").map(Number);
+        const date = new Date(y, m - 1, d);
+        const hier = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        return jourLocal(date) === jourLocal(hier) ? "d'hier" : `de ${JOURS[date.getDay()]} ${d}`;
+    };
+    const messageVeille = () => {
+        if (!tableau || !veille) return "";
+        if (tableau.meilleureDuMois) return "Ta meilleure journée du mois ! 🔥";
+        const ecart = Math.round(veille.actes - tableau.moyenne);
+        if (ecart >= 1) return `${ecart} acte${ecart > 1 ? "s" : ""} de plus que ta moyenne 💪`;
+        if (ecart > -1) return "Pile dans ta moyenne, régulier 👌";
+        return "En dessous de ta moyenne : aujourd'hui on rattrape 🚀";
+    };
+    // « À relancer » : seulement les produits qui concernent le conseiller (présents dans ses chiffres du mois).
+    const codesConcernes = new Set(items.map((it) => it.code));
+    const aRelancer = (tableau?.aRelancer ?? []).filter((r) => codesConcernes.has(r.code));
+    const nomProduit = (code: string) => items.find((it) => it.code === code)?.produit ?? code;
+    const maxBarre = Math.max(1, ...(tableau?.jours ?? []).map((j) => j.actes), Math.ceil(tableau?.moyenne ?? 0));
+    const JOURS_COURTS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+
+    const carte = "rounded-3xl bg-white/[0.05] p-4 ring-1 ring-white/10";
+    const titreCarte = "mb-2 text-[11px] font-black uppercase tracking-[0.2em] text-white/40";
+
+    const verification = (
+        <ul className="grid gap-1.5 sm:grid-cols-2">
+            {items.map((it, i) => {
+                const ecart = it.valeur - (originaux[i]?.valeur ?? 0);
+                return (
+                    <li key={it.code} className={`flex items-center gap-2.5 rounded-xl px-3 py-1.5 ${ecart !== 0 ? "bg-amber-400/10 ring-1 ring-amber-300/30" : "bg-white/[0.04]"}`}>
+                        <span className="w-5 text-center" aria-hidden="true">{emojiDe(it.code)}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-bold text-white/80">{it.produit}</span>
+                        {ecart !== 0 && <span className="text-[11px] font-black text-amber-300">{ecart > 0 ? `+${ecart}` : ecart}</span>}
+                        <button onClick={() => ajuster(it.code, -1)} aria-label={`Retirer 1 ${it.produit}`} className="flex h-7 w-7 items-center justify-center rounded-full bg-white/5 text-base font-black text-white/60 ring-1 ring-white/10 active:scale-90">−</button>
+                        <span className="w-8 text-center text-lg font-black tabular-nums text-white">{it.valeur}</span>
+                        <button onClick={() => ajuster(it.code, +1)} aria-label={`Ajouter 1 ${it.produit}`} className="flex h-7 w-7 items-center justify-center rounded-full bg-white/5 text-base font-black text-white/60 ring-1 ring-white/10 active:scale-90">+</button>
+                    </li>
+                );
+            })}
+        </ul>
+    );
+
+    const boutonDemarrer = (
+        <button
+            onClick={demarrer}
+            disabled={enregistrement}
+            className="group flex w-full items-center justify-between rounded-[20px] bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-4 text-left shadow-[0_12px_40px_rgba(124,58,237,.45)] transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
+        >
+            <span>
+                <span className="block text-[11px] font-bold uppercase tracking-[0.25em] text-white/70">
+                    {modifies > 0 ? `${modifies} correction${modifies > 1 ? "s" : ""} à enregistrer` : "Tout est bon"}
+                </span>
+                <span className="block text-xl font-black text-white">
+                    {enregistrement ? "Enregistrement…" : modifies > 0 ? "Enregistrer et démarrer" : "Je démarre ma journée"}
+                </span>
+            </span>
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-white transition-transform group-hover:translate-x-1">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+            </span>
+        </button>
+    );
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: "#060612" }}>
@@ -165,26 +227,32 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
             <div className="pointer-events-none fixed -bottom-40 -right-40 h-[500px] w-[500px] rounded-full bg-fuchsia-600/15 blur-[120px]" />
 
             <div
-                className="relative mx-auto w-full max-w-3xl px-5 py-8 transition-all duration-700 sm:py-10"
+                className={`relative mx-auto flex w-full flex-col px-4 py-4 transition-all duration-700 sm:px-5 ${modeCorrection ? "max-w-3xl" : "max-w-[1500px] lg:h-screen"}`}
                 style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(24px)" }}
             >
-                {/* ── En-tête ────────────────────────────────────────── */}
+                {/* ── En-tête ── */}
                 <div className="flex items-center gap-4">
-                    <CartoonAvatar prenom={nom} etat="souriant_main" className="h-24 w-24 shrink-0 object-contain drop-shadow-[0_10px_30px_rgba(139,92,246,.45)] sm:h-28 sm:w-28" />
-                    <div>
-                        <p className="text-xs font-black uppercase tracking-[0.3em] text-violet-400">{modeCorrection ? "Corriger mes chiffres" : "Cerebro Check"}</p>
-                        <h1 className="text-3xl font-black leading-tight text-white sm:text-4xl">
+                    <CartoonAvatar prenom={nom} etat="souriant_main" className="h-16 w-16 shrink-0 object-contain drop-shadow-[0_10px_30px_rgba(139,92,246,.45)]" />
+                    <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-black uppercase tracking-[0.3em] text-violet-400">{modeCorrection ? "Corriger mes chiffres" : "Cerebro Check"}</p>
+                        <h1 className="text-2xl font-black leading-tight text-white sm:text-3xl">
                             Bonjour <span className="bg-gradient-to-r from-violet-300 to-fuchsia-300 bg-clip-text text-transparent">{prenom}</span> 👋
                         </h1>
-                        <p className="mt-1 text-sm font-semibold text-white/45">
+                        <p className="text-sm font-semibold text-white/45">
                             {dateLabel}
                             {briefing && <span> · {briefing.travaille ? "tu travailles aujourd'hui" : "jour de repos"}</span>}
                         </p>
                     </div>
+                    {briefing && !modeCorrection && briefing.rang > 0 && (
+                        <div className="rounded-2xl bg-white/[0.06] px-4 py-2 text-right ring-1 ring-white/10">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">Classement du mois</p>
+                            <p className="text-2xl font-black text-white">#{briefing.rang} <span className="text-sm text-white/40">sur {briefing.effectif}</span>{briefing.rang === 1 && " 👑"}</p>
+                        </div>
+                    )}
                 </div>
 
                 {isReset && (
-                    <p className="mt-5 rounded-2xl bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-200 ring-1 ring-amber-300/20">
+                    <p className="mt-3 rounded-2xl bg-amber-400/10 px-4 py-2.5 text-sm font-semibold text-amber-200 ring-1 ring-amber-300/20">
                         ⚠️ Ton manager t&apos;a demandé de revérifier tes chiffres. Ajuste-les si besoin — rien n&apos;est supprimé.
                     </p>
                 )}
@@ -193,103 +261,109 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
                     <div className="flex justify-center py-20">
                         <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-500 border-t-transparent" />
                     </div>
+                ) : modeCorrection ? (
+                    <>
+                        <div className={`mt-5 ${carte}`}>
+                            <p className={titreCarte}>Tes chiffres du mois sont-ils justes ?</p>
+                            {verification}
+                        </div>
+                        <div className="mt-4">{boutonDemarrer}</div>
+                    </>
                 ) : (
                     <>
-                        {/* ── Briefing ───────────────────────────────────── */}
-                        {briefing && !modeCorrection && (
-                            <div className="mt-7 grid gap-3 sm:grid-cols-2">
-                                <div className="rounded-2xl bg-white/[0.05] p-4 ring-1 ring-white/10">
-                                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">{derniereLabel ? `${derniereLabel}, tu as fait` : "Ta dernière journée"}</p>
-                                    {briefing.derniere ? (
-                                        <p className="mt-1 text-white">
-                                            <span className="text-3xl font-black tabular-nums">{briefing.derniere.actes}</span>
-                                            <span className="ml-1 text-sm font-bold text-white/50">actes</span>
-                                            {briefing.derniere.cagnotte > 0 && <span className="ml-3 text-sm font-black text-emerald-300">+{fmtEuro(briefing.derniere.cagnotte)}</span>}
+                        <div className="mt-4 grid min-h-0 flex-1 gap-3 lg:grid-cols-12 lg:grid-rows-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                            {/* Hier */}
+                            <div className={`${carte} lg:col-span-4`}>
+                                <p className={titreCarte}>{veille ? `Ta journée ${libJour(veille.jour)}` : "Ta dernière journée"}</p>
+                                {veille ? (
+                                    <>
+                                        <p className="text-5xl font-black tabular-nums text-white">
+                                            {veille.actes}<span className="ml-2 text-base font-bold text-white/50">acte{veille.actes > 1 ? "s" : ""}</span>
+                                            {briefing?.derniere && briefing.derniere.jour === veille.jour && briefing.derniere.cagnotte > 0 && (
+                                                <span className="ml-3 text-base font-black text-emerald-300">+{fmtEuro(briefing.derniere.cagnotte)}</span>
+                                            )}
                                         </p>
-                                    ) : <p className="mt-1 text-sm text-white/50">Pas de vente sur les 7 derniers jours.</p>}
-                                </div>
-
-                                <div className="rounded-2xl bg-white/[0.05] p-4 ring-1 ring-white/10">
-                                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">Classement du mois</p>
-                                    <p className="mt-1 text-white">
-                                        <span className="text-3xl font-black tabular-nums">{briefing.rang > 0 ? `#${briefing.rang}` : "–"}</span>
-                                        {briefing.effectif > 0 && <span className="ml-1 text-sm font-bold text-white/50">sur {briefing.effectif}</span>}
-                                        {briefing.rang === 1 && <span className="ml-2 text-sm">👑</span>}
-                                    </p>
-                                </div>
-
-                                {defi ? (
-                                    <div className="sm:col-span-2">
-                                        <DefiJourChoix defi={defi} onChange={setDefi} />
-                                    </div>
-                                ) : (
-                                <div className="rounded-2xl bg-white/[0.05] p-4 ring-1 ring-white/10 sm:col-span-2">
-                                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">🎯 Tes objectifs du jour</p>
-                                    {briefing.objectifsJour.length > 0 ? (
-                                        <div className="mt-2 flex flex-wrap gap-2">
-                                            {briefing.objectifsJour.map((o) => (
-                                                <span key={o.code} className="rounded-xl bg-violet-500/15 px-3 py-1.5 text-sm font-black text-violet-100 ring-1 ring-violet-400/25">
-                                                    <span aria-hidden="true">{emojiDe(o.code)}</span> {o.objectif} {o.produit}
-                                                </span>
+                                        <p className="mt-1 text-sm font-bold text-emerald-300">{messageVeille()}</p>
+                                        <div className="mt-3 flex flex-wrap gap-1.5">
+                                            {CODES_ACTES_MATIN.filter((c) => (veille.parCode[c] ?? 0) > 0).map((c) => (
+                                                <span key={c} className="rounded-lg bg-white/10 px-2 py-1 text-xs font-black text-white">{emojiDe(c)} {veille.parCode[c]}</span>
                                             ))}
                                         </div>
-                                    ) : <p className="mt-1 text-sm text-white/50">{briefing.travaille ? "Pas d'objectif fixé aujourd'hui." : "Profite de ta journée 🌴"}</p>}
+                                    </>
+                                ) : <p className="text-sm text-white/50">Pas de journée travaillée récente.</p>}
+                            </div>
+
+                            {/* 10 derniers jours */}
+                            <div className={`${carte} flex min-h-[180px] flex-col lg:col-span-5`}>
+                                <p className={titreCarte}>Tes 10 derniers jours</p>
+                                <div className="relative flex min-h-0 flex-1 items-end gap-1.5 pt-5">
+                                    {tableau && tableau.moyenne > 0 && (
+                                        <div className="pointer-events-none absolute inset-x-0 border-t border-dashed border-violet-300/50" style={{ bottom: `calc(${(tableau.moyenne / maxBarre) * 100}% * 0.82 + 16px)` }}>
+                                            <span className="absolute -top-4 right-0 text-[10px] font-bold text-violet-300">moy. {tableau.moyenne.toFixed(1).replace(".", ",")}</span>
+                                        </div>
+                                    )}
+                                    {(tableau?.jours ?? []).map((j, i, arr) => {
+                                        const dernier = i === arr.length - 1;
+                                        const [y, m, d] = j.jour.split("-").map(Number);
+                                        return (
+                                            <div key={j.jour} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+                                                <span className={`text-[11px] font-black tabular-nums ${dernier ? "text-white" : "text-white/50"}`}>{j.actes}</span>
+                                                <div className={`w-full rounded-t-md ${dernier ? "bg-gradient-to-t from-violet-600 to-fuchsia-400" : "bg-white/15"}`} style={{ height: `${Math.max(3, (j.actes / maxBarre) * 82)}%` }} />
+                                                <span className="text-[10px] font-bold text-white/40">{JOURS_COURTS[new Date(y, m - 1, d).getDay()]}</span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                                )}
+                            </div>
 
-                                {briefing.boxUrgentes && (
-                                    <div className="rounded-2xl bg-rose-500/10 p-4 ring-1 ring-rose-400/25 sm:col-span-2">
-                                        <p className="text-sm font-black text-rose-100">
-                                            📦 {briefing.boxUrgentes.nb} box à raccorder avant le {briefing.boxUrgentes.limite.toLocaleDateString("fr-FR")}
-                                            <span className="ml-2 rounded-lg bg-rose-500/25 px-2 py-0.5 text-xs">J-{briefing.boxUrgentes.jours}</span>
-                                        </p>
-                                        <p className="text-xs text-rose-200/70">Sinon elles ne seront pas payées. À vérifier dans Ma variable → Mes box.</p>
+                            {/* À relancer */}
+                            <div className={`${carte} overflow-y-auto lg:col-span-3`}>
+                                <p className={titreCarte}>⏰ À relancer</p>
+                                <div className="space-y-1.5">
+                                    {aRelancer.slice(0, 4).map((r) => (
+                                        <div key={r.code} className="rounded-xl bg-amber-400/10 px-3 py-2 ring-1 ring-amber-300/25">
+                                            <p className="text-sm font-black text-amber-100">{emojiDe(r.code)} {nomProduit(r.code)}</p>
+                                            <p className="text-[11px] text-amber-200/70">
+                                                {r.derniere ? `Dernier le ${libJour(r.derniere).replace(/^de |^d'/, "")} · ${r.joursSans} jours sans` : `Pas depuis plus de ${r.joursSans} jours`}
+                                            </p>
+                                        </div>
+                                    ))}
+                                    {aRelancer.length === 0 && <p className="text-sm text-white/50">Tout a été vendu ces derniers jours 👏</p>}
+                                    {briefing?.boxUrgentes && (
+                                        <div className="rounded-xl bg-rose-500/10 px-3 py-2 ring-1 ring-rose-400/25">
+                                            <p className="text-sm font-black text-rose-100">📦 {briefing.boxUrgentes.nb} box à raccorder <span className="ml-1 rounded bg-rose-500/25 px-1.5 text-[11px]">J-{briefing.boxUrgentes.jours}</span></p>
+                                            <p className="text-[11px] text-rose-200/70">Avant le {briefing.boxUrgentes.limite.toLocaleDateString("fr-FR")}, sinon non payées.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Vérification des chiffres (gauche) */}
+                            <div className={`${carte} overflow-y-auto lg:col-span-8`}>
+                                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">Tes chiffres du mois sont-ils justes ?</p>
+                                    <p className="text-[11px] text-white/35">Corrige seulement si besoin — rien n&apos;est supprimé.</p>
+                                </div>
+                                {verification}
+                            </div>
+
+                            {/* Aujourd'hui : objectifs + défi (droite) */}
+                            <div className={`${carte} overflow-y-auto lg:col-span-4`}>
+                                <p className={titreCarte}>🎯 Aujourd&apos;hui</p>
+                                {briefing && briefing.objectifsJour.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {briefing.objectifsJour.map((o) => (
+                                            <span key={o.code} title={o.produit} className="rounded-xl bg-violet-500/15 px-2.5 py-1.5 text-sm font-black text-violet-100 ring-1 ring-violet-400/25">
+                                                <span aria-hidden="true">{emojiDe(o.code)}</span> {o.objectif}
+                                            </span>
+                                        ))}
                                     </div>
-                                )}
+                                ) : <p className="text-sm text-white/50">{briefing?.travaille ? "Pas d'objectif fixé aujourd'hui." : "Profite de ta journée 🌴"}</p>}
+                                {defi && <div className="mt-3"><DefiJourChoix defi={defi} onChange={setDefi} /></div>}
                             </div>
-                        )}
-
-                        {/* ── Vérification des chiffres du mois ──────────── */}
-                        <div className="mt-7 rounded-2xl bg-white/[0.04] p-4 ring-1 ring-white/10 sm:p-5">
-                            <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                <p className="text-sm font-black text-white">Tes chiffres du mois sont-ils justes ?</p>
-                                <p className="text-xs text-white/40">Corrige seulement si besoin — rien n&apos;est supprimé.</p>
-                            </div>
-                            <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
-                                {items.map((it, i) => {
-                                    const ecart = it.valeur - (originaux[i]?.valeur ?? 0);
-                                    return (
-                                        <li key={it.code} className={`flex items-center gap-3 rounded-xl px-3 py-2 ${ecart !== 0 ? "bg-amber-400/10 ring-1 ring-amber-300/30" : "bg-white/[0.03]"}`}>
-                                            <span className="w-5 text-center" aria-hidden="true">{emojiDe(it.code)}</span>
-                                            <span className="min-w-0 flex-1 truncate text-sm font-bold text-white/80">{it.produit}</span>
-                                            {ecart !== 0 && <span className="text-[11px] font-black text-amber-300">{ecart > 0 ? `+${ecart}` : ecart}</span>}
-                                            <button onClick={() => ajuster(it.code, -1)} aria-label={`Retirer 1 ${it.produit}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-base font-black text-white/60 ring-1 ring-white/10 active:scale-90">−</button>
-                                            <span className="w-8 text-center text-lg font-black tabular-nums text-white">{it.valeur}</span>
-                                            <button onClick={() => ajuster(it.code, +1)} aria-label={`Ajouter 1 ${it.produit}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-base font-black text-white/60 ring-1 ring-white/10 active:scale-90">+</button>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
                         </div>
 
-                        {/* ── Démarrer ───────────────────────────────────── */}
-                        <button
-                            onClick={demarrer}
-                            disabled={enregistrement}
-                            className="group mt-6 flex w-full items-center justify-between rounded-[20px] bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-5 text-left shadow-[0_12px_40px_rgba(124,58,237,.45)] transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
-                        >
-                            <span>
-                                <span className="block text-xs font-bold uppercase tracking-[0.25em] text-white/70">
-                                    {modifies > 0 ? `${modifies} correction${modifies > 1 ? "s" : ""} à enregistrer` : "Tout est bon"}
-                                </span>
-                                <span className="mt-0.5 block text-xl font-black text-white">
-                                    {enregistrement ? "Enregistrement…" : modifies > 0 ? "Enregistrer et démarrer" : "Je démarre ma journée"}
-                                </span>
-                            </span>
-                            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-white transition-transform group-hover:translate-x-1">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-                            </span>
-                        </button>
+                        <div className="mt-3">{boutonDemarrer}</div>
                     </>
                 )}
             </div>
