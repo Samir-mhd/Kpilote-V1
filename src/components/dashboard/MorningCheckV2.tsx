@@ -48,6 +48,7 @@ function fmtEuro(n: number) {
 
 type Briefing = {
     travaille: boolean;
+    dernierJourSemaine: boolean;
     derniere: { jour: string; actes: number; cagnotte: number } | null;
     rang: number;
     effectif: number;
@@ -117,6 +118,7 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
 
             setBriefing({
                 travaille: planifie > 0,
+                dernierJourSemaine: planifie > 0 && (missionsJour as { dernierJourSemaine?: boolean }[]).some((m) => m.dernierJourSemaine),
                 derniere,
                 rang: classement.findIndex((c) => c.id === conseillerId) + 1,
                 effectif: classement.length,
@@ -240,7 +242,7 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
                         </h1>
                         <p className="text-sm font-semibold text-white/45">
                             {dateLabel}
-                            {briefing && <span> · {briefing.travaille ? "tu travailles aujourd'hui" : "jour de repos"}</span>}
+                            {briefing?.dernierJourSemaine && <span className="ml-2 rounded-full bg-amber-400/15 px-2.5 py-0.5 text-xs font-black text-amber-200 ring-1 ring-amber-300/30">📅 Dernier jour de ta semaine</span>}
                         </p>
                     </div>
                     {briefing && !modeCorrection && briefing.rang > 0 && (
