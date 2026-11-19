@@ -63,7 +63,6 @@ export default function AccueilD() {
                     <h1 className="mt-4 text-5xl font-black leading-[1.05] text-white sm:text-7xl">
                         Chaque vente <span className="bg-gradient-to-r from-violet-300 via-fuchsia-300 to-orange-300 bg-clip-text text-transparent">compte.</span>
                     </h1>
-                    <p className="mt-4 text-lg text-white/55">Touche ta photo pour commencer.</p>
                 </div>
 
                 {/* L'équipe */}
