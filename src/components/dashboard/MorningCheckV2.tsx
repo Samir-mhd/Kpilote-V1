@@ -203,15 +203,17 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
         </ul>
     );
 
+    // Le défi doit être accepté ou refusé avant de pouvoir démarrer la journée.
+    const defiEnAttente = !modeCorrection && defi?.statut === "propose";
     const boutonDemarrer = (
         <button
             onClick={demarrer}
-            disabled={enregistrement}
-            className="group flex w-full items-center justify-between rounded-[20px] bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-4 text-left shadow-[0_12px_40px_rgba(124,58,237,.45)] transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
+            disabled={enregistrement || defiEnAttente}
+            className="group flex w-full items-center justify-between rounded-[20px] bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-4 text-left shadow-[0_12px_40px_rgba(124,58,237,.45)] transition-all hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:brightness-100"
         >
             <span>
                 <span className="block text-[11px] font-bold uppercase tracking-[0.25em] text-white/70">
-                    {modifies > 0 ? `${modifies} correction${modifies > 1 ? "s" : ""} à enregistrer` : "Tout est bon"}
+                    {defiEnAttente ? "👆 Réponds d'abord au défi du jour" : modifies > 0 ? `${modifies} correction${modifies > 1 ? "s" : ""} à enregistrer` : "Tout est bon"}
                 </span>
                 <span className="block text-xl font-black text-white">
                     {enregistrement ? "Enregistrement…" : modifies > 0 ? "Enregistrer et démarrer" : "Je démarre ma journée"}
