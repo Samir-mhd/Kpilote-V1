@@ -4,8 +4,8 @@ import { lireCatalogueFree } from "@/services/telephonesFreeService";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-/** Catalogue mis en cache 6 h : mobile.free.fr n'est relu que 4 fois par jour au maximum. */
-const catalogue = unstable_cache(lireCatalogueFree, ["catalogue-telephones-free-v3"], { revalidate: 21600 });
+/** Catalogue mis en cache 1 h : mobile.free.fr est relu au plus une fois par heure. */
+const catalogue = unstable_cache(lireCatalogueFree, ["catalogue-telephones-free-v3"], { revalidate: 3600 });
 
 export async function GET() {
     try {

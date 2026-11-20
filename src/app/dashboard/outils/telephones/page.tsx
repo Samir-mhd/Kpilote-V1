@@ -14,6 +14,22 @@ const go = (n: number) => (n <= 0 ? "—" : n >= 1024 ? `${n / 1024} To` : `${n}
 const flexDe = (v: VarianteTel, p: Profil): PrixFlex | null => (p === "abonne" ? v.flexAbonne : v.flexProspect);
 const rembMax = (v: VarianteTel) => v.offres.reduce((t, o) => t + o.montant, 0);
 
+const FORFAITS = [9.99, 12.99, 15.99, 19.99];
+/** Grille assurance mobile : classe selon le prix comptant de base (sans remise). */
+const ASSURANCE: [number, number][] = [[250, 4.99], [400, 8.99], [600, 12.99], [800, 13.99], [1000, 14.99], [1300, 16.99], [2000, 19.99], [Infinity, 22.99]];
+const assuranceDe = (v: VarianteTel): { classe: number; prix: number } | null => {
+    if (v.comptant == null) return null;
+    const i = ASSURANCE.findIndex(([max]) => v.comptant! <= max);
+    return { classe: i + 1, prix: ASSURANCE[i][1] };
+};
+type Options = { forfait: number; assurance: boolean };
+/** Mensualité affichée = Free Flex + forfait choisi + assurance (si cochés). */
+const mensuelTotal = (v: VarianteTel, p: Profil, o: Options): number | null => {
+    const f = flexDe(v, p);
+    if (!f) return null;
+    return Math.round((f.mensuel + o.forfait + (o.assurance ? assuranceDe(v)?.prix ?? 0 : 0)) * 100) / 100;
+};
+
 function dateMaj(iso: string) {
     const d = new Date(iso);
     return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" }) + " à " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
@@ -30,6 +46,10 @@ export default function ComparateurTelephonesPage() {
     const [stockage, setStockage] = useState<Record<number, number>>({});
     const [coches, setCoches] = useState<number[]>([]);
     const [comparer, setComparer] = useState(false);
+    const [forfait, setForfait] = useState(0);
+    const [assurance, setAssurance] = useState(false);
+    const options: Options = { forfait, assurance };
+    const avecOptions = forfait > 0 || assurance;
 
     useEffect(() => {
         fetch("/api/telephones")
@@ -52,14 +72,14 @@ export default function ComparateurTelephonesPage() {
             (marque === "Toutes" || t.marque === marque) &&
             (!reco || t.reconditionne) &&
             (!q || `${t.marque} ${t.nom}`.toLowerCase().includes(q)));
-        const prixFlex = (t: TelephoneFree) => flexDe(t.variantes[0], profil)?.mensuel ?? Infinity;
+        const prixFlex = (t: TelephoneFree) => mensuelTotal(t.variantes[0], profil, { forfait, assurance }) ?? Infinity;
         const prixCash = (t: TelephoneFree) => t.variantes[0].comptant ?? Infinity;
         return l.sort((a, b) =>
             tri === "flex" ? prixFlex(a) - prixFlex(b)
                 : tri === "comptant" ? prixCash(a) - prixCash(b)
                     : tri === "comptant_desc" ? prixCash(b) - prixCash(a)
                         : `${a.marque} ${a.nom}`.localeCompare(`${b.marque} ${b.nom}`));
-    }, [data, recherche, marque, reco, tri, profil]);
+    }, [data, recherche, marque, reco, tri, profil, forfait, assurance]);
 
     function cocher(id: number) {
         setCoches((c) => (c.includes(id) ? c.filter((x) => x !== id) : c.length >= 2 ? c : [...c, id]));
@@ -89,13 +109,31 @@ export default function ComparateurTelephonesPage() {
                         {data ? <>Prix de mobile.free.fr · mis à jour le {dateMaj(data.majLe)} · coche 2 modèles pour les comparer</> : "Chargement du catalogue Free…"}
                     </p>
                 </div>
-                <div className="flex rounded-2xl bg-white p-1 ring-1 ring-slate-200">
-                    {([["prospect", "Nouveau client"], ["abonne", "Déjà abonné"]] as [Profil, string][]).map(([p, l]) => (
-                        <button key={p} onClick={() => setProfil(p)}
-                            className={`rounded-xl px-4 py-2 text-sm font-black transition-colors ${profil === p ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-900"}`}>
-                            {l}
+                <div className="flex flex-col items-end gap-2">
+                    <div className="flex rounded-2xl bg-white p-1 ring-1 ring-slate-200">
+                        {([["prospect", "Nouveau client"], ["abonne", "Déjà abonné"]] as [Profil, string][]).map(([p, l]) => (
+                            <button key={p} onClick={() => setProfil(p)}
+                                className={`rounded-xl px-4 py-2 text-sm font-black transition-colors ${profil === p ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-900"}`}>
+                                {l}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        <span className="mr-1 text-xs font-bold text-slate-400">Prix avec forfait</span>
+                        {FORFAITS.map((f) => (
+                            <button key={f} onClick={() => setForfait(forfait === f ? 0 : f)}
+                                className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-black transition-colors ${forfait === f ? "bg-violet-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"}`}>
+                                <span className={`flex h-3.5 w-3.5 items-center justify-center rounded ${forfait === f ? "bg-white text-violet-600" : "ring-1 ring-current"}`}>{forfait === f && <Check size={11} strokeWidth={4} />}</span>
+                                {eur(f)}
+                            </button>
+                        ))}
+                        <span className="mx-1 h-5 w-px bg-slate-200" />
+                        <button onClick={() => setAssurance(!assurance)}
+                            className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-black transition-colors ${assurance ? "bg-emerald-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"}`}>
+                            <span className={`flex h-3.5 w-3.5 items-center justify-center rounded ${assurance ? "bg-white text-emerald-600" : "ring-1 ring-current"}`}>{assurance && <Check size={11} strokeWidth={4} />}</span>
+                            Avec assurance
                         </button>
-                    ))}
+                    </div>
                 </div>
             </div>
 
@@ -167,10 +205,17 @@ export default function ComparateurTelephonesPage() {
                                     {t.variantes.length === 1 && v.stockage > 0 && <p className="mt-1 text-xs font-bold text-slate-400">{go(v.stockage)}</p>}
                                     <div className="mt-auto pt-3">
                                         <div className="rounded-2xl bg-violet-50 px-3 py-2">
-                                            <p className="text-[10px] font-black uppercase tracking-wider text-violet-500">Free Flex · {profil === "abonne" ? "abonné" : "nouveau client"}</p>
+                                            <p className="text-[10px] font-black uppercase tracking-wider text-violet-500">
+                                                Free Flex · {profil === "abonne" ? "abonné" : "nouveau client"}{forfait > 0 && " + forfait"}{assurance && " + assurance"}
+                                            </p>
                                             {f ? (
                                                 <>
-                                                    <p className="text-xl font-black tabular-nums text-violet-900">{eur(f.mensuel)}<span className="text-xs font-bold text-violet-500">/mois</span></p>
+                                                    <p className="text-xl font-black tabular-nums text-violet-900">{eur(mensuelTotal(v, profil, options))}<span className="text-xs font-bold text-violet-500">/mois</span></p>
+                                                    {avecOptions && (
+                                                        <p className="text-[11px] font-semibold leading-snug text-violet-600">
+                                                            tél. {eur(f.mensuel)}{forfait > 0 && <> + forfait {eur(forfait)}</>}{assurance && assuranceDe(v) && <> + assurance {eur(assuranceDe(v)!.prix)}</>}
+                                                        </p>
+                                                    )}
                                                     <p className="text-[11px] font-semibold text-violet-600">{eur(f.premierLoyer)} au départ · {f.duree} mois</p>
                                                 </>
                                             ) : <p className="text-sm font-bold text-violet-400">Non disponible</p>}
@@ -209,7 +254,7 @@ export default function ComparateurTelephonesPage() {
             )}
 
             {comparer && choisis.length === 2 && (
-                <Comparaison tels={choisis} variantes={choisis.map(variante)} profil={profil} setProfil={setProfil} onClose={() => setComparer(false)} />
+                <Comparaison tels={choisis} variantes={choisis.map(variante)} profil={profil} setProfil={setProfil} options={options} onClose={() => setComparer(false)} />
             )}
         </div>
     );
@@ -219,8 +264,8 @@ export default function ComparateurTelephonesPage() {
 
 type Ligne = { label: string; val: (t: TelephoneFree, v: VarianteTel) => string; num?: (t: TelephoneFree, v: VarianteTel) => number | null; mieux?: "bas" | "haut" };
 
-function Comparaison({ tels, variantes, profil, setProfil, onClose }: {
-    tels: TelephoneFree[]; variantes: VarianteTel[]; profil: Profil; setProfil: (p: Profil) => void; onClose: () => void;
+function Comparaison({ tels, variantes, profil, setProfil, options, onClose }: {
+    tels: TelephoneFree[]; variantes: VarianteTel[]; profil: Profil; setProfil: (p: Profil) => void; options: Options; onClose: () => void;
 }) {
     useEffect(() => {
         const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -228,8 +273,14 @@ function Comparaison({ tels, variantes, profil, setProfil, onClose }: {
         return () => window.removeEventListener("keydown", k);
     }, [onClose]);
 
+    const avecOptions = options.forfait > 0 || options.assurance;
     const prix: Ligne[] = [
-        { label: "Free Flex / mois", val: (_, v) => eur(flexDe(v, profil)?.mensuel), num: (_, v) => flexDe(v, profil)?.mensuel ?? null, mieux: "bas" },
+        ...(avecOptions ? [
+            { label: `Total / mois (${["téléphone", options.forfait > 0 && "forfait", options.assurance && "assurance"].filter(Boolean).join(" + ")})`, val: (_: TelephoneFree, v: VarianteTel) => eur(mensuelTotal(v, profil, options)), num: (_: TelephoneFree, v: VarianteTel) => mensuelTotal(v, profil, options), mieux: "bas" as const },
+        ] : []),
+        { label: avecOptions ? "dont téléphone (Free Flex)" : "Free Flex / mois", val: (_, v) => eur(flexDe(v, profil)?.mensuel), num: (_, v) => flexDe(v, profil)?.mensuel ?? null, mieux: "bas" },
+        ...(options.forfait > 0 ? [{ label: "dont forfait", val: () => eur(options.forfait) }] : []),
+        ...(options.assurance ? [{ label: "dont assurance", val: (_: TelephoneFree, v: VarianteTel) => { const a = assuranceDe(v); return a ? `${eur(a.prix)} (classe ${a.classe})` : "—"; }, num: (_: TelephoneFree, v: VarianteTel) => assuranceDe(v)?.prix ?? null, mieux: "bas" as const }] : []),
         { label: "1er loyer", val: (_, v) => eur(flexDe(v, profil)?.premierLoyer), num: (_, v) => flexDe(v, profil)?.premierLoyer ?? null, mieux: "bas" },
         { label: "Durée", val: (_, v) => (flexDe(v, profil) ? `${flexDe(v, profil)!.duree} mois` : "—") },
         { label: "Option d'achat (fin de contrat)", val: (_, v) => eur(flexDe(v, profil)?.optionAchat) },
