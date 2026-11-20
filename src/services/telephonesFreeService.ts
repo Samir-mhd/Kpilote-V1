@@ -37,7 +37,19 @@ export type TelephoneFree = {
         batterie: number | null;       // mAh
         batterieHorsFree: boolean;     // true = complétée hors Free (Free ne la donne pas)
         photo: string | null;          // ex. « 50 + 12 + 8 Mpx »
+        nbCapteurs: number | null;     // capteurs arrière
+        capteurPrincipal: number | null;
+        ultraGrandAngle: number | null;
+        teleobjectif: number | null;   // zoom optique
+        macro: number | null;
+        zoom: boolean;
+        video: string | null;          // ex. « 4K à 120 i/s »
+        stabilisation: boolean;
         selfie: number | null;
+        chargeFilaireW: number | null;
+        chargeRapide: boolean;
+        sansFil: boolean;
+        sansFilRapide: boolean;
         poids: number | null;
         os: string | null;
         fiveG: boolean;
@@ -105,6 +117,15 @@ function offres(p: any): OffreTel[] {
         .map((o) => ({ titre: String(o.title), montant: num(o.amount) ?? 0, fin: o.endDate ?? null }));
 }
 
+/** « _4K_120_IPS » → « 4K à 120 i/s » ; « _FHD_30_IPS » → « Full HD à 30 i/s ». */
+function videoLisible(v: any): string | null {
+    if (!v || typeof v !== "string") return null;
+    const m = v.replace(/^_/, "").match(/^([A-Z0-9]+)_(\d+)_IPS$/i);
+    if (!m) return v.replace(/_/g, " ").trim() || null;
+    const def = ({ FHD: "Full HD", HD: "HD", UHD: "4K" } as Record<string, string>)[m[1].toUpperCase()] ?? m[1];
+    return `${def} à ${m[2]} i/s`;
+}
+
 function carac(m: any): TelephoneFree["carac"] {
     const c = m.characteristics ?? {};
     const s = c.screen ?? {}, perf = c.performances ?? {}, ph = c.photo ?? {}, g = c.general ?? {}, a = c.autonomy ?? {};
@@ -120,7 +141,19 @@ function carac(m: any): TelephoneFree["carac"] {
         batterie: num(a.batteryCapacity) ?? batterieComplement(`${m.brand ?? ""} ${m.name ?? ""}`),
         batterieHorsFree: num(a.batteryCapacity) === null && batterieComplement(`${m.brand ?? ""} ${m.name ?? ""}`) !== null,
         photo: capteurs.length ? `${capteurs.join(" + ")} Mpx` : null,
+        nbCapteurs: num(ph.numberOfCameras),
+        capteurPrincipal: num(ph.mainResolution),
+        ultraGrandAngle: num(ph.wideAngleResolution),
+        teleobjectif: num(ph.telephotoResolution),
+        macro: num(ph.macroResolution),
+        zoom: !!ph.zoom,
+        video: videoLisible(c.video?.mainResolution),
+        stabilisation: !!c.video?.stabilization,
         selfie: num(ph.frontResolution),
+        chargeFilaireW: num(pack.maxW),
+        chargeRapide: !!(a.wiredQuickCharge || pack.hasFastCharge),
+        sansFil: !!a.wirelessCharge,
+        sansFilRapide: !!a.wirelessQuickCharge,
         poids: num(g.weight),
         os: perf.OS
             ? (perf.OS_Version && String(perf.OS_Version).toLowerCase().startsWith(String(perf.OS).toLowerCase())
