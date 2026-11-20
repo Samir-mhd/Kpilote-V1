@@ -35,6 +35,7 @@ export type TelephoneFree = {
         puce: string | null;
         ram: number | null;
         batterie: number | null;       // mAh
+        batterieHorsFree: boolean;     // true = complétée hors Free (Free ne la donne pas)
         photo: string | null;          // ex. « 50 + 12 + 8 Mpx »
         selfie: number | null;
         poids: number | null;
@@ -49,6 +50,26 @@ export type TelephoneFree = {
     };
 };
 export type CatalogueTelephones = { majLe: string; telephones: TelephoneFree[]; erreurs: number };
+
+/**
+ * Batteries que Free ne renseigne pas (surtout iPhone : Apple ne publie pas les mAh).
+ * Utilisé UNIQUEMENT si la fiche Free est vide. Sources : étiquettes énergie UE / fiches réglementaires
+ * relayées par MacRumors, GSMArena, Android Authority (vérifié le 20/11/2026).
+ */
+const BATTERIES_COMPLEMENT: [RegExp, number][] = [
+    [/iphone 17 pro max/i, 5088],
+    [/iphone 17 pro(?! max)/i, 4252],
+    [/iphone 17(?! pro)/i, 3692],
+    [/iphone air/i, 3149],
+    [/iphone duo/i, 4883],
+    [/iphone 16 plus/i, 4674],
+    [/iphone 16(?! plus| pro)/i, 3561],
+    [/iphone 14(?! plus| pro)/i, 3279],
+    [/iphone 13 pro(?! max)/i, 3095],
+    [/iphone 13(?! pro| mini)/i, 3227],
+    [/galaxy s24(?! ultra|\+| fe)/i, 4000],
+];
+const batterieComplement = (nom: string) => BATTERIES_COMPLEMENT.find(([re]) => re.test(nom))?.[1] ?? null;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -96,7 +117,8 @@ function carac(m: any): TelephoneFree["carac"] {
         ecran,
         puce: perf.chip ?? null,
         ram: num(perf.RAM),
-        batterie: num(a.batteryCapacity),
+        batterie: num(a.batteryCapacity) ?? batterieComplement(`${m.brand ?? ""} ${m.name ?? ""}`),
+        batterieHorsFree: num(a.batteryCapacity) === null && batterieComplement(`${m.brand ?? ""} ${m.name ?? ""}`) !== null,
         photo: capteurs.length ? `${capteurs.join(" + ")} Mpx` : null,
         selfie: num(ph.frontResolution),
         poids: num(g.weight),

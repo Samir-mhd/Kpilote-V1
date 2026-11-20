@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 /** Catalogue mis en cache 6 h : mobile.free.fr n'est relu que 4 fois par jour au maximum. */
-const catalogue = unstable_cache(lireCatalogueFree, ["catalogue-telephones-free-v2"], { revalidate: 21600 });
+const catalogue = unstable_cache(lireCatalogueFree, ["catalogue-telephones-free-v3"], { revalidate: 21600 });
 
 export async function GET() {
     try {

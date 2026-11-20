@@ -241,7 +241,7 @@ function Comparaison({ tels, variantes, profil, setProfil, onClose }: {
         { label: "Écran", val: (t) => t.carac.ecran ?? "—" },
         { label: "Processeur", val: (t) => t.carac.puce ?? "—" },
         { label: "Mémoire vive", val: (t) => (t.carac.ram ? `${t.carac.ram} Go` : "—"), num: (t) => t.carac.ram, mieux: "haut" },
-        { label: "Batterie", val: (t) => (t.carac.batterie ? `${t.carac.batterie.toLocaleString("fr-FR")} mAh` : "—"), num: (t) => t.carac.batterie, mieux: "haut" },
+        { label: "Batterie", val: (t) => (t.carac.batterie ? `${t.carac.batterie.toLocaleString("fr-FR")} mAh${t.carac.batterieHorsFree ? "*" : ""}` : "—"), num: (t) => t.carac.batterie, mieux: "haut" },
         { label: "Recharge", val: (t) => t.carac.recharge ?? "—" },
         { label: "Appareil photo", val: (t) => t.carac.photo ?? "—" },
         { label: "Caméra selfie", val: (t) => (t.carac.selfie ? `${t.carac.selfie} Mpx` : "—"), num: (t) => t.carac.selfie, mieux: "haut" },
@@ -316,7 +316,8 @@ function Comparaison({ tels, variantes, profil, setProfil, onClose }: {
                 <div className="mt-1">{caracs.map(rangee)}</div>
 
                 <div className="mt-5 grid grid-cols-[1.1fr_1fr_1fr]">
-                    <span className="text-[11px] text-slate-400">Prix indicatifs relevés sur mobile.free.fr, à confirmer au moment de la vente.</span>
+                    <span className="text-[11px] text-slate-400">Prix indicatifs relevés sur mobile.free.fr, à confirmer au moment de la vente.
+                        {tels.some((t) => t.carac.batterieHorsFree) && <><br />* Batterie non indiquée par Free : donnée constructeur.</>}</span>
                     {tels.map((t) => (
                         <a key={t.id} href={t.url} target="_blank" rel="noopener noreferrer"
                             className="mx-2 flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 py-2 text-xs font-black text-slate-700 hover:bg-slate-200">
