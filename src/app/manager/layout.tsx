@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import KPIIcon from "@/components/ui/KPIIcon";
 import ManagerAuthGate from "@/components/manager/ManagerAuthGate";
 import MenuCompact from "@/components/ui/MenuCompact";
+import { useModeSombre } from "@/components/ui/modeSombre";
 
 const menu = [
     {
@@ -68,10 +69,11 @@ export default function ManagerLayout({
     const pathname = usePathname();
     const [ouvert, setOuvert] = useState(false);
     useEffect(() => { setOuvert(false); }, [pathname]);
+    const [sombre, basculerSombre] = useModeSombre("manager");
 
     return (
         <ManagerAuthGate>
-        <div className="flex min-h-screen bg-slate-50">
+        <div data-sombre={sombre ? "1" : undefined} className="flex min-h-screen bg-slate-50">
             <MenuCompact
                 ouvert={ouvert}
                 setOuvert={setOuvert}
@@ -81,7 +83,10 @@ export default function ManagerLayout({
                     icon: <KPIIcon name={item.icon} size={16} />,
                     active: pathname === item.href || pathname.startsWith(item.href + "/"),
                 }))}
-                pied={<Link href="/" className="block rounded-lg px-1.5 py-1.5 text-xs text-slate-500 hover:text-slate-300">← Accueil KPILOTE</Link>}
+                pied={<>
+                    <button onClick={basculerSombre} className="mb-1 flex w-full items-center justify-center rounded-xl bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-300 transition-colors hover:bg-white/10 hover:text-white">{sombre ? "☀️ Mode clair" : "🌙 Mode sombre"}</button>
+                    <Link href="/" className="block rounded-lg px-1.5 py-1.5 text-xs text-slate-500 hover:text-slate-300">← Accueil KPILOTE</Link>
+                </>}
             />
             <main className="flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-7xl py-7 pl-20 pr-6">
