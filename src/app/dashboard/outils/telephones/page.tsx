@@ -219,12 +219,17 @@ export default function ComparateurTelephonesPage() {
                             const bloque = !coche && coches.length >= MAX_COCHES;
                             const remb = rembMax(v);
                             return (
-                                <div key={t.id} className={`relative flex flex-col rounded-3xl bg-white p-4 transition-all ${coche ? "shadow-[0_10px_30px_rgba(205,30,37,.18)] ring-2 ring-[#cd1e25]" : "ring-1 ring-slate-200"}`}>
-                                    <button onClick={() => cocher(t.id)} disabled={bloque} aria-label={coche ? "Retirer de la sélection" : "Sélectionner"}
-                                        className={`absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black transition-colors ${coche ? `${ROUGE} text-white` : bloque ? "bg-slate-100 text-slate-300" : "bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-[#cd1e25]"}`}>
-                                        <CaseACocher actif={coche} />
-                                        Sélectionner
-                                    </button>
+                                <div key={t.id} role="button" tabIndex={0} aria-pressed={coche}
+                                    aria-label={`${coche ? "Retirer" : "Sélectionner"} ${t.marque} ${t.nom}`}
+                                    title={bloque ? "3 modèles maximum : retire-en un pour en ajouter un autre" : undefined}
+                                    onClick={() => cocher(t.id)}
+                                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cocher(t.id); } }}
+                                    className={`relative flex select-none flex-col rounded-3xl bg-white p-4 outline-none transition-all focus-visible:ring-2 focus-visible:ring-[#cd1e25] ${coche ? "cursor-pointer shadow-[0_10px_30px_rgba(205,30,37,.18)] ring-2 ring-[#cd1e25]" : bloque ? "cursor-not-allowed opacity-60 ring-1 ring-slate-200" : "cursor-pointer ring-1 ring-slate-200 hover:-translate-y-0.5 hover:shadow-lg hover:ring-[#cd1e25]/40"}`}>
+                                    {coche && (
+                                        <span className={`absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full ${ROUGE} text-white shadow-md`}>
+                                            <Check size={16} strokeWidth={3.5} />
+                                        </span>
+                                    )}
                                     <div className="flex gap-1.5">
                                         {t.nouveau && <span className={`rounded-full ${ROUGE} px-2 py-0.5 text-[10px] font-black text-white`}>Nouveau</span>}
                                         {t.reconditionne && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600">Reconditionné</span>}
@@ -235,7 +240,7 @@ export default function ComparateurTelephonesPage() {
                                     {t.variantes.length > 1 && (
                                         <div className="mt-2 flex flex-wrap gap-1">
                                             {t.variantes.map((x) => (
-                                                <button key={x.stockage} onClick={() => setStockage((s) => ({ ...s, [t.id]: x.stockage }))}
+                                                <button key={x.stockage} onClick={(e) => { e.stopPropagation(); setStockage((s) => ({ ...s, [t.id]: x.stockage })); }}
                                                     className={`rounded-lg px-2 py-0.5 text-[11px] font-black ${x.stockage === v.stockage ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
                                                     {go(x.stockage)}
                                                 </button>
