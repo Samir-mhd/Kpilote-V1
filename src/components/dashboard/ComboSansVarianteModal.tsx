@@ -31,10 +31,12 @@ type Props = {
     onValider: (selection: ComboSansVarianteSelection) => Promise<void>;
     /** Items à ne pas proposer (ex. Assurance pour un conseiller qui n'en vend pas). */
     masquer?: (keyof ComboSansVarianteSelection)[];
+    /** Items déjà cochés à l'ouverture (actes choisis depuis « Déclarer une vente »). */
+    preselection?: Partial<ComboSansVarianteSelection>;
 };
 
-export default function ComboSansVarianteModal({ onClose, onValider, masquer = [] }: Props) {
-    const [s, setS] = useState<ComboSansVarianteSelection>(SELECTION_VIDE);
+export default function ComboSansVarianteModal({ onClose, onValider, masquer = [], preselection }: Props) {
+    const [s, setS] = useState<ComboSansVarianteSelection>({ ...SELECTION_VIDE, ...preselection });
     const [enCours, setEnCours] = useState(false);
     const items = ITEMS.filter((i) => !masquer.includes(i.cle));
 

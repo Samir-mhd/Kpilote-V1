@@ -54,10 +54,14 @@ type Props = {
     bonusManuels: BonusManuel[];
     onClose: () => void;
     onValider: (selection: ComboSelection) => Promise<void>;
+    /** Produits choisis depuis la carte « Déclarer une vente » (codes box, forfaits, telephones,
+     *  mcafee, assurance) : seuls ces groupes sont affichés et chacun doit être renseigné. */
+    produits?: string[];
 };
 
-export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValider }: Props) {
-    const [s, setS] = useState<ComboSelection>(SELECTION_VIDE);
+export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValider, produits }: Props) {
+    const voir = (code: string) => !produits || produits.includes(code);
+    const [s, setS] = useState<ComboSelection>(() => ({ ...SELECTION_VIDE, telephone: !!produits?.includes("telephones") }));
     const [enCours, setEnCours] = useState(false);
 
     const bonusConstructeur = bonusManuels.filter((b) => !b.categorie || b.categorie === "destockage");
@@ -96,9 +100,14 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
         (s.assurance === "nouveau_mobile" ? bareme.assurance_nouveau_mobile : s.assurance === "essentielle" ? bareme.assurance_essentielle : 0);
 
     const rienSelectionne = !s.box && !s.forfait && !s.quatreP && !s.telephone && !s.mcafee && !s.mcafeeMobileId && !s.assurance;
+    // Depuis « Déclarer une vente » : chaque produit coché doit avoir son modèle choisi.
+    const manquants = (produits ?? []).filter((p) =>
+        (p === "box" && !s.box) || (p === "forfaits" && !s.forfait) || (p === "telephones" && !s.telephone)
+        || (p === "mcafee" && !s.mcafee) || (p === "assurance" && !s.assurance));
+    const LIBELLES: Record<string, string> = { box: "Box", forfaits: "Forfait", telephones: "Téléphone", mcafee: "McAfee", assurance: "Assurance" };
 
     async function valider() {
-        if (rienSelectionne || enCours) return;
+        if (rienSelectionne || manquants.length > 0 || enCours) return;
         setEnCours(true);
         try {
             await onValider(s);
@@ -121,13 +130,13 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
                 <p className="mb-5 text-xs text-white/40">Coche tout ce qui fait partie de cette même vente — chaque item crédite sa carte et ta cagnotte.</p>
 
                 <div className="space-y-5">
-                    <Groupe titre="📦 Box">
+                    {voir("box") && <Groupe titre="📦 Box">
                         {boxOptions.map((o) => (
                             <Puce key={o.cle} actif={s.box === o.cle} onClick={() => setS((p) => ({ ...p, box: p.box === o.cle ? null : o.cle, canal: p.box === o.cle ? p.canal : (o.cle === "box_ultra" ? p.canal : null) }))}>
                                 {o.label} · {fmtEuro(o.montant)}
                             </Puce>
                         ))}
-                    </Groupe>
+                    </Groupe>}
 
                     {s.box && (
                         <Groupe titre="📝 Commentaire box (optionnel)">
@@ -150,13 +159,13 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
                         </Groupe>
                     )}
 
-                    <Groupe titre="📱 Forfait">
+                    {voir("forfaits") && <Groupe titre="📱 Forfait">
                         {forfaitOptions.map((o) => (
                             <Puce key={o.cle} actif={s.forfait === o.cle} onClick={() => setS((p) => ({ ...p, forfait: p.forfait === o.cle ? null : o.cle }))}>
                                 {o.label} · {fmtEuro(o.montant)}
                             </Puce>
                         ))}
-                    </Groupe>
+                    </Groupe>}
 
                     {(s.box || s.forfait) && (
                         <Groupe titre="🔁 Cross-sell 4P">
@@ -166,11 +175,11 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
                         </Groupe>
                     )}
 
-                    <Groupe titre="📲 Téléphone">
+                    {voir("telephones") && <Groupe titre="📲 Téléphone">
                         <Puce actif={s.telephone} onClick={() => setS((p) => ({ ...p, telephone: !p.telephone, boostConstructeurId: p.telephone ? null : p.boostConstructeurId }))}>
                             Smartphone · {fmtEuro(bareme.smartphone)}
                         </Puce>
-                    </Groupe>
+                    </Groupe>}
 
                     {s.telephone && bonusConstructeur.length > 0 && (
                         <Groupe titre="🏭 Boost constructeur / déstockage">
@@ -182,15 +191,15 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
                         </Groupe>
                     )}
 
-                    <Groupe titre="🛡️ McAfee">
+                    {voir("mcafee") && <Groupe titre="🛡️ McAfee">
                         {mcafeeOptions.map((o) => (
                             <Puce key={o.cle} actif={s.mcafee === o.cle} onClick={() => setS((p) => ({ ...p, mcafee: p.mcafee === o.cle ? null : o.cle }))}>
                                 {o.label}
                             </Puce>
                         ))}
-                    </Groupe>
+                    </Groupe>}
 
-                    {bonusMcafeeMobile.length > 0 && (
+                    {bonusMcafeeMobile.length > 0 && (voir("mcafee") || voir("forfaits")) && (
                         <Groupe titre="📶 McAfee Mobile">
                             {bonusMcafeeMobile.map((b) => (
                                 <Puce key={b.id} actif={s.mcafeeMobileId === b.id} onClick={() => setS((p) => ({ ...p, mcafeeMobileId: p.mcafeeMobileId === b.id ? null : b.id }))}>
@@ -200,14 +209,14 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
                         </Groupe>
                     )}
 
-                    <Groupe titre="✅ Assurance">
+                    {voir("assurance") && <Groupe titre="✅ Assurance">
                         <Puce actif={s.assurance === "nouveau_mobile"} onClick={() => setS((p) => ({ ...p, assurance: p.assurance === "nouveau_mobile" ? null : "nouveau_mobile" }))}>
                             Nouveau Mobile · {fmtEuro(bareme.assurance_nouveau_mobile)}
                         </Puce>
                         <Puce actif={s.assurance === "essentielle"} onClick={() => setS((p) => ({ ...p, assurance: p.assurance === "essentielle" ? null : "essentielle" }))}>
                             Essentielle · {fmtEuro(bareme.assurance_essentielle)}
                         </Puce>
-                    </Groupe>
+                    </Groupe>}
                 </div>
 
                 <div className="mt-6 flex items-center justify-between gap-4 rounded-2xl bg-white/5 p-4">
@@ -217,10 +226,10 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
 
                 <button
                     onClick={valider}
-                    disabled={rienSelectionne || enCours}
+                    disabled={rienSelectionne || manquants.length > 0 || enCours}
                     className="mt-4 w-full rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-sm font-black text-white transition-all hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-30"
                 >
-                    {enCours ? "Enregistrement..." : "Valider la vente combo"}
+                    {enCours ? "Enregistrement..." : manquants.length > 0 ? `Choisis : ${manquants.map((m) => LIBELLES[m]).join(", ")}` : "Valider la vente combo"}
                 </button>
             </div>
         </div>

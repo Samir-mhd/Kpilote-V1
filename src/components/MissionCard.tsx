@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import ChoixActeModal, { ChoixActe } from "@/components/dashboard/ChoixActeModal";
 
 type BoostInfo = { label: string; montant: number };
@@ -40,6 +40,12 @@ type Props = {
     dernierJourSemaine?: boolean;
     /** Carte réduite (variante Accueil "layout=v2") : même parcours de vente, affichage dense. */
     compact?: boolean;
+    /** Affichage en anneau (Accueil) : pas de bouton, la vente est lancée depuis la carte
+     *  « Déclarer une vente » via le déclencheur enregistré ci-dessous. Même parcours de vente. */
+    anneau?: boolean;
+    emoji?: string;
+    /** Reçoit la fonction qui lance la vente de cette carte (comme un clic sur « +1 »). */
+    onDeclencheur?: (lancer: (() => void) | null) => void;
 };
 
 // Mapping couleur Tailwind → hex (pour le SVG arc) + gradient (pour la barre/bouton)
@@ -121,7 +127,7 @@ function genParticles(): Particle[] {
 export default function MissionCard({
     titre, realise, objectif, couleur, onSale, sousChoix, acteDirect, onChoixVariable,
     demanderCrossSell4P, montantCrossSell4P, onCrossSell4P, questionsCrossSellPour, onBoostReady, dernierJourSemaine,
-    compact = false,
+    compact = false, anneau = false, emoji, onDeclencheur,
 }: Props) {
     const [celebrating, setCelebrating] = useState(false);
     const [celebEmoji, setCelebEmoji] = useState("🎉");
@@ -136,6 +142,7 @@ export default function MissionCard({
     const [commentaireBoxChoix, setCommentaireBoxChoix] = useState<ChoixActe | null>(null);
     const [commentaireBoxTexte, setCommentaireBoxTexte] = useState("");
     const boostEnAttenteRef = useRef<BoostInfo | undefined>(undefined);
+    const idOr = `anneau-or-${useId().replace(/:/g, "")}`;
 
     const pal   = PALETTE[couleur] ?? DEFAULT_PAL;
     const pct   = objectif > 0 ? Math.min(Math.round((realise / objectif) * 100), 100) : 0;
@@ -215,6 +222,14 @@ export default function MissionCard({
         declencherVente(acteDirect);
     }
 
+    // Toujours la dernière version de handleSale (elle lit l'état courant de la carte).
+    const handleSaleRef = useRef(handleSale);
+    useEffect(() => { handleSaleRef.current = handleSale; });
+    useEffect(() => {
+        onDeclencheur?.(() => handleSaleRef.current());
+        return () => onDeclencheur?.(null);
+    }, [onDeclencheur]);
+
     function handleChoix(choix: ChoixActe) {
         setModalOuverte(false);
         // Box : une étape de commentaire s'intercale avant de déclencher la vente, pour que le
@@ -285,6 +300,239 @@ export default function MissionCard({
         setPickerOuvert(false);
         setQuestionActive(null);
         avancerQuestions(queueQuestions);
+    }
+
+    const modales = (
+        <>
+            {modalOuverte && sousChoix && (
+                <ChoixActeModal
+                    titre={`J'ai vendu ${article} ${displayTitre}`}
+                    options={sousChoix}
+                    onChoisir={handleChoix}
+                    onClose={() => setModalOuverte(false)}
+                />
+            )}
+
+            {commentaireBoxChoix && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                    onClick={validerCommentaireBox}
+                >
+                    <div
+                        className="mx-4 w-full max-w-xs rounded-[28px] bg-slate-900 p-7 text-center shadow-[0_24px_64px_rgba(0,0,0,.5)]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <p className="text-4xl">📝</p>
+                        <p className="mt-3 text-lg font-black text-white">Un commentaire pour cette box ?</p>
+                        <p className="mt-1 text-xs text-white/40">Identifiant client, RDV technicien... (optionnel)</p>
+                        <input
+                            autoFocus
+                            value={commentaireBoxTexte}
+                            onChange={(e) => setCommentaireBoxTexte(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && validerCommentaireBox()}
+                            placeholder="Commentaire"
+                            className="mt-4 h-11 w-full rounded-2xl border border-white/15 bg-white/5 px-4 text-sm text-white outline-none focus:border-violet-400"
+                        />
+                        <div className="mt-5 flex gap-3">
+                            <button
+                                onClick={validerCommentaireBox}
+                                className="flex-1 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 py-3 text-sm font-black text-white transition-all hover:opacity-90"
+                            >
+                                {commentaireBoxTexte.trim() ? "Valider" : "Passer"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {question4POuverte && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                    onClick={() => !envoi4PEnCours && handleReponse4P(false)}
+                >
+                    <div
+                        className="mx-4 w-full max-w-xs rounded-[28px] bg-slate-900 p-7 text-center shadow-[0_24px_64px_rgba(0,0,0,.5)]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <p className="text-4xl">🔀</p>
+                        <p className="mt-3 text-lg font-black text-white">T'as fait une 4P ?</p>
+                        <div className="mt-6 flex gap-3">
+                            <button
+                                onClick={() => handleReponse4P(false)}
+                                disabled={envoi4PEnCours}
+                                className="flex-1 rounded-2xl border-2 border-white/15 py-3 text-sm font-bold text-white/60 transition-all hover:bg-white/5 disabled:opacity-50"
+                            >
+                                Non
+                            </button>
+                            <button
+                                onClick={() => handleReponse4P(true)}
+                                disabled={envoi4PEnCours}
+                                className="flex-1 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 py-3 text-sm font-black text-white transition-all hover:opacity-90 disabled:opacity-60"
+                            >
+                                {envoi4PEnCours ? "…" : `Oui +${(montantCrossSell4P ?? 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {questionActive && !pickerOuvert && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                    onClick={() => !envoiCrossSellEnCours && handleReponseCrossSell(false)}
+                >
+                    <div
+                        className="mx-4 w-full max-w-xs rounded-[28px] bg-slate-900 p-7 text-center shadow-[0_24px_64px_rgba(0,0,0,.5)]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <p className="text-4xl">{questionActive.emoji}</p>
+                        <p className="mt-3 text-lg font-black text-white">{questionActive.question}</p>
+                        <div className="mt-6 flex gap-3">
+                            <button
+                                onClick={() => handleReponseCrossSell(false)}
+                                disabled={envoiCrossSellEnCours}
+                                className="flex-1 rounded-2xl border-2 border-white/15 py-3 text-sm font-bold text-white/60 transition-all hover:bg-white/5 disabled:opacity-50"
+                            >
+                                Non
+                            </button>
+                            <button
+                                onClick={() => handleReponseCrossSell(true)}
+                                disabled={envoiCrossSellEnCours}
+                                className="flex-1 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 py-3 text-sm font-black text-white transition-all hover:opacity-90 disabled:opacity-60"
+                            >
+                                {envoiCrossSellEnCours
+                                    ? "…"
+                                    : questionActive.options.length === 1
+                                    ? `Oui +${(questionActive.options[0].montant ?? 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €`
+                                    : "Oui →"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {questionActive && pickerOuvert && (
+                <ChoixActeModal
+                    titre={questionActive.question}
+                    options={questionActive.options}
+                    onChoisir={handlePickerCrossSell}
+                    onClose={fermerPickerSansChoix}
+                    layout="tableau"
+                />
+            )}
+        </>
+    );
+    const styleAnim = (
+            <style>{`
+                @keyframes bounceUp {
+                    0%   { transform: scale(.4) translateY(20px); opacity: 0; }
+                    60%  { transform: scale(1.2) translateY(-4px); opacity: 1; }
+                    100% { transform: scale(1) translateY(0); }
+                }
+                @keyframes particleBurst {
+                    0%   { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+                    100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0.2); opacity: 0; }
+                }
+            `}</style>
+    );
+
+    if (anneau) {
+        const R = 34;
+        const C = 2 * Math.PI * R;
+        const pctAnneau = objectif > 0 ? pct : realise > 0 ? 100 : 0;
+        // Couleurs unifiées : bleu en cours, vert atteint, or scintillant dépassé.
+        const depasse = realise > objectif;
+        const etatAnneau = depasse ? "depasse" : atteint ? "atteint" : "en_cours";
+        const traitAnneau = depasse ? `url(#${idOr})` : atteint ? "#10b981" : "#3b82f6";
+        return (
+            <div className="relative flex flex-col items-center text-center">
+                <div className={`relative h-[84px] w-[84px] ${depasse ? "anneau-or" : ""}`} data-etat={etatAnneau}>
+                    <svg viewBox="0 0 84 84" className="h-[84px] w-[84px] -rotate-90">
+                        <defs>
+                            <linearGradient id={idOr} x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stopColor="#b45309" />
+                                <stop offset="35%" stopColor="#fbbf24" />
+                                <stop offset="50%" stopColor="#fef3c7">
+                                    <animate attributeName="offset" values="0.1;0.9;0.1" dur="2.4s" repeatCount="indefinite" />
+                                </stop>
+                                <stop offset="65%" stopColor="#f59e0b" />
+                                <stop offset="100%" stopColor="#b45309" />
+                            </linearGradient>
+                        </defs>
+                        <circle cx="42" cy="42" r={R} fill="none" strokeWidth="8" className="stroke-slate-100" />
+                        <circle
+                            cx="42" cy="42" r={R} fill="none" stroke={traitAnneau} strokeWidth="8"
+                            strokeLinecap={pctAnneau > 0 ? "round" : "butt"}
+                            strokeDasharray={C}
+                            strokeDashoffset={C * (1 - pctAnneau / 100)}
+                            style={{ transition: "stroke-dashoffset .8s cubic-bezier(.4,0,.2,1), stroke .4s" }}
+                        />
+                    </svg>
+                    <span className="absolute inset-0 flex flex-col items-center justify-center">
+                        {emoji && <span className="text-xl leading-none">{emoji}</span>}
+                        <span className="mt-0.5 text-sm font-black tabular-nums text-slate-900">
+                            {realise}<span className="text-[11px] text-slate-400">/{objectif}</span>
+                        </span>
+                    </span>
+                    {depasse ? (
+                        <span className="absolute -right-0.5 top-0 flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 text-xs text-white ring-2 ring-white">★</span>
+                    ) : atteint && (
+                        <span className="absolute -right-0.5 top-0 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white ring-2 ring-white">✓</span>
+                    )}
+                    {depasse && (
+                        <>
+                            <span className="anneau-etincelle pointer-events-none absolute -left-1 top-3 text-[10px] text-amber-400">✦</span>
+                            <span className="anneau-etincelle pointer-events-none absolute -bottom-0.5 right-2 text-xs text-amber-400" style={{ animationDelay: ".8s" }}>✦</span>
+                            <span className="anneau-etincelle pointer-events-none absolute right-0 top-9 text-[8px] text-amber-300" style={{ animationDelay: "1.5s" }}>✦</span>
+                        </>
+                    )}
+                    {celebrating && !sansAnimation && (
+                        <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                            <span className="absolute h-24 w-24 animate-ping rounded-full" style={{ background: `${traitAnneau.startsWith("#") ? traitAnneau : "#f59e0b"}30` }} />
+                            <span className="relative text-4xl" style={{ animation: "bounceUp .35s ease" }}>{celebEmoji}</span>
+                        </span>
+                    )}
+                    {particles.map((p) => (
+                        <span
+                            key={p.id}
+                            className="pointer-events-none absolute z-20 rounded-full"
+                            style={{
+                                width: p.size, height: p.size, background: p.color, top: "50%", left: "50%",
+                                ["--tx" as string]: `${Math.cos(p.angle * Math.PI / 180) * p.dist * 0.6}px`,
+                                ["--ty" as string]: `${Math.sin(p.angle * Math.PI / 180) * p.dist * 0.6}px`,
+                                animation: `particleBurst 0.65s ease-out ${p.delay}s forwards`,
+                            }}
+                        />
+                    ))}
+                </div>
+                <p className="mt-1.5 text-xs font-black text-slate-800">{displayTitre}</p>
+                <p className={`text-[11px] font-bold ${depasse ? "text-amber-600" : atteint ? "text-emerald-600" : "text-slate-400"}`}>
+                    {objectif === 0 && realise === 0
+                        ? "Pas d’objectif"
+                        : depasse
+                        ? `+${realise - objectif} au-dessus`
+                        : atteint
+                        ? "✓ Atteint"
+                        : `Encore ${objectif - realise}`}
+                </p>
+                {modales}
+                {styleAnim}
+                <style>{`
+                    .anneau-or { animation: anneauOr 2.4s ease-in-out infinite; border-radius: 9999px; }
+                    @keyframes anneauOr {
+                        0%,100% { filter: drop-shadow(0 0 2px rgba(245,158,11,.35)); }
+                        50%     { filter: drop-shadow(0 0 9px rgba(251,191,36,.75)); }
+                    }
+                    .anneau-etincelle { animation: anneauEtincelle 2.2s ease-in-out infinite; opacity: 0; }
+                    @keyframes anneauEtincelle {
+                        0%,100% { opacity: 0; transform: scale(.4) rotate(0deg); }
+                        40%     { opacity: 1; transform: scale(1.15) rotate(45deg); }
+                        70%     { opacity: 0; transform: scale(.6) rotate(90deg); }
+                    }
+                    @media (prefers-reduced-motion: reduce) { .anneau-or, .anneau-etincelle { animation: none; opacity: 1; } }
+                `}</style>
+            </div>
+        );
     }
 
     return (
@@ -470,134 +718,9 @@ export default function MissionCard({
             </div>
             )}
 
-            {modalOuverte && sousChoix && (
-                <ChoixActeModal
-                    titre={`J'ai vendu ${article} ${displayTitre}`}
-                    options={sousChoix}
-                    onChoisir={handleChoix}
-                    onClose={() => setModalOuverte(false)}
-                />
-            )}
+            {modales}
 
-            {commentaireBoxChoix && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-                    onClick={validerCommentaireBox}
-                >
-                    <div
-                        className="mx-4 w-full max-w-xs rounded-[28px] bg-slate-900 p-7 text-center shadow-[0_24px_64px_rgba(0,0,0,.5)]"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <p className="text-4xl">📝</p>
-                        <p className="mt-3 text-lg font-black text-white">Un commentaire pour cette box ?</p>
-                        <p className="mt-1 text-xs text-white/40">Identifiant client, RDV technicien... (optionnel)</p>
-                        <input
-                            autoFocus
-                            value={commentaireBoxTexte}
-                            onChange={(e) => setCommentaireBoxTexte(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && validerCommentaireBox()}
-                            placeholder="Commentaire"
-                            className="mt-4 h-11 w-full rounded-2xl border border-white/15 bg-white/5 px-4 text-sm text-white outline-none focus:border-violet-400"
-                        />
-                        <div className="mt-5 flex gap-3">
-                            <button
-                                onClick={validerCommentaireBox}
-                                className="flex-1 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 py-3 text-sm font-black text-white transition-all hover:opacity-90"
-                            >
-                                {commentaireBoxTexte.trim() ? "Valider" : "Passer"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {question4POuverte && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-                    onClick={() => !envoi4PEnCours && handleReponse4P(false)}
-                >
-                    <div
-                        className="mx-4 w-full max-w-xs rounded-[28px] bg-slate-900 p-7 text-center shadow-[0_24px_64px_rgba(0,0,0,.5)]"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <p className="text-4xl">🔀</p>
-                        <p className="mt-3 text-lg font-black text-white">T'as fait une 4P ?</p>
-                        <div className="mt-6 flex gap-3">
-                            <button
-                                onClick={() => handleReponse4P(false)}
-                                disabled={envoi4PEnCours}
-                                className="flex-1 rounded-2xl border-2 border-white/15 py-3 text-sm font-bold text-white/60 transition-all hover:bg-white/5 disabled:opacity-50"
-                            >
-                                Non
-                            </button>
-                            <button
-                                onClick={() => handleReponse4P(true)}
-                                disabled={envoi4PEnCours}
-                                className="flex-1 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 py-3 text-sm font-black text-white transition-all hover:opacity-90 disabled:opacity-60"
-                            >
-                                {envoi4PEnCours ? "…" : `Oui +${(montantCrossSell4P ?? 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €`}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {questionActive && !pickerOuvert && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-                    onClick={() => !envoiCrossSellEnCours && handleReponseCrossSell(false)}
-                >
-                    <div
-                        className="mx-4 w-full max-w-xs rounded-[28px] bg-slate-900 p-7 text-center shadow-[0_24px_64px_rgba(0,0,0,.5)]"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <p className="text-4xl">{questionActive.emoji}</p>
-                        <p className="mt-3 text-lg font-black text-white">{questionActive.question}</p>
-                        <div className="mt-6 flex gap-3">
-                            <button
-                                onClick={() => handleReponseCrossSell(false)}
-                                disabled={envoiCrossSellEnCours}
-                                className="flex-1 rounded-2xl border-2 border-white/15 py-3 text-sm font-bold text-white/60 transition-all hover:bg-white/5 disabled:opacity-50"
-                            >
-                                Non
-                            </button>
-                            <button
-                                onClick={() => handleReponseCrossSell(true)}
-                                disabled={envoiCrossSellEnCours}
-                                className="flex-1 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 py-3 text-sm font-black text-white transition-all hover:opacity-90 disabled:opacity-60"
-                            >
-                                {envoiCrossSellEnCours
-                                    ? "…"
-                                    : questionActive.options.length === 1
-                                    ? `Oui +${(questionActive.options[0].montant ?? 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €`
-                                    : "Oui →"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {questionActive && pickerOuvert && (
-                <ChoixActeModal
-                    titre={questionActive.question}
-                    options={questionActive.options}
-                    onChoisir={handlePickerCrossSell}
-                    onClose={fermerPickerSansChoix}
-                    layout="tableau"
-                />
-            )}
-
-            <style>{`
-                @keyframes bounceUp {
-                    0%   { transform: scale(.4) translateY(20px); opacity: 0; }
-                    60%  { transform: scale(1.2) translateY(-4px); opacity: 1; }
-                    100% { transform: scale(1) translateY(0); }
-                }
-                @keyframes particleBurst {
-                    0%   { transform: translate(-50%,-50%) scale(1); opacity: 1; }
-                    100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0.2); opacity: 0; }
-                }
-            `}</style>
+            {styleAnim}
         </section>
     );
 }

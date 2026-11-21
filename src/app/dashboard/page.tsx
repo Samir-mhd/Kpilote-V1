@@ -3,6 +3,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { Check, ChevronRight, Smartphone, Ticket, X } from "lucide-react";
 import HeroCompact from "@/components/dashboard/HeroCompact";
 import MorningCheckV2 from "@/components/dashboard/MorningCheckV2";
 import { DefiJourBandeau } from "@/components/dashboard/DefiJour";
@@ -51,6 +53,19 @@ import { calculerBadgesConseiller, prochainBadgeADebloquer, ProchainBadge } from
 import { PRODUITS_ORDRE, PRODUITS_HORS_ACTES, ProduitCode } from "@/utils/produits";
 
 const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
+
+/** Actes regroupables dans une vente combo (les autres sont de simples compteurs). */
+const PRODUITS_COMBO = ["box", "forfaits", "telephones", "mcafee", "assurance"];
+const NOMS_ACTES: Record<string, string> = { "Téléphones": "Téléphone", "Forfaits": "Forfait" };
+function nomActe(produit: string): string { return NOMS_ACTES[produit] ?? produit; }
+function emojiProduit(produit: string): string { return PRODUITS_ORDRE.find((p) => p.label === produit)?.emoji ?? "•"; }
+function libellePlusUn(produit: string): string {
+    const n = produit.toLowerCase();
+    if (n === "spiderhome") return "+1 historisation";
+    if (n === "avis google") return "+1 avis Google";
+    if (n === "récap co") return "+1 Récap Co";
+    return `+1 ${nomActe(produit)}`;
+}
 
 // Ordre par défaut des cartes Accueil (personnalisable par chaque conseiller depuis Profil).
 const ORDRE_ACCUEIL_DEFAUT = ["box", "mcafee", "telephones", "assurance", "forfaits", "avis_google", "recap_commercial", "spiderhome"];
@@ -222,6 +237,12 @@ export default function Dashboard() {
     const [prochainBadge, setProchainBadge] = useState<ProchainBadge | null>(null);
     const [comboOuvert, setComboOuvert] = useState(false);
     const [comboSansVarianteOuvert, setComboSansVarianteOuvert] = useState(false);
+    // Carte « Déclarer une vente » : actes cochés (noms de missions). 1 acte = vente simple
+    // (même parcours que l'ancien bouton « +1 »), plusieurs = vente combo pré-remplie.
+    const [actesChoisis, setActesChoisis] = useState<string[]>([]);
+    const [comboProduits, setComboProduits] = useState<string[] | undefined>(undefined);
+    const declencheursRef = useRef<Record<string, () => void>>({});
+    const enregistreursRef = useRef<Record<string, (lancer: (() => void) | null) => void>>({});
     // Compteur d'articles de la vente en cours (carte + questions de rebond qui suivent, ou
     // combo) — flushé en une transaction "ventes_transactions" à la fin du flux (onBoostReady
     // pour le parcours normal, explicitement en fin de soumission pour les cartes combo).
@@ -849,12 +870,43 @@ export default function Dashboard() {
         setCoachMessage("🎁 Vente combo enregistrée — bien joué !");
     }
 
+    // Fonction stable par produit : chaque anneau y dépose la fonction qui lance sa vente.
+    function enregistreurPour(produit: string) {
+        return (enregistreursRef.current[produit] ??= (lancer) => {
+            if (lancer) declencheursRef.current[produit] = lancer;
+            else delete declencheursRef.current[produit];
+        });
+    }
+
+    function basculerActe(produit: string) {
+        setActesChoisis((l) => (l.includes(produit) ? l.filter((p) => p !== produit) : [...l, produit]));
+    }
+
+    function validerDeclaration() {
+        const choisis = ordonnerAccueil(missions.filter((m) => !m.sansCarte && actesChoisis.includes(m.produit)));
+        const combinables = choisis.filter((m) => PRODUITS_COMBO.includes(produitCode(m.produit)));
+        const autres = choisis.filter((m) => !PRODUITS_COMBO.includes(produitCode(m.produit)));
+        setActesChoisis([]);
+        // Avis Google / Récap Co / Spiderhome : simples compteurs, enregistrés directement.
+        for (const m of autres) declencheursRef.current[m.produit]?.();
+        if (combinables.length >= 2) {
+            setComboProduits(combinables.map((m) => produitCode(m.produit)));
+            if (variableActivee) setComboOuvert(true);
+            else setComboSansVarianteOuvert(true);
+        } else if (combinables.length === 1) {
+            declencheursRef.current[combinables[0].produit]?.();
+        }
+    }
+
     // Cartes objectifs — partagées par les deux mises en page (seul l'affichage change en compact).
-    function cartesMissions(compact: boolean) {
+    function cartesMissions(compact: boolean, anneau = false) {
         return ordonnerAccueil(missions.filter((m) => !m.sansCarte)).map((mission) => (
             <MissionCard
                 key={mission.produit}
                 compact={compact}
+                anneau={anneau}
+                emoji={emojiProduit(mission.produit)}
+                onDeclencheur={anneau ? enregistreurPour(mission.produit) : undefined}
                 titre={mission.produit}
                 realise={mission.realise}
                 objectif={mission.objectif}
@@ -1080,8 +1132,6 @@ export default function Dashboard() {
                 />
             )}
 
-            {/* ── Défi du jour (accepté → progression, refusé → priorité du jour) ── */}
-            {conseillerId && <DefiJourBandeau conseillerId={conseillerId} nom={nom} />}
 
             {/* ── Invitations défi reçues ──────────────────────────────── */}
             {invitations.map((inv) => (
@@ -1206,46 +1256,127 @@ export default function Dashboard() {
             )}
 
             {(
-                <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                    <section className="xl:col-span-2">
-                        {/* Vente combo mise en avant : le moyen le plus rapide de tout déclarer */}
-                        <button
-                            onClick={() => (variableActivee ? setComboOuvert(true) : setComboSansVarianteOuvert(true))}
-                            className="group relative mb-5 flex w-full items-center gap-4 overflow-hidden rounded-[24px] bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 p-4 text-left text-white shadow-[0_14px_40px_rgba(234,88,12,.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_50px_rgba(234,88,12,.45)] active:scale-[0.99] sm:p-5"
-                        >
-                            <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(110deg,transparent_30%,rgba(255,255,255,.35)_45%,transparent_60%)] motion-safe:animate-[podium-reflet_3.5s_ease-in-out_infinite]" />
-                            <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-3xl ring-1 ring-white/40 sm:h-16 sm:w-16 sm:text-4xl">
-                                🎁
-                            </span>
-                            <span className="relative min-w-0 flex-1">
-                                <span className="block text-xl font-black leading-tight sm:text-2xl">Vente combo</span>
-                                <span className="mt-0.5 block text-sm font-semibold text-white/90">
-                                    Box + forfait + téléphone + assurance : tout déclarer en une fois
-                                </span>
-                                <span className="mt-1.5 hidden text-lg leading-none tracking-wide sm:block">📦 📱 📲 🛡️ ✅</span>
-                            </span>
-                            <span className="relative flex shrink-0 items-center gap-1.5 rounded-2xl bg-white px-4 py-3 text-sm font-black text-orange-600 shadow-lg transition-transform group-hover:translate-x-0.5">
-                                Déclarer
-                                <span aria-hidden="true">→</span>
-                            </span>
-                        </button>
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_1fr]">
+                        {/* ── Déclarer une vente : 1 acte = vente simple, plusieurs = vente combo ── */}
+                        <section className="rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-slate-200">
+                            <div className="mb-4 flex items-center gap-3">
+                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-xl">✍️</span>
+                                <div>
+                                    <h2 className="text-lg font-black leading-tight text-slate-900">Déclarer une vente</h2>
+                                    <p className="text-xs font-semibold text-slate-400">Touche tes actes puis valide · à partir de 2, c&apos;est une vente combo</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {ordonnerAccueil(missions.filter((m) => !m.sansCarte)).map((m) => {
+                                    const actif = actesChoisis.includes(m.produit);
+                                    return (
+                                        <button
+                                            key={m.produit}
+                                            type="button"
+                                            aria-pressed={actif}
+                                            onClick={() => basculerActe(m.produit)}
+                                            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-black transition-all active:scale-95 ${actif ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+                                        >
+                                            {actif ? <Check size={14} strokeWidth={3.5} /> : <span>{emojiProduit(m.produit)}</span>}
+                                            {nomActe(m.produit)}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {(() => {
+                                const choisis = ordonnerAccueil(missions.filter((m) => !m.sansCarte && actesChoisis.includes(m.produit)));
+                                if (choisis.length === 0) {
+                                    return (
+                                        <div className="mt-4 rounded-2xl border-2 border-dashed border-slate-200 px-4 py-3.5 text-center text-sm font-bold text-slate-400">
+                                            Touche un ou plusieurs actes · à partir de 2, c&apos;est une vente combo 🎁
+                                        </div>
+                                    );
+                                }
+                                const combo = choisis.filter((m) => PRODUITS_COMBO.includes(produitCode(m.produit))).length >= 2;
+                                const libelle = combo
+                                    ? `Valider la vente combo (${choisis.length})`
+                                    : choisis.length === 1 ? `Valider : ${libellePlusUn(choisis[0].produit)}` : `Valider (${choisis.length})`;
+                                return (
+                                    <div className={`mt-4 flex flex-wrap items-center gap-3 rounded-2xl p-3 ${combo ? "bg-gradient-to-r from-amber-50 via-orange-50 to-pink-50 ring-1 ring-orange-200" : "bg-slate-50 ring-1 ring-slate-200"}`}>
+                                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                                            {combo && <span className="rounded-full bg-gradient-to-r from-amber-400 to-pink-500 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-white">🎁 Combo</span>}
+                                            {choisis.map((m) => (
+                                                <button key={m.produit} type="button" onClick={() => basculerActe(m.produit)} className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-black text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100">
+                                                    {emojiProduit(m.produit)} {nomActe(m.produit)} <X size={12} className="text-slate-400" />
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={validerDeclaration}
+                                            className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-black text-white shadow-md transition-all hover:-translate-y-0.5 active:scale-[0.98] ${combo ? "bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500" : "bg-slate-900"}`}
+                                        >
+                                            {libelle} →
+                                        </button>
+                                    </div>
+                                );
+                            })()}
+                        </section>
 
-                        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-                            <h2 className="text-xl font-black text-slate-900">Tes objectifs du jour</h2>
-                            {missions.some((m) => m.dernierJourSemaine) && (
-                                <p className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
-                                    📅 Dernier jour de ta semaine : le reste de tes objectifs se joue aujourd&apos;hui
-                                </p>
-                            )}
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-4">
-                            {cartesMissions(true)}
-                        </div>
-                    </section>
+                        {/* ── Outils : accès direct (le menu est trop petit pour naviguer) ── */}
+                        <section className="rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-slate-200">
+                            <div className="mb-4 flex items-center gap-3">
+                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-xl">🧰</span>
+                                <div>
+                                    <h2 className="text-lg font-black leading-tight text-slate-900">Outils</h2>
+                                    <p className="text-xs font-semibold text-slate-400">Aide à la vente</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                                {[
+                                    { href: "/dashboard/outils/telephones", Icone: Smartphone, titre: "Comparateur téléphones", texte: "Prix Free Flex et comptant, jusqu'à 3 modèles" },
+                                    { href: "/dashboard/outils/odr", Icone: Ticket, titre: "Coupons ODR", texte: "Coupons de remboursement, impression en 1 clic" },
+                                ].map(({ href, Icone, titre, texte }) => (
+                                    <Link key={href} href={`${href}${`?id=${encodeURIComponent(conseillerId)}&nom=${encodeURIComponent(nom)}`}`} className="group flex items-center gap-3 rounded-2xl bg-red-50/60 p-3 ring-1 ring-red-100 transition-all hover:-translate-y-0.5 hover:bg-red-50">
+                                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#cd1e25] text-white"><Icone size={18} /></span>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block text-sm font-black text-slate-900">{titre}</span>
+                                            <span className="block truncate text-[11px] font-semibold text-slate-500">{texte}</span>
+                                        </span>
+                                        <ChevronRight size={16} className="shrink-0 text-[#cd1e25] transition-transform group-hover:translate-x-0.5" />
+                                    </Link>
+                                ))}
+                            </div>
+                        </section>
+                    </div>
 
-                    <aside className="xl:sticky xl:top-6 xl:self-start">
-                        <TeamFeed conseillerId={conseillerId} condense />
-                    </aside>
+                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_1fr]">
+                        {/* ── Objectifs du jour en anneaux (la jauge avance à chaque vente) ── */}
+                        <section className="rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-slate-200">
+                            <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-xl">🎯</span>
+                                    <div>
+                                        <h2 className="text-lg font-black leading-tight text-slate-900">Objectifs du jour</h2>
+                                        {missions.some((m) => m.dernierJourSemaine) && (
+                                            <p className="text-xs font-semibold text-amber-700">📅 Dernier jour de ta semaine : le reste se joue aujourd&apos;hui</p>
+                                        )}
+                                    </div>
+                                </div>
+                                {(() => {
+                                    const cartes = missions.filter((m) => !m.sansCarte && m.objectif > 0);
+                                    const atteints = cartes.filter((m) => m.realise >= m.objectif).length;
+                                    return cartes.length > 0 ? (
+                                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">{atteints} / {cartes.length} atteints</span>
+                                    ) : null;
+                                })()}
+                            </div>
+                            <div className="grid grid-cols-3 gap-y-5 sm:grid-cols-4">
+                                {cartesMissions(true, true)}
+                            </div>
+                            {conseillerId && <div className="mt-5"><DefiJourBandeau conseillerId={conseillerId} nom={nom} /></div>}
+                        </section>
+
+                        <aside className="xl:self-start">
+                            <TeamFeed conseillerId={conseillerId} condense />
+                        </aside>
+                    </div>
                 </div>
             )}
 
@@ -1253,7 +1384,8 @@ export default function Dashboard() {
                 <ComboVenteModal
                     bareme={bareme}
                     bonusManuels={bonusManuels}
-                    onClose={() => setComboOuvert(false)}
+                    produits={comboProduits}
+                    onClose={() => { setComboOuvert(false); setComboProduits(undefined); }}
                     onValider={soumettreCombo}
                 />
             )}
@@ -1262,7 +1394,12 @@ export default function Dashboard() {
                 <ComboSansVarianteModal
                     // Assurance proposée seulement si le conseiller en a (ex. Pauline : non).
                     masquer={missions.some((m) => produitCode(m.produit) === "assurance") ? [] : ["assurance"]}
-                    onClose={() => setComboSansVarianteOuvert(false)}
+                    preselection={comboProduits ? {
+                        box: comboProduits.includes("box"), forfait: comboProduits.includes("forfaits"),
+                        telephone: comboProduits.includes("telephones"), mcafee: comboProduits.includes("mcafee"),
+                        assurance: comboProduits.includes("assurance"),
+                    } : undefined}
+                    onClose={() => { setComboSansVarianteOuvert(false); setComboProduits(undefined); }}
                     onValider={soumettreComboSansVariante}
                 />
             )}
