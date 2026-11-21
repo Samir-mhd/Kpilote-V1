@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useEffect, useMemo, useState } from "react";
-import { Search, X, ExternalLink, Check } from "lucide-react";
+import { Search, X, ExternalLink, Check, RefreshCw } from "lucide-react";
 import type { CatalogueTelephones, TelephoneFree, VarianteTel, PrixFlex } from "@/services/telephonesFreeService";
 
 type Profil = "prospect" | "abonne";
@@ -65,11 +65,28 @@ export default function ComparateurTelephonesPage() {
     const options: Options = { forfait, assurance };
     const avecOptions = forfait > 0 || assurance;
 
+    const [actualisation, setActualisation] = useState<"" | "en_cours" | "ok" | "erreur">("");
+
     useEffect(() => {
         fetch("/api/telephones")
             .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.erreur ?? "Erreur"); setData(j); })
             .catch((e) => setErreur(e.message));
     }, []);
+
+    /** Relit mobile.free.fr tout de suite (sans attendre la mise à jour automatique horaire). */
+    async function actualiser() {
+        setActualisation("en_cours");
+        try {
+            const r = await fetch("/api/telephones", { method: "POST" });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.erreur ?? "Erreur");
+            setData(j);
+            setActualisation("ok");
+        } catch {
+            setActualisation("erreur");
+        }
+        setTimeout(() => setActualisation(""), 4000);
+    }
 
     const variante = (t: TelephoneFree) => t.variantes.find((v) => v.stockage === stockage[t.id]) ?? t.variantes[0];
 
@@ -122,6 +139,15 @@ export default function ComparateurTelephonesPage() {
                     <p className="mt-1 text-sm text-slate-500">
                         {data ? <>Prix de mobile.free.fr · mis à jour le {dateMaj(data.majLe)} · coche 1 modèle pour l&apos;afficher, jusqu&apos;à 3 pour comparer</> : "Chargement du catalogue Free…"}
                     </p>
+                    {data && (
+                        <button onClick={actualiser} disabled={actualisation === "en_cours"}
+                            className="mt-2 flex items-center gap-1.5 rounded-xl bg-white px-3 py-1.5 text-xs font-black text-slate-700 ring-1 ring-slate-200 transition-colors hover:bg-red-50 hover:text-[#cd1e25] disabled:opacity-60">
+                            <RefreshCw size={13} className={actualisation === "en_cours" ? "animate-spin" : ""} />
+                            {actualisation === "en_cours" ? "Lecture de mobile.free.fr…"
+                                : actualisation === "ok" ? "✓ Offres à jour"
+                                    : actualisation === "erreur" ? "Free ne répond pas, réessaie" : "Actualiser les offres"}
+                        </button>
+                    )}
                 </div>
                 <div className="flex flex-col items-end gap-2">
                     <div className="flex rounded-2xl bg-white p-1 ring-1 ring-slate-200">
