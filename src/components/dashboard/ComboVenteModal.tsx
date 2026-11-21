@@ -13,11 +13,13 @@ export type ComboSelection = {
     mcafee: "mcafee_499" | "mcafee_699" | null;
     mcafeeMobileId: string | null;
     assurance: "nouveau_mobile" | "essentielle" | null;
+    /** Commentaire de la box (identifiant client, RDV technicien…) — reporté sur la fiche de suivi. */
+    commentaire: string;
 };
 
 const SELECTION_VIDE: ComboSelection = {
     box: null, canal: null, forfait: null, quatreP: false,
-    telephone: false, boostConstructeurId: null, mcafee: null, mcafeeMobileId: null, assurance: null,
+    telephone: false, boostConstructeurId: null, mcafee: null, mcafeeMobileId: null, assurance: null, commentaire: "",
 };
 
 function fmtEuro(n: number) {
@@ -126,6 +128,17 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
                             </Puce>
                         ))}
                     </Groupe>
+
+                    {s.box && (
+                        <Groupe titre="📝 Commentaire box (optionnel)">
+                            <input
+                                value={s.commentaire}
+                                onChange={(e) => setS((p) => ({ ...p, commentaire: e.target.value }))}
+                                placeholder="Identifiant client, RDV technicien…"
+                                className="h-11 w-full rounded-2xl border border-white/15 bg-white/5 px-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-amber-400"
+                            />
+                        </Groupe>
+                    )}
 
                     {s.box === "box_ultra" && (
                         <Groupe titre="📺 Canal+">

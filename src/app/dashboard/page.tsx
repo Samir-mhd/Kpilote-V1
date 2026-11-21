@@ -770,7 +770,8 @@ export default function Dashboard() {
             const acte = BOX_CHOIX.find((c) => c.champ === s.box);
             if (acte) {
                 await handleSale("Box");
-                await ajouterActeVariable(acte);
+                const commentaire = s.commentaire.trim();
+                await ajouterActeVariable(commentaire ? { ...acte, commentaire } : acte);
             }
             if (s.box === "box_ultra" && s.canal) {
                 await ajouterActeVariable({ label: CANAL_LABELS_COMBO[s.canal], montant: bareme[s.canal] });
