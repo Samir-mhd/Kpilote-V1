@@ -75,13 +75,17 @@ export default function OdrPage() {
         if (!data) return [];
         const auj = aujourdhui();
         return data.telephones.map((t) => {
+            // Coupons identiques mutualisés : même type + même montant + même fin = un seul coupon,
+            // quel que soit le mode d'achat (comptant, Free Flex nouveau client / déjà abonné) ou la capacité.
             const parDoc = new Map<string, CouponTel>();
             for (const v of t.variantes) {
                 for (const c of v.coupons ?? []) {
                     if (c.fin && c.fin < auj) continue;
-                    const e = parDoc.get(c.document) ?? { ...c, stockages: [] };
+                    const cle = `${c.type}|${c.montant}|${c.fin ?? ""}|${c.type === "remboursement_operateur" ? "" : c.titre}`;
+                    const e = parDoc.get(cle) ?? { ...c, profils: [...c.profils], stockages: [] };
+                    for (const p of c.profils) if (!e.profils.includes(p)) e.profils.push(p);
                     if (v.stockage > 0 && !e.stockages.includes(v.stockage)) e.stockages.push(v.stockage);
-                    parDoc.set(c.document, e);
+                    parDoc.set(cle, e);
                 }
             }
             const ordre = ["remboursement_operateur", "remboursement_constructeur", "bonus_reprise_operateur"];
