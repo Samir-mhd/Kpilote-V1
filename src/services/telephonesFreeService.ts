@@ -12,6 +12,16 @@ const ABONNE = "2";
 
 export type PrixFlex = { premierLoyer: number; mensuel: number; duree: number; optionAchat: number | null; total: number };
 export type OffreTel = { titre: string; montant: number; fin: string | null };
+/** Coupon de remboursement (ODR) téléchargeable sur mobile.free.fr. */
+export type CouponOdr = {
+    titre: string;
+    montant: number;
+    type: string;               // remboursement_operateur | remboursement_constructeur | bonus_reprise_operateur | …
+    debut: string | null;
+    fin: string | null;
+    document: string;           // URL absolue du PDF
+    profils: ("comptant" | "flex_prospect" | "flex_abonne")[];
+};
 export type VarianteTel = {
     stockage: number;                     // Go
     comptant: number | null;              // prix comptant (avant remboursements)
@@ -19,6 +29,7 @@ export type VarianteTel = {
     flexProspect: PrixFlex | null;
     flexAbonne: PrixFlex | null;
     offres: OffreTel[];
+    coupons: CouponOdr[];        // ODR imprimables (tous profils de prix confondus)
 };
 export type TelephoneFree = {
     id: number;
@@ -117,6 +128,29 @@ function offres(p: any): OffreTel[] {
         .map((o) => ({ titre: String(o.title), montant: num(o.amount) ?? 0, fin: o.endDate ?? null }));
 }
 
+/** Coupons ODR d'une référence : union des offres comptant / Free Flex prospect / Free Flex abonné, dédoublonnée par PDF. */
+function coupons(r: any): CouponOdr[] {
+    const sources: [CouponOdr["profils"][number], any][] = [
+        ["comptant", r.priceCash?.[PROSPECT] ?? r.priceCash?.[ABONNE]],
+        ["flex_prospect", r.priceFlex?.[PROSPECT]],
+        ["flex_abonne", r.priceFlex?.[ABONNE]],
+    ];
+    const parDoc = new Map<string, CouponOdr>();
+    for (const [profil, p] of sources) {
+        for (const o of (p?.offers ?? []) as any[]) {
+            if (!o?.document || typeof o.document !== "string") continue;
+            const document = o.document.startsWith("http") ? o.document : BASE + o.document;
+            const c = parDoc.get(document) ?? {
+                titre: String(o.title ?? "Offre de remboursement"), montant: num(o.amount) ?? 0, type: String(o.type ?? ""),
+                debut: o.startDate ?? null, fin: o.endDate ?? null, document, profils: [] as CouponOdr["profils"],
+            };
+            if (!c.profils.includes(profil)) c.profils.push(profil);
+            parDoc.set(document, c);
+        }
+    }
+    return [...parDoc.values()];
+}
+
 /** « _4K_120_IPS » → « 4K à 120 i/s » ; « _FHD_30_IPS » → « Full HD à 30 i/s ». */
 function videoLisible(v: any): string | null {
     if (!v || typeof v !== "string") return null;
@@ -189,6 +223,7 @@ async function lireTelephone(liste: any): Promise<TelephoneFree> {
             flexProspect: flex(r.priceFlex?.[PROSPECT]),
             flexAbonne: flex(r.priceFlex?.[ABONNE]),
             offres: offres(cash ?? r.priceFlex?.[PROSPECT]),
+            coupons: coupons(r),
         };
     });
     return {

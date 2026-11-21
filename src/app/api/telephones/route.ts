@@ -7,7 +7,7 @@ export const maxDuration = 120;
 const TAG = "catalogue-telephones-free";
 
 /** Catalogue mis en cache 1 h : mobile.free.fr est relu au plus une fois par heure. */
-const catalogue = unstable_cache(lireCatalogueFree, ["catalogue-telephones-free-v4"], { revalidate: 3600, tags: [TAG] });
+const catalogue = unstable_cache(lireCatalogueFree, ["catalogue-telephones-free-v5"], { revalidate: 3600, tags: [TAG] });
 
 export async function GET() {
     try {
