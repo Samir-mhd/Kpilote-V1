@@ -41,14 +41,6 @@ function dateMaj(iso: string) {
     return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" }) + " à " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
-function CaseACocher({ actif, couleur = ROUGE_TXT }: { actif: boolean; couleur?: string }) {
-    return (
-        <span className={`flex h-3.5 w-3.5 items-center justify-center rounded ${actif ? `bg-white ${couleur}` : "ring-1 ring-current"}`}>
-            {actif && <Check size={11} strokeWidth={4} />}
-        </span>
-    );
-}
-
 export default function ComparateurTelephonesPage() {
     const [data, setData] = useState<CatalogueTelephones | null>(null);
     const [erreur, setErreur] = useState<string | null>(null);
@@ -131,76 +123,73 @@ export default function ComparateurTelephonesPage() {
 
     return (
         <div className="pb-28">
-            {/* En-tête */}
-            <div className="flex flex-wrap items-end justify-between gap-4">
+            {/* En-tête (version A) : titre + date des prix, puis une barre d'outils unique et les marques */}
+            <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
                     <p className={`text-[11px] font-black uppercase tracking-[0.25em] ${ROUGE_TXT}`}>Outils</p>
-                    <h1 className="text-3xl font-black text-slate-900">📱 Comparateur téléphones</h1>
-                    <p className="mt-1 text-sm text-slate-500">
-                        {data ? <>Prix de mobile.free.fr · mis à jour le {dateMaj(data.majLe)} · coche 1 modèle pour l&apos;afficher, jusqu&apos;à 3 pour comparer</> : "Chargement du catalogue Free…"}
-                    </p>
+                    <h1 className="text-3xl font-black text-slate-900">Comparateur téléphones</h1>
+                </div>
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
+                    {actualisation === "en_cours" ? "Lecture de mobile.free.fr…"
+                        : actualisation === "ok" ? "✓ Offres à jour"
+                            : actualisation === "erreur" ? "Free ne répond pas, réessaie"
+                                : data ? `Prix Free du ${dateMaj(data.majLe)}` : "Chargement du catalogue Free…"}
                     {data && (
-                        <button onClick={actualiser} disabled={actualisation === "en_cours"}
-                            className="mt-2 flex items-center gap-1.5 rounded-xl bg-white px-3 py-1.5 text-xs font-black text-slate-700 ring-1 ring-slate-200 transition-colors hover:bg-red-50 hover:text-[#cd1e25] disabled:opacity-60">
+                        <button onClick={actualiser} disabled={actualisation === "en_cours"} aria-label="Actualiser les offres" title="Actualiser les offres"
+                            className="rounded-lg bg-white p-1.5 text-slate-500 ring-1 ring-slate-200 transition-colors hover:bg-red-50 hover:text-[#cd1e25] disabled:opacity-60">
                             <RefreshCw size={13} className={actualisation === "en_cours" ? "animate-spin" : ""} />
-                            {actualisation === "en_cours" ? "Lecture de mobile.free.fr…"
-                                : actualisation === "ok" ? "✓ Offres à jour"
-                                    : actualisation === "erreur" ? "Free ne répond pas, réessaie" : "Actualiser les offres"}
                         </button>
                     )}
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                    <div className="flex rounded-2xl bg-white p-1 ring-1 ring-slate-200">
-                        {([["prospect", "Nouveau client"], ["abonne", "Déjà abonné"]] as [Profil, string][]).map(([p, l]) => (
-                            <button key={p} onClick={() => setProfil(p)}
-                                className={`rounded-xl px-4 py-2 text-sm font-black transition-colors ${profil === p ? `${ROUGE} text-white` : "text-slate-500 hover:text-slate-900"}`}>
-                                {l}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="flex flex-wrap items-center justify-end gap-1.5">
-                        <span className="mr-1 text-xs font-bold text-slate-400">Prix avec forfait</span>
-                        {FORFAITS.map((f) => (
-                            <button key={f} onClick={() => setForfait(forfait === f ? 0 : f)}
-                                className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-black transition-colors ${forfait === f ? `${ROUGE} text-white` : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"}`}>
-                                <CaseACocher actif={forfait === f} />
-                                {eur(f)}
-                            </button>
-                        ))}
-                        <span className="mx-1 h-5 w-px bg-slate-200" />
-                        <button onClick={() => setAssurance(!assurance)}
-                            className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-black transition-colors ${assurance ? `${ROUGE} text-white` : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"}`}>
-                            <CaseACocher actif={assurance} />
-                            Avec assurance
-                        </button>
-                    </div>
-                </div>
             </div>
 
-            {/* Filtres */}
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-                <div className="relative">
+            <div className="mt-5 flex flex-wrap items-center gap-2 rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
+                <div className="relative min-w-[220px] flex-1">
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Rechercher un modèle"
-                        className="w-60 rounded-xl bg-white py-2 pl-9 pr-3 text-sm font-semibold text-slate-900 outline-none ring-1 ring-slate-200 focus:ring-[#cd1e25]" />
+                    <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Rechercher un modèle…"
+                        className="w-full rounded-xl bg-slate-50 py-2.5 pl-9 pr-3 text-sm font-semibold text-slate-900 outline-none focus:ring-1 focus:ring-[#cd1e25]" />
                 </div>
+                <div className="flex rounded-xl bg-slate-100 p-1">
+                    {([["prospect", "Nouveau client"], ["abonne", "Déjà abonné"]] as [Profil, string][]).map(([p, l]) => (
+                        <button key={p} onClick={() => setProfil(p)}
+                            className={`rounded-lg px-3 py-1.5 text-sm font-black transition-colors ${profil === p ? `${ROUGE} text-white` : "text-slate-500 hover:text-slate-900"}`}>
+                            {l}
+                        </button>
+                    ))}
+                </div>
+                <select value={forfait} onChange={(e) => setForfait(Number(e.target.value))} aria-label="Forfait inclus dans la mensualité"
+                    className={`rounded-xl px-3 py-2.5 text-sm font-bold outline-none ${forfait > 0 ? `${ROUGE} text-white` : "bg-slate-100 text-slate-700"}`}>
+                    <option value={0}>Forfait : aucun</option>
+                    {FORFAITS.map((f) => <option key={f} value={f}>Forfait : {eur(f)}</option>)}
+                </select>
+                <button onClick={() => setAssurance(!assurance)} role="switch" aria-checked={assurance}
+                    className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold transition-colors ${assurance ? "bg-red-50 text-[#cd1e25]" : "bg-slate-100 text-slate-700"}`}>
+                    <span className={`h-4 w-7 rounded-full p-0.5 transition-colors ${assurance ? ROUGE : "bg-slate-300"}`}>
+                        <span className={`block h-3 w-3 rounded-full bg-white transition-transform ${assurance ? "translate-x-3" : ""}`} />
+                    </span>
+                    Assurance
+                </button>
+                <select value={tri} onChange={(e) => setTri(e.target.value as Tri)} aria-label="Tri"
+                    className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm font-bold text-slate-700 outline-none">
+                    <option value="flex">Free Flex : moins cher</option>
+                    <option value="comptant">Comptant : moins cher</option>
+                    <option value="comptant_desc">Comptant : plus cher</option>
+                    <option value="nom">Nom (A → Z)</option>
+                </select>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
                 {marques.map((m) => (
                     <button key={m} onClick={() => setMarque(m)}
-                        className={`rounded-full px-3.5 py-1.5 text-xs font-black transition-colors ${marque === m ? "bg-slate-900 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"}`}>
+                        className={`rounded-full px-3 py-1.5 text-xs font-black transition-colors ${marque === m ? "bg-slate-900 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"}`}>
                         {m}
                     </button>
                 ))}
+                <span className="mx-1 h-5 w-px bg-slate-200" />
                 <button onClick={() => setReco(!reco)}
-                    className={`rounded-full px-3.5 py-1.5 text-xs font-black transition-colors ${reco ? "bg-slate-900 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"}`}>
+                    className={`rounded-full px-3 py-1.5 text-xs font-black transition-colors ${reco ? "bg-slate-900 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"}`}>
                     ♻️ Reconditionnés
                 </button>
-                <select value={tri} onChange={(e) => setTri(e.target.value as Tri)}
-                    className="ml-auto rounded-xl bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none ring-1 ring-slate-200">
-                    <option value="flex">Free Flex : moins cher d&apos;abord</option>
-                    <option value="comptant">Comptant : moins cher d&apos;abord</option>
-                    <option value="comptant_desc">Comptant : plus cher d&apos;abord</option>
-                    <option value="nom">Nom (A → Z)</option>
-                </select>
             </div>
 
             {/* Grille */}
@@ -210,7 +199,7 @@ export default function ComparateurTelephonesPage() {
                 </div>
             ) : (
                 <>
-                    <p className="mt-4 text-xs font-bold text-slate-400">{liste.length} modèle{liste.length > 1 ? "s" : ""}</p>
+                    <p className="mt-4 text-xs font-bold text-slate-400">{liste.length} modèle{liste.length > 1 ? "s" : ""} · clique sur une carte pour la sélectionner (jusqu&apos;à 3)</p>
                     <div className="mt-2 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
                         {liste.map((t) => {
                             const v = variante(t);
