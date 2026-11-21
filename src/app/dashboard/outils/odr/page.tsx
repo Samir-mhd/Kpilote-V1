@@ -27,7 +27,8 @@ function pourQui(p: CouponOdr["profils"]): string | null {
     return l.length ? `Pour : ${l.join(" + ")}` : null;
 }
 const typeDe = (t: string) => TYPES[t] ?? { label: "Offre", filtre: "tous" as Filtre, classe: "bg-slate-100 text-slate-600" };
-const lienOdr = (doc: string) => `/api/odr?u=${encodeURIComponent(doc)}`;
+/** Lien du coupon via KPILOTE ; `fin` = dernier jour : le coupon reste en cache jusqu'à minuit ce soir-là. */
+const lienOdr = (doc: string, fin: string | null) => `/api/odr?u=${encodeURIComponent(doc)}${fin ? `&fin=${fin}` : ""}`;
 const go = (n: number) => (n <= 0 ? "" : n >= 1024 ? `${n / 1024} To` : `${n} Go`);
 
 function aujourdhui() {
@@ -103,25 +104,34 @@ export default function OdrPage() {
             .sort((a, b) => `${a.marque} ${a.nom}`.localeCompare(`${b.marque} ${b.nom}`));
     }, [telephones, recherche, filtre]);
 
+    // Recherche ciblée (8 téléphones ou moins) : le navigateur précharge ces coupons, l'impression est alors immédiate.
+    useEffect(() => {
+        if (!recherche.trim() || liste.length === 0 || liste.length > 8) return;
+        const t = setTimeout(() => {
+            for (const tel of liste) for (const c of tel.coupons) fetch(lienOdr(c.document, c.fin)).catch(() => {});
+        }, 500);
+        return () => clearTimeout(t);
+    }, [liste, recherche]);
+
     const nbCoupons = useMemo(() => new Set(telephones.flatMap((t) => t.coupons.map((c) => c.document))).size, [telephones]);
 
     /** Impression directe : le PDF est chargé dans un cadre invisible puis on ouvre la fenêtre d'impression. */
-    function imprimer(doc: string) {
+    function imprimer(doc: string, fin: string | null) {
         const f = cadre.current;
         if (!f) return;
         setImpression(doc);
         let fait = false;
-        const secours = setTimeout(() => { if (!fait) { window.open(lienOdr(doc), "_blank"); setImpression(null); } }, 15000);
+        const secours = setTimeout(() => { if (!fait) { window.open(lienOdr(doc, fin), "_blank"); setImpression(null); } }, 15000);
         f.onload = () => {
             fait = true;
             clearTimeout(secours);
             setTimeout(() => {
                 try { f.contentWindow?.focus(); f.contentWindow?.print(); }
-                catch { window.open(lienOdr(doc), "_blank"); }
+                catch { window.open(lienOdr(doc, fin), "_blank"); }
                 setImpression(null);
             }, 400);
         };
-        f.src = lienOdr(doc);
+        f.src = lienOdr(doc, fin);
     }
 
     if (erreur) {
@@ -203,11 +213,11 @@ export default function OdrPage() {
                                                         </p>
                                                     )}
                                                 </div>
-                                                <a href={lienOdr(c.document)} target="_blank" rel="noopener noreferrer" aria-label="Ouvrir le coupon"
+                                                <a href={lienOdr(c.document, c.fin)} target="_blank" rel="noopener noreferrer" aria-label="Ouvrir le coupon"
                                                     className="rounded-xl bg-white p-2 text-slate-500 ring-1 ring-slate-200 hover:text-slate-900">
                                                     <ExternalLink size={15} />
                                                 </a>
-                                                <button onClick={() => imprimer(c.document)} disabled={impression !== null}
+                                                <button onClick={() => imprimer(c.document, c.fin)} disabled={impression !== null}
                                                     className={`flex items-center gap-1.5 rounded-xl ${ROUGE} px-3 py-2 text-xs font-black text-white hover:brightness-110 disabled:opacity-60`}>
                                                     <Printer size={14} />
                                                     {impression === c.document ? "Préparation…" : "Imprimer"}

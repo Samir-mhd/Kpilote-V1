@@ -1,0 +1,16 @@
+# Toutes les heures (≈ 6h-22h, heure de Paris) : relit le catalogue mobile.free.fr en arrière-plan
+# (nouveaux téléphones, prix, coupons ODR) et précharge les coupons en cours dans le cache de KPILOTE.
+name: Rafraîchir catalogue Free
+
+on:
+  schedule:
+    - cron: "5 5-20 * * *"
+  workflow_dispatch:
+
+jobs:
+  rafraichir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Relire Free et précharger les coupons
+        run: curl -fsS -X POST --max-time 290 https://kpilote-v1.vercel.app/api/outils/rafraichir
