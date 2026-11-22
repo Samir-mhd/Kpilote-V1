@@ -290,7 +290,7 @@ export default function ComparateurTelephonesPage() {
             )}
 
             {ouvert && choisis.length > 0 && (
-                <Comparaison tels={choisis} variantes={choisis.map(variante)} profil={profil} setProfil={setProfil} options={options} onClose={() => setOuvert(false)} />
+                <Comparaison tels={choisis} variantes={choisis.map(variante)} profil={profil} setProfil={setProfil} options={options} setProtection={setAssurance} setForfait={setForfait} onClose={() => setOuvert(false)} />
             )}
         </div>
     );
@@ -300,8 +300,10 @@ export default function ComparateurTelephonesPage() {
 
 type Ligne = { label: string; val: (t: TelephoneFree, v: VarianteTel) => string; num?: (t: TelephoneFree, v: VarianteTel) => number | null; mieux?: "bas" | "haut" };
 
-function Comparaison({ tels, variantes, profil, setProfil, options, onClose }: {
-    tels: TelephoneFree[]; variantes: VarianteTel[]; profil: Profil; setProfil: (p: Profil) => void; options: Options; onClose: () => void;
+function Comparaison({ tels, variantes, profil, setProfil, options, setProtection, setForfait, onClose }: {
+    tels: TelephoneFree[]; variantes: VarianteTel[]; profil: Profil; setProfil: (p: Profil) => void; options: Options;
+    /** Interrupteur Protection dans l'en-tête : évite de revenir en arrière si on l'a oubliée. */
+    setProtection: (actif: boolean) => void; setForfait: (montant: number) => void; onClose: () => void;
 }) {
     useEffect(() => {
         const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -378,7 +380,23 @@ function Comparaison({ tels, variantes, profil, setProfil, options, onClose }: {
         <div className="fixed inset-0 z-50 flex flex-col bg-slate-100">
             <div className={`flex shrink-0 flex-wrap items-center justify-between gap-3 ${ROUGE} px-4 py-3 sm:px-8 sm:py-4`}>
                 <h2 className="text-xl font-black text-white sm:text-2xl">{seul ? "Fiche téléphone" : `Comparaison de ${tels.length} modèles`}</h2>
-                <div className="flex items-center gap-2 sm:gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <select
+                        value={options.forfait}
+                        onChange={(e) => setForfait(Number(e.target.value))}
+                        aria-label="Forfait inclus dans la mensualité"
+                        className={`rounded-xl px-3 py-2 text-xs font-black outline-none sm:text-sm ${options.forfait > 0 ? `bg-white ${ROUGE_TXT}` : "bg-white/15 text-white/85 hover:bg-white/25"}`}
+                    >
+                        <option value={0} className="text-slate-900">Forfait : aucun</option>
+                        {FORFAITS.map((m) => <option key={m} value={m} className="text-slate-900">Forfait : {eur(m)}</option>)}
+                    </select>
+                    <button onClick={() => setProtection(!options.assurance)} role="switch" aria-checked={options.assurance}
+                        className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black transition-colors sm:text-sm ${options.assurance ? `bg-white ${ROUGE_TXT}` : "bg-white/15 text-white/85 hover:bg-white/25"}`}>
+                        <span className={`h-4 w-7 rounded-full p-0.5 transition-colors ${options.assurance ? ROUGE : "bg-white/40"}`}>
+                            <span className={`block h-3 w-3 rounded-full bg-white transition-transform ${options.assurance ? "translate-x-3" : ""}`} />
+                        </span>
+                        Protection
+                    </button>
                     <div className="flex rounded-xl bg-white/15 p-1">
                         {([["prospect", "Nouveau client"], ["abonne", "Déjà abonné"]] as [Profil, string][]).map(([p, l]) => (
                             <button key={p} onClick={() => setProfil(p)}
