@@ -55,6 +55,8 @@ const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
 
 /** Actes regroupables dans une vente combo (les autres sont de simples compteurs). */
 const PRODUITS_COMBO = ["box", "forfaits", "telephones", "mcafee", "assurance"];
+/** Produits qu'un même client peut prendre plusieurs fois dans une vente (plusieurs lignes). */
+const PRODUITS_MULTIPLES = ["forfaits", "telephones", "assurance"];
 const NOMS_ACTES: Record<string, string> = { "Téléphones": "Téléphone", "Forfaits": "Forfait" };
 function nomActe(produit: string): string { return NOMS_ACTES[produit] ?? produit; }
 const EMOJIS_COMBO: Record<string, string> = { "McAfee Mobile": "🔐", "Assurance Essentielle": "⛑️", "Canal+": "📺" };
@@ -241,6 +243,8 @@ export default function Dashboard() {
     // Carte « Déclarer une vente » : actes cochés (noms de missions). 1 acte = vente simple
     // (même parcours que l'ancien bouton « +1 »), plusieurs = vente combo pré-remplie.
     const [actesChoisis, setActesChoisis] = useState<string[]>([]);
+    const [quantitesActes, setQuantitesActes] = useState<Record<string, number>>({});
+    const [comboQuantites, setComboQuantites] = useState<Record<string, number>>({});
     const [comboProduits, setComboProduits] = useState<string[] | undefined>(undefined);
     const declencheursRef = useRef<Record<string, () => void>>({});
     const enregistreursRef = useRef<Record<string, (lancer: (() => void) | null) => void>>({});
@@ -794,24 +798,27 @@ export default function Dashboard() {
             }
         }
 
-        if (s.forfait) {
-            const acte = FORFAIT_CHOIX.find((c) => c.champ === s.forfait);
-            if (acte) {
+        for (const champ of ["forfait_free_serie", "forfait_free_max"] as const) {
+            const acte = FORFAIT_CHOIX.find((c) => c.champ === champ);
+            for (let i = 0; acte && i < s.forfaits[champ]; i++) {
                 await handleSale("Forfaits");
                 await ajouterActeVariable(acte);
             }
         }
+        const nbForfaitsCombo = s.forfaits.forfait_free_serie + s.forfaits.forfait_free_max;
 
         if (s.quatreP) {
             await ajouterActeVariable(VENTE_4P_ACTE);
-            if (s.forfait && conseillerId) {
+            if (nbForfaitsCombo > 0 && conseillerId) {
                 creerForfait4PDiffere(conseillerId, bareme.cross_sell_4p).catch(() => {});
             }
         }
 
-        if (s.telephone) {
+        for (let i = 0; i < s.telephones; i++) {
             await handleSale("Téléphones");
             await ajouterActeVariable(TELEPHONE_ACTE);
+        }
+        if (s.telephones > 0) {
             if (s.boostConstructeurId) {
                 const b = bonusManuels.find((x) => x.id === s.boostConstructeurId);
                 if (b) await ajouterActeVariable({ label: b.label, montant: b.montant, bonusManuelId: b.id });
@@ -831,10 +838,11 @@ export default function Dashboard() {
             if (b) await ajouterActeVariable({ label: b.label, montant: b.montant, bonusManuelId: b.id });
         }
 
-        if (s.assurance === "nouveau_mobile") {
+        for (let i = 0; i < s.assurances.nouveau_mobile; i++) {
             await handleSale("Assurance");
             await ajouterActeVariable(ASSURANCE_ACTE);
-        } else if (s.assurance === "essentielle") {
+        }
+        for (let i = 0; i < s.assurances.essentielle; i++) {
             await ajouterActeVariable({ label: "Assurance essentielle", montant: bareme.assurance_essentielle, champ: "assurance_essentielle" });
         }
 
@@ -849,10 +857,10 @@ export default function Dashboard() {
     // d'articles quand !variableActivee).
     async function soumettreComboSansVariante(s: ComboSansVarianteSelection) {
         if (s.box) await handleSale("Box");
-        if (s.forfait) await handleSale("Forfaits");
-        if (s.telephone) await handleSale("Téléphones");
+        for (let i = 0; i < s.forfait; i++) await handleSale("Forfaits");
+        for (let i = 0; i < s.telephone; i++) await handleSale("Téléphones");
         if (s.mcafee) await handleSale("McAfee");
-        if (s.assurance) await handleSale("Assurance");
+        for (let i = 0; i < s.assurance; i++) await handleSale("Assurance");
         // McAfee Mobile / Canal+ : pas de ligne "ventes", enregistrés comme les ventes combo
         // (variable_actes_jour à 0 €). McAfee Mobile compte comme un article, pas Canal+.
         if (conseillerId && s.mcafeeMobile) {
@@ -875,17 +883,32 @@ export default function Dashboard() {
 
     function basculerActe(produit: string) {
         setActesChoisis((l) => (l.includes(produit) ? l.filter((p) => p !== produit) : [...l, produit]));
+        setQuantitesActes((q) => { const n = { ...q }; delete n[produit]; return n; });
+    }
+
+    const quantiteActe = (produit: string) => (PRODUITS_MULTIPLES.includes(produitCode(produit)) ? quantitesActes[produit] ?? 1 : 1);
+    function reglerQuantite(produit: string, n: number) {
+        setQuantitesActes((q) => ({ ...q, [produit]: Math.max(1, Math.min(20, n)) }));
+    }
+    /** Vente combo dès qu'il y a au moins 2 articles combinables (2 produits, ou 2 forfaits…). */
+    function estCombo(choisis: MissionDashboard[]) {
+        return choisis.filter((m) => PRODUITS_COMBO.includes(produitCode(m.produit))).reduce((t, m) => t + quantiteActe(m.produit), 0) >= 2;
     }
 
     function validerDeclaration() {
         const choisis = ordonnerAccueil(missions.filter((m) => !m.sansCarte && actesChoisis.includes(m.produit)));
         const combinables = choisis.filter((m) => PRODUITS_COMBO.includes(produitCode(m.produit)));
         const autres = choisis.filter((m) => !PRODUITS_COMBO.includes(produitCode(m.produit)));
+        const combo = estCombo(choisis);
+        const quantites: Record<string, number> = {};
+        combinables.forEach((m) => { quantites[produitCode(m.produit)] = quantiteActe(m.produit); });
         setActesChoisis([]);
+        setQuantitesActes({});
         // Avis Google / Récap Co / Spiderhome : simples compteurs, enregistrés directement.
         for (const m of autres) declencheursRef.current[m.produit]?.();
-        if (combinables.length >= 2) {
+        if (combo) {
             setComboProduits(combinables.map((m) => produitCode(m.produit)));
+            setComboQuantites(quantites);
             if (variableActivee) setComboOuvert(true);
             else setComboSansVarianteOuvert(true);
         } else if (combinables.length === 1) {
@@ -1286,19 +1309,34 @@ export default function Dashboard() {
                                         </div>
                                     );
                                 }
-                                const combo = choisis.filter((m) => PRODUITS_COMBO.includes(produitCode(m.produit))).length >= 2;
+                                const combo = estCombo(choisis);
+                                const nbArticles = choisis.reduce((t, m) => t + quantiteActe(m.produit), 0);
                                 const libelle = combo
-                                    ? `Valider la vente combo (${choisis.length})`
+                                    ? `Valider la vente combo (${nbArticles})`
                                     : choisis.length === 1 ? `Valider : ${libellePlusUn(choisis[0].produit)}` : `Valider (${choisis.length})`;
                                 return (
                                     <div className={`mt-4 flex flex-wrap items-center gap-3 rounded-2xl p-3 ${combo ? "bg-gradient-to-r from-amber-50 via-orange-50 to-pink-50 ring-1 ring-orange-200" : "bg-slate-50 ring-1 ring-slate-200"}`}>
                                         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
                                             {combo && <span className="rounded-full bg-gradient-to-r from-amber-400 to-pink-500 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-white">🎁 Combo</span>}
-                                            {choisis.map((m) => (
-                                                <button key={m.produit} type="button" onClick={() => basculerActe(m.produit)} className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-black text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100">
-                                                    {emojiProduit(m.produit)} {nomActe(m.produit)} <X size={12} className="text-slate-400" />
-                                                </button>
-                                            ))}
+                                            {choisis.map((m) => {
+                                                const multiple = PRODUITS_MULTIPLES.includes(produitCode(m.produit));
+                                                const n = quantiteActe(m.produit);
+                                                return (
+                                                    <span key={m.produit} className="inline-flex items-center gap-1 rounded-full bg-white py-0.5 pl-2.5 pr-1 text-xs font-black text-slate-700 ring-1 ring-slate-200">
+                                                        {emojiProduit(m.produit)} {nomActe(m.produit)}
+                                                        {multiple && (
+                                                            <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-slate-100 px-0.5">
+                                                                <button type="button" aria-label={`Un ${nomActe(m.produit)} de moins`} onClick={() => reglerQuantite(m.produit, n - 1)} disabled={n <= 1} className="flex h-5 w-5 items-center justify-center rounded-full text-sm leading-none hover:bg-white disabled:opacity-30">−</button>
+                                                                <span className="w-4 text-center tabular-nums">{n}</span>
+                                                                <button type="button" aria-label={`Un ${nomActe(m.produit)} de plus`} onClick={() => reglerQuantite(m.produit, n + 1)} className="flex h-5 w-5 items-center justify-center rounded-full text-sm leading-none hover:bg-white">+</button>
+                                                            </span>
+                                                        )}
+                                                        <button type="button" aria-label={`Retirer ${nomActe(m.produit)}`} onClick={() => basculerActe(m.produit)} className="flex h-5 w-5 items-center justify-center rounded-full hover:bg-slate-100">
+                                                            <X size={12} className="text-slate-400" />
+                                                        </button>
+                                                    </span>
+                                                );
+                                            })}
                                         </div>
                                         <button
                                             type="button"
@@ -1378,6 +1416,7 @@ export default function Dashboard() {
                     bareme={bareme}
                     bonusManuels={bonusManuels}
                     produits={comboProduits}
+                    quantites={comboQuantites}
                     onClose={() => { setComboOuvert(false); setComboProduits(undefined); }}
                     onValider={soumettreCombo}
                 />
@@ -1388,9 +1427,11 @@ export default function Dashboard() {
                     // Assurance proposée seulement si le conseiller en a (ex. Pauline : non).
                     masquer={missions.some((m) => produitCode(m.produit) === "assurance") ? [] : ["assurance"]}
                     preselection={comboProduits ? {
-                        box: comboProduits.includes("box"), forfait: comboProduits.includes("forfaits"),
-                        telephone: comboProduits.includes("telephones"), mcafee: comboProduits.includes("mcafee"),
-                        assurance: comboProduits.includes("assurance"),
+                        box: comboProduits.includes("box"),
+                        forfait: comboProduits.includes("forfaits") ? comboQuantites.forfaits ?? 1 : 0,
+                        telephone: comboProduits.includes("telephones") ? comboQuantites.telephones ?? 1 : 0,
+                        mcafee: comboProduits.includes("mcafee"),
+                        assurance: comboProduits.includes("assurance") ? comboQuantites.assurance ?? 1 : 0,
                     } : undefined}
                     onClose={() => { setComboSansVarianteOuvert(false); setComboProduits(undefined); }}
                     onValider={soumettreComboSansVariante}
