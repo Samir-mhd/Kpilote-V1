@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useEffect, useMemo, useState } from "react";
-import { Search, X, ExternalLink, Check, RefreshCw } from "lucide-react";
+import { Search, X, ExternalLink, Check, RefreshCw, Minus, Smartphone, Battery, Camera, Wifi } from "lucide-react";
 import type { CatalogueTelephones, TelephoneFree, VarianteTel, PrixFlex } from "@/services/telephonesFreeService";
 
 type Profil = "prospect" | "abonne";
@@ -310,7 +310,6 @@ function Comparaison({ tels, variantes, profil, setProfil, options, onClose }: {
     }, [onClose]);
 
     const seul = tels.length === 1;
-    const colonnes = { gridTemplateColumns: `1.1fr repeat(${tels.length}, minmax(0, 1fr))` };
     const avecOptions = options.forfait > 0 || options.assurance;
 
     const prix: Ligne[] = [
@@ -328,9 +327,7 @@ function Comparaison({ tels, variantes, profil, setProfil, options, onClose }: {
     const general: Ligne[] = [
         { label: "Stockage", val: (_, v) => go(v.stockage), num: (_, v) => v.stockage, mieux: "haut" },
         { label: "Écran", val: (t) => t.carac.ecran ?? "—" },
-        { label: "Processeur", val: (t) => t.carac.puce ?? "—" },
         { label: "Mémoire vive", val: (t) => (t.carac.ram ? `${t.carac.ram} Go` : "—"), num: (t) => t.carac.ram, mieux: "haut" },
-        { label: "Système", val: (t) => t.carac.os ?? "—" },
         { label: "Poids", val: (t) => (t.carac.poids ? `${t.carac.poids} g` : "—"), num: (t) => t.carac.poids, mieux: "bas" },
     ];
     const batterie: Ligne[] = [
@@ -351,93 +348,137 @@ function Comparaison({ tels, variantes, profil, setProfil, options, onClose }: {
         { label: "5G", val: (t) => (t.carac.fiveG ? "Oui" : "Non") },
         { label: "eSIM", val: (t) => (t.carac.esim ? "Oui" : "Non") },
         { label: "Résistant à l'eau", val: (t) => (t.carac.etanche ? "Oui" : "Non") },
-        { label: "DAS tête / tronc", val: (t) => (t.carac.dasTete != null ? `${t.carac.dasTete.toLocaleString("fr-FR")} / ${t.carac.dasTronc?.toLocaleString("fr-FR") ?? "—"} W/kg` : "—") },
-        { label: "Indice énergie", val: (t) => t.carac.indiceEnergie ?? "—" },
     ];
 
-    /** Meilleure(s) valeur(s) en vert ; rien si 1 seul modèle ou si toutes égales. */
-    function rangee(l: Ligne) {
-        const n = l.num && !seul ? tels.map((t, i) => l.num!(t, variantes[i])) : [];
+    /** Indices des meilleures valeurs d'une ligne ; vide si 1 seul modèle ou si toutes égales. */
+    function meilleurs(l: Ligne): Set<number> {
+        if (seul || !l.num || !l.mieux) return new Set();
+        const n = tels.map((t, i) => l.num!(t, variantes[i]));
         const valides = n.filter((x): x is number => x != null);
-        const meilleur = l.mieux && valides.length === tels.length && new Set(valides).size > 1
-            ? (l.mieux === "bas" ? Math.min(...valides) : Math.max(...valides)) : null;
-        return (
-            <div key={l.label} style={colonnes} className="grid items-center border-b border-slate-100 py-2.5 text-sm last:border-0">
-                <span className="font-bold text-slate-500">{l.label}</span>
-                {tels.map((t, i) => (
-                    <span key={t.id} className={`px-2 text-center font-black tabular-nums ${meilleur != null && n[i] === meilleur ? "text-emerald-600" : "text-slate-900"}`}>
-                        {l.val(t, variantes[i])}
-                    </span>
-                ))}
-            </div>
-        );
+        if (valides.length !== tels.length || new Set(valides).size < 2) return new Set();
+        const m = l.mieux === "bas" ? Math.min(...valides) : Math.max(...valides);
+        return new Set(n.map((x, i) => (x === m ? i : -1)).filter((i) => i >= 0));
     }
 
-    const section = (titre: string, lignes: Ligne[]) => (
-        <>
-            <p className={`mt-6 text-[11px] font-black uppercase tracking-[0.2em] ${ROUGE_TXT}`}>{titre}</p>
-            <div className="mt-1">{lignes.map(rangee)}</div>
-        </>
-    );
+    const sections: { titre: string; Icone: typeof Smartphone; lignes: Ligne[] }[] = [
+        { titre: "Écran et mémoire", Icone: Smartphone, lignes: general },
+        { titre: "Batterie et recharge", Icone: Battery, lignes: batterie },
+        { titre: "Photo et vidéo", Icone: Camera, lignes: photo },
+        { titre: "Connectivité", Icone: Wifi, lignes: autres },
+    ];
+    const toutes = [...prix, ...general, ...batterie, ...photo];
+    const meilleursParLigne = new Map(toutes.map((l) => [l, meilleurs(l)]));
+    const pointsForts = tels.map((_, i) => toutes.filter((l) => meilleursParLigne.get(l)!.has(i)).length);
+    const maxPoints = Math.max(...pointsForts);
+    const plusComplet = (i: number) => !seul && maxPoints > 0 && pointsForts[i] === maxPoints && pointsForts.filter((p) => p === maxPoints).length < tels.length;
+    const ligneTotal = prix[0];
+    const ligneOui = (txt: string) => txt === "Oui" || txt.startsWith("Oui,");
 
     return (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm" onClick={onClose}>
-            <div className={`my-6 w-full ${seul ? "max-w-2xl" : tels.length === 2 ? "max-w-4xl" : "max-w-6xl"} overflow-hidden rounded-[28px] bg-white shadow-2xl`} onClick={(e) => e.stopPropagation()}>
-                <div className={`flex items-center justify-between gap-3 ${ROUGE} px-6 py-4`}>
-                    <h2 className="text-xl font-black text-white">{seul ? "Fiche téléphone" : `Comparaison de ${tels.length} modèles`}</h2>
-                    <div className="flex items-center gap-2">
-                        <div className="flex rounded-xl bg-white/15 p-1">
-                            {([["prospect", "Nouveau client"], ["abonne", "Déjà abonné"]] as [Profil, string][]).map(([p, l]) => (
-                                <button key={p} onClick={() => setProfil(p)}
-                                    className={`rounded-lg px-3 py-1.5 text-xs font-black ${profil === p ? `bg-white ${ROUGE_TXT}` : "text-white/80"}`}>{l}</button>
-                            ))}
-                        </div>
-                        <button onClick={onClose} aria-label="Fermer" className="rounded-xl bg-white/15 p-2 text-white hover:bg-white/25"><X size={18} /></button>
+        <div className="fixed inset-0 z-50 flex flex-col bg-slate-100">
+            <div className={`flex shrink-0 flex-wrap items-center justify-between gap-3 ${ROUGE} px-4 py-3 sm:px-8 sm:py-4`}>
+                <h2 className="text-xl font-black text-white sm:text-2xl">{seul ? "Fiche téléphone" : `Comparaison de ${tels.length} modèles`}</h2>
+                <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="flex rounded-xl bg-white/15 p-1">
+                        {([["prospect", "Nouveau client"], ["abonne", "Déjà abonné"]] as [Profil, string][]).map(([p, l]) => (
+                            <button key={p} onClick={() => setProfil(p)}
+                                className={`rounded-lg px-3 py-1.5 text-xs font-black sm:px-4 sm:text-sm ${profil === p ? `bg-white ${ROUGE_TXT}` : "text-white/80"}`}>{l}</button>
+                        ))}
                     </div>
+                    <button onClick={onClose} aria-label="Fermer" className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-white hover:bg-white/25"><X size={20} /></button>
                 </div>
+            </div>
 
-                <div className="p-6 pt-4">
-                    <div style={colonnes} className="grid items-end">
-                        <span />
-                        {tels.map((t, i) => (
-                            <div key={t.id} className="flex flex-col items-center px-2 text-center">
-                                <img src={t.image} alt={t.nom} className="h-40 w-full object-contain" />
-                                <p className="mt-2 text-[11px] font-black uppercase tracking-wider text-slate-400">{t.marque}</p>
-                                <p className="font-black leading-tight text-slate-900">{t.nom}</p>
-                                {variantes[i].stockage > 0 && <p className="text-xs font-bold text-slate-400">{go(variantes[i].stockage)}</p>}
-                            </div>
-                        ))}
-                    </div>
+            <div className="flex-1 overflow-y-auto">
+                <div
+                    className={`mx-auto grid grid-cols-1 gap-5 px-4 py-5 sm:px-8 sm:py-6 ${seul ? "max-w-2xl" : tels.length === 2 ? "max-w-5xl md:grid-cols-2" : "md:grid-cols-3"}`}
+                >
+                    {tels.map((t, i) => {
+                        const v = variantes[i];
+                        const f = flexDe(v, profil);
+                        const complet = plusComplet(i);
+                        return (
+                            <article key={t.id} className={`relative flex flex-col overflow-hidden rounded-[28px] bg-white shadow-sm ${complet ? "ring-2 ring-emerald-400" : "ring-1 ring-slate-200"}`}>
+                                {complet && <span className="absolute right-4 top-4 z-10 rounded-full bg-emerald-500 px-3 py-1 text-xs font-black text-white">🏆 Le plus complet</span>}
 
-                    {section(`Prix · ${profil === "abonne" ? "déjà abonné" : "nouveau client"}`, prix)}
+                                <div className="flex items-center gap-5 bg-gradient-to-b from-slate-50 to-white px-5 pb-4 pt-6 sm:px-6">
+                                    <img src={t.image} alt={t.nom} className="h-32 w-24 shrink-0 object-contain" />
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-black uppercase tracking-wider text-slate-400">{t.marque}</p>
+                                        <p className="text-xl font-black leading-tight text-slate-900">{t.nom}</p>
+                                        {v.stockage > 0 && <p className="text-sm font-bold text-slate-400">{go(v.stockage)}</p>}
+                                        {!seul && <p className="mt-1 text-xs font-bold text-emerald-700">{pointsForts[i]} point{pointsForts[i] > 1 ? "s" : ""} fort{pointsForts[i] > 1 ? "s" : ""}</p>}
+                                    </div>
+                                </div>
 
-                    <div style={colonnes} className="mt-2 grid py-2 text-sm">
-                        <span className="font-bold text-slate-500">Offres en cours</span>
-                        {variantes.map((v, i) => (
-                            <div key={i} className="flex flex-col gap-1 px-2">
-                                {v.offres.length ? v.offres.map((o, j) => (
-                                    <span key={j} className="rounded-lg bg-red-50 px-2 py-1 text-center text-[11px] font-bold text-[#a8161c]">{o.titre}</span>
-                                )) : <span className="text-center text-slate-300">—</span>}
-                            </div>
-                        ))}
-                    </div>
+                                <div className={`mx-5 rounded-2xl ${ROUGE} px-5 py-4 text-white sm:mx-6`}>
+                                    <p className="text-[11px] font-black uppercase tracking-wider text-white/70">
+                                        Free Flex · {profil === "abonne" ? "déjà abonné" : "nouveau client"}{options.forfait > 0 && " + forfait"}{options.assurance && " + assurance"}
+                                    </p>
+                                    {f ? (
+                                        <>
+                                            <p className="flex flex-wrap items-baseline gap-x-2">
+                                                <span className="text-4xl font-black tabular-nums">{eur(mensuelTotal(v, profil, options))}<span className="text-sm font-bold text-white/70">/mois</span></span>
+                                                {meilleursParLigne.get(ligneTotal)!.has(i) && <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black uppercase text-emerald-700">le moins cher</span>}
+                                            </p>
+                                            {avecOptions && (
+                                                <p className="text-sm font-semibold text-white/85">
+                                                    tél. {eur(f.mensuel)}{options.forfait > 0 && <> + forfait {eur(options.forfait)}</>}
+                                                    {options.assurance && assuranceDe(v) && <> + assurance {eur(assuranceDe(v)!.prix)} (classe {assuranceDe(v)!.classe})</>}
+                                                </p>
+                                            )}
+                                            <p className="text-sm font-semibold text-white/85">{eur(f.premierLoyer)} au départ · option d&apos;achat {eur(f.optionAchat)}</p>
+                                        </>
+                                    ) : <p className="py-2 text-lg font-black">Free Flex non disponible</p>}
+                                    <p className="mt-1 text-sm font-semibold text-white/85">
+                                        Comptant {eur(v.comptant)}{v.comptantApresRemb != null && v.comptantApresRemb !== v.comptant && <> → {eur(v.comptantApresRemb)} après remb.</>}
+                                    </p>
+                                </div>
 
-                    {section("Caractéristiques", general)}
-                    {section("Batterie et recharge", batterie)}
-                    {section("Photo et vidéo", photo)}
-                    {section("Connectivité et autres", autres)}
+                                <div className="flex-1 space-y-4 px-5 py-4 sm:px-6">
+                                    {sections.map((s) => (
+                                        <div key={s.titre}>
+                                            <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400"><s.Icone size={13} /> {s.titre}</p>
+                                            {s.lignes.map((l) => {
+                                                const txt = l.val(t, v);
+                                                const top = (meilleursParLigne.get(l) ?? meilleurs(l)).has(i);
+                                                const binaire = txt === "Oui" || txt === "Non";
+                                                return (
+                                                    <div key={l.label} className="flex items-center justify-between gap-3 border-b border-slate-100 py-1.5 text-sm last:border-0">
+                                                        <span className="text-slate-500">{l.label}</span>
+                                                        <span className={`flex items-center gap-1.5 text-right tabular-nums ${top ? "font-black text-emerald-600" : "font-bold text-slate-800"}`}>
+                                                            {binaire ? (ligneOui(txt) ? <Check size={16} className="text-emerald-500" /> : <Minus size={16} className="text-slate-300" />) : txt}
+                                                            {top && <span className="rounded-full bg-emerald-50 px-1.5 text-[10px] font-black text-emerald-600">top</span>}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ))}
+                                </div>
 
-                    <div style={colonnes} className="mt-5 grid">
-                        <span className="text-[11px] text-slate-400">Prix indicatifs relevés sur mobile.free.fr, à confirmer au moment de la vente.
-                            {tels.some((t) => t.carac.batterieHorsFree) && <><br />* Batterie non indiquée par Free : donnée constructeur.</>}</span>
-                        {tels.map((t) => (
-                            <a key={t.id} href={t.url} target="_blank" rel="noopener noreferrer"
-                                className="mx-2 flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 py-2 text-xs font-black text-slate-700 hover:bg-slate-200">
-                                Fiche Free <ExternalLink size={13} />
-                            </a>
-                        ))}
-                    </div>
+                                {v.offres.length > 0 && (
+                                    <div className="mx-5 mb-4 flex flex-wrap gap-1.5 sm:mx-6">
+                                        {v.offres.map((o, j) => (
+                                            <span key={j} className="rounded-lg bg-red-50 px-2 py-1 text-[11px] font-bold text-[#a8161c] ring-1 ring-red-100">🎁 {o.titre}</span>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className="px-5 pb-5 sm:px-6">
+                                    <a href={t.url} target="_blank" rel="noopener noreferrer"
+                                        className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-200">
+                                        Fiche Free <ExternalLink size={14} />
+                                    </a>
+                                </div>
+                            </article>
+                        );
+                    })}
                 </div>
+                <p className="px-4 pb-6 text-center text-[11px] text-slate-400 sm:px-8">
+                    Prix indicatifs relevés sur mobile.free.fr, à confirmer au moment de la vente. En vert : le meilleur sur la ligne.
+                    {tels.some((t) => t.carac.batterieHorsFree) && <> · * Batterie non indiquée par Free : donnée constructeur.</>}
+                </p>
             </div>
         </div>
     );
