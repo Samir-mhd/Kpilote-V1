@@ -167,7 +167,7 @@ export default function ComparateurTelephonesPage() {
                     <span className={`h-4 w-7 rounded-full p-0.5 transition-colors ${assurance ? ROUGE : "bg-slate-300"}`}>
                         <span className={`block h-3 w-3 rounded-full bg-white transition-transform ${assurance ? "translate-x-3" : ""}`} />
                     </span>
-                    Assurance
+                    Protection
                 </button>
                 <select value={tri} onChange={(e) => setTri(e.target.value as Tri)} aria-label="Tri"
                     className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm font-bold text-slate-700 outline-none">
@@ -240,14 +240,14 @@ export default function ComparateurTelephonesPage() {
                                     <div className="mt-auto pt-3">
                                         <div className="rounded-2xl bg-red-50 px-3 py-2 ring-1 ring-red-100">
                                             <p className={`text-[10px] font-black uppercase tracking-wider ${ROUGE_TXT}`}>
-                                                Free Flex · {profil === "abonne" ? "abonné" : "nouveau client"}{forfait > 0 && " + forfait"}{assurance && " + assurance"}
+                                                Free Flex · {profil === "abonne" ? "abonné" : "nouveau client"}{forfait > 0 && " + forfait"}{assurance && " + protection"}
                                             </p>
                                             {f ? (
                                                 <>
                                                     <p className="text-xl font-black tabular-nums text-slate-900">{eur(mensuelTotal(v, profil, options))}<span className="text-xs font-bold text-slate-500">/mois</span></p>
                                                     {avecOptions && (
                                                         <p className="text-[11px] font-semibold leading-snug text-slate-600">
-                                                            tél. {eur(f.mensuel)}{forfait > 0 && <> + forfait {eur(forfait)}</>}{assurance && assuranceDe(v) && <> + assurance {eur(assuranceDe(v)!.prix)}</>}
+                                                            tél. {eur(f.mensuel)}{forfait > 0 && <> + forfait {eur(forfait)}</>}{assurance && assuranceDe(v) && <> + protection {eur(assuranceDe(v)!.prix)}</>}
                                                         </p>
                                                     )}
                                                     <p className="text-[11px] font-semibold text-slate-600">
@@ -314,11 +314,11 @@ function Comparaison({ tels, variantes, profil, setProfil, options, onClose }: {
 
     const prix: Ligne[] = [
         ...(avecOptions ? [
-            { label: `Total / mois (${["téléphone", options.forfait > 0 && "forfait", options.assurance && "assurance"].filter(Boolean).join(" + ")})`, val: (_: TelephoneFree, v: VarianteTel) => eur(mensuelTotal(v, profil, options)), num: (_: TelephoneFree, v: VarianteTel) => mensuelTotal(v, profil, options), mieux: "bas" as const },
+            { label: `Total / mois (${["téléphone", options.forfait > 0 && "forfait", options.assurance && "protection"].filter(Boolean).join(" + ")})`, val: (_: TelephoneFree, v: VarianteTel) => eur(mensuelTotal(v, profil, options)), num: (_: TelephoneFree, v: VarianteTel) => mensuelTotal(v, profil, options), mieux: "bas" as const },
         ] : []),
         { label: avecOptions ? "dont téléphone (Free Flex)" : "Free Flex / mois", val: (_, v) => eur(flexDe(v, profil)?.mensuel), num: (_, v) => flexDe(v, profil)?.mensuel ?? null, mieux: "bas" },
         ...(options.forfait > 0 ? [{ label: "dont forfait", val: () => eur(options.forfait) }] : []),
-        ...(options.assurance ? [{ label: "dont assurance", val: (_: TelephoneFree, v: VarianteTel) => { const a = assuranceDe(v); return a ? `${eur(a.prix)} (classe ${a.classe})` : "—"; }, num: (_: TelephoneFree, v: VarianteTel) => assuranceDe(v)?.prix ?? null, mieux: "bas" as const }] : []),
+        ...(options.assurance ? [{ label: "dont protection", val: (_: TelephoneFree, v: VarianteTel) => { const a = assuranceDe(v); return a ? eur(a.prix) : "—"; }, num: (_: TelephoneFree, v: VarianteTel) => assuranceDe(v)?.prix ?? null, mieux: "bas" as const }] : []),
         { label: "1er loyer", val: (_, v) => eur(flexDe(v, profil)?.premierLoyer), num: (_, v) => flexDe(v, profil)?.premierLoyer ?? null, mieux: "bas" },
         { label: "Option d'achat (fin de contrat)", val: (_, v) => eur(flexDe(v, profil)?.optionAchat) },
         { label: "Comptant", val: (_, v) => eur(v.comptant), num: (_, v) => v.comptant, mieux: "bas" },
@@ -413,7 +413,7 @@ function Comparaison({ tels, variantes, profil, setProfil, options, onClose }: {
 
                                 <div className={`mx-5 rounded-2xl ${ROUGE} px-5 py-4 text-white sm:mx-6`}>
                                     <p className="text-[11px] font-black uppercase tracking-wider text-white/70">
-                                        Free Flex · {profil === "abonne" ? "déjà abonné" : "nouveau client"}{options.forfait > 0 && " + forfait"}{options.assurance && " + assurance"}
+                                        Free Flex · {profil === "abonne" ? "déjà abonné" : "nouveau client"}{options.forfait > 0 && " + forfait"}{options.assurance && " + protection"}
                                     </p>
                                     {f ? (
                                         <>
@@ -424,7 +424,7 @@ function Comparaison({ tels, variantes, profil, setProfil, options, onClose }: {
                                             {avecOptions && (
                                                 <p className="text-sm font-semibold text-white/85">
                                                     tél. {eur(f.mensuel)}{options.forfait > 0 && <> + forfait {eur(options.forfait)}</>}
-                                                    {options.assurance && assuranceDe(v) && <> + assurance {eur(assuranceDe(v)!.prix)} (classe {assuranceDe(v)!.classe})</>}
+                                                    {options.assurance && assuranceDe(v) && <> + protection {eur(assuranceDe(v)!.prix)}</>}
                                                 </p>
                                             )}
                                             <p className="text-sm font-semibold text-white/85">{eur(f.premierLoyer)} au départ · option d&apos;achat {eur(f.optionAchat)}</p>
