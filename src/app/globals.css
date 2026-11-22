@@ -872,3 +872,9 @@ body::before {
 [data-sombre="1"] main .text-fuchsia-500{color:var(--color-fuchsia-400,#d946ef)}
 [data-sombre="1"] main .bg-blue-300{background-color:color-mix(in srgb,var(--color-blue-500,#3b82f6) 42%,transparent)}
 [data-sombre="1"] main .text-blue-500{color:var(--color-blue-400,#3b82f6)}
+
+/* Accueil : piste des anneaux d'objectifs et tuiles Outils en mode sombre */
+[data-sombre="1"] main .anneau-piste{stroke:rgba(255,255,255,.09)}
+[data-sombre="1"] main .tuile-outil{background-color:rgba(205,30,37,.14);--tw-ring-color:rgba(205,30,37,.35)}
+[data-sombre="1"] main .tuile-outil:hover{background-color:rgba(205,30,37,.22)}
+[data-sombre="1"] main .tuile-outil .text-slate-500{color:#94a3b8}

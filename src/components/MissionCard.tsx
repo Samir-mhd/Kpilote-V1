@@ -459,7 +459,7 @@ export default function MissionCard({
                                 <stop offset="100%" stopColor="#b45309" />
                             </linearGradient>
                         </defs>
-                        <circle cx="42" cy="42" r={R} fill="none" strokeWidth="8" className="stroke-slate-100" />
+                        <circle cx="42" cy="42" r={R} fill="none" strokeWidth="8" className="anneau-piste stroke-slate-100" />
                         <circle
                             cx="42" cy="42" r={R} fill="none" stroke={traitAnneau} strokeWidth="8"
                             strokeLinecap={pctAnneau > 0 ? "round" : "butt"}
