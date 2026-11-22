@@ -331,7 +331,7 @@ function ClassementInner() {
                     groupe={groupe}
                     conseillerId={conseillerId}
                     photos={photos}
-                    vue={(["B", "C"] as const).find((v) => v === searchParams.get("vue")) ?? null}
+                    vue={(["A", "B", "C"] as const).find((v) => v === searchParams.get("vue")) ?? null}
                 />
             )}
         </div>

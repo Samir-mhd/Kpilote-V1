@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Variantes de mise en page du Classement (en test, &vue=B ou &vue=C) :
+ * Variantes de mise en page du Classement (en test, &vue=A, &vue=B ou &vue=C) :
+ *  - A : mini-podium + liste compacte (barres de statut), fiche détaillée à droite.
  *  - B : podium intégré à la liste (top 3 en grandes lignes), mini-anneaux par objectif,
  *        fiche détaillée du conseiller sélectionné à droite.
  *  - C : liste « Les stars » à gauche, matrice d'anneaux de toute l'équipe à droite.
@@ -10,6 +11,7 @@
 import { useState } from "react";
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
+import { ChevronRight } from "lucide-react";
 import type { Periode } from "@/utils/periodes";
 
 export type StatutVue = "atteint" | "avance" | "juste" | "retard" | "encours" | "bonus";
@@ -147,6 +149,99 @@ const FONDS_TOP = [
 ];
 
 /* ── B : podium dans la liste + fiche détaillée ── */
+/* ── A : mini-podium + liste compacte à gauche, fiche détaillée à droite ── */
+const CADRES_MINI = [
+    { cadre: "from-amber-200 to-amber-500", h: "h-[150px]" },
+    { cadre: "from-slate-200 to-slate-400", h: "h-[134px]" },
+    { cadre: "from-orange-300 to-amber-700", h: "h-[122px]" },
+];
+export function VueA({ liste, conseillerId, photos, unite, periode, message, emojiDe, labelDe, entete }: Commun) {
+    const [selection, setSelection] = useState<string>(conseillerId || liste[0]?.id || "");
+    const idx = Math.max(0, liste.findIndex((l) => l.id === selection));
+    const choisi = liste[idx];
+    // Le podium reste au volume, même quand la liste est triée par régularité.
+    const podium = [...liste].sort((a, b) => b.score - a.score).slice(0, 3);
+    const podiumVisible = podium.length >= 2 && podium[0].score > 0;
+    return (
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_1.1fr] lg:items-start">
+            <div className="min-w-0 space-y-4">
+                {podiumVisible && (
+                    <section className="relative overflow-hidden rounded-[24px] bg-[#0d0f1a] px-3 pb-4 pt-4 sm:px-4">
+                        <div className="pointer-events-none absolute left-1/2 top-0 h-60 w-80 -translate-x-1/2 bg-[conic-gradient(from_180deg_at_50%_0%,transparent_160deg,rgba(255,255,255,.10)_180deg,transparent_200deg)]" />
+                        <p className="relative text-center text-[10px] font-black uppercase tracking-[0.3em] text-amber-300">Les stars</p>
+                        <div className="relative mt-3 flex items-end justify-center gap-2 sm:gap-3">
+                            {[1, 0, 2].map((rang0) => {
+                                const l = podium[rang0];
+                                if (!l) return null;
+                                const st = CADRES_MINI[rang0];
+                                return (
+                                    <button
+                                        key={l.id}
+                                        type="button"
+                                        onClick={() => setSelection(l.id)}
+                                        className={`w-[31%] max-w-[150px] rounded-[18px] bg-gradient-to-b ${st.cadre} p-[2px] transition-transform hover:-translate-y-0.5`}
+                                    >
+                                        <span className={`relative flex ${st.h} flex-col items-center rounded-[16px] bg-gradient-to-b from-[#1b1f33] to-[#10121d] pt-2`}>
+                                            <span className="absolute left-1.5 top-1 text-sm sm:left-2 sm:text-base">{MEDAILLES[rang0]}</span>
+                                            {l.id === conseillerId && <span className="absolute right-1.5 top-1.5 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[8px] font-black uppercase text-white">toi</span>}
+                                            <CartoonAvatar prenom={l.nom} etat="en_feu" size={rang0 === 0 ? 64 : 54} className="shrink-0 object-contain" />
+                                            <span className="mt-0.5 w-full truncate px-1 text-center text-xs font-black text-white">{prenom(l.nom)}</span>
+                                            <span className="text-2xl font-black tabular-nums text-white">{l.score}</span>
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </section>
+                )}
+                <section className="rounded-[24px] bg-white p-3 shadow-[0_4px_24px_rgba(15,23,42,.07)] sm:p-4">
+                    <div className="px-1 pb-2">{entete}</div>
+                    <ol className="space-y-1">
+                        {liste.map((l, i) => {
+                            const estMoi = l.id === conseillerId;
+                            const actif = l.id === choisi?.id;
+                            return (
+                                <li key={l.id}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelection(l.id)}
+                                        aria-pressed={actif}
+                                        className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all ${actif ? "bg-emerald-50 ring-2 ring-emerald-300" : estMoi ? "bg-green-50" : "hover:bg-slate-50"}`}
+                                    >
+                                        <span className="w-6 shrink-0 text-center text-sm font-black text-slate-400">{i < 3 && l.score > 0 ? MEDAILLES[i] : i + 1}</span>
+                                        <PhotoAvatar nom={l.nom} photoUrl={photos[l.id] ?? null} size={36} />
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block truncate text-sm font-black text-slate-900">
+                                                {prenom(l.nom)}{estMoi && <span className="ml-1 text-xs text-emerald-600">(toi)</span>}
+                                                {l.mouvement !== 0 && <span className={`ml-1.5 text-[11px] font-black ${l.mouvement > 0 ? "text-emerald-600" : "text-rose-600"}`}>{l.mouvement > 0 ? `▲ ${l.mouvement}` : `▼ ${-l.mouvement}`}</span>}
+                                            </span>
+                                            <span className="mt-1 flex gap-1">
+                                                {l.objectifs.map((o) => (
+                                                    <span
+                                                        key={o.code}
+                                                        className="h-1.5 w-8 rounded-full"
+                                                        style={{ background: COULEUR[o.statut].hex }}
+                                                        title={`${labelDe(o.code)} : ${o.realise}${o.objectif > 0 ? ` / ${o.objectif}` : ""} · ${COULEUR[o.statut].label}`}
+                                                    />
+                                                ))}
+                                            </span>
+                                        </span>
+                                        <span className="shrink-0 text-lg font-black tabular-nums text-slate-900">{l.score}</span>
+                                        <ChevronRight size={16} className="shrink-0 text-slate-300" />
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ol>
+                </section>
+            </div>
+            {choisi && (
+                <Fiche l={choisi} rang={idx + 1} estMoi={choisi.id === conseillerId} message={message} unite={unite} periode={periode} emojiDe={emojiDe} labelDe={labelDe} />
+            )}
+        </div>
+    );
+}
+
 export function VueB({ liste, conseillerId, photos, unite, periode, message, emojiDe, labelDe, entete }: Commun) {
     const [selection, setSelection] = useState<string>(conseillerId || liste[0]?.id || "");
     const idx = Math.max(0, liste.findIndex((l) => l.id === selection));

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import PodiumTopPerformers, { messageMotivation, messageEquipe } from "@/components/dashboard/PodiumTopPerformers";
-import { VueB, VueC, type LigneVue } from "@/components/classement/ClassementVues";
+import { VueA, VueB, VueC, type LigneVue } from "@/components/classement/ClassementVues";
 import { useGenres } from "@/utils/genre";
 import { construireClassementPeriode } from "@/services/classementService";
 import { getJoursTravailPlageTous } from "@/services/planningService";
@@ -33,8 +33,8 @@ type Props = {
     groupe: GroupeId;
     conseillerId: string;
     photos: Record<string, string | null>;
-    /** Mise en page en test : "B" (podium dans la liste + fiche) ou "C" (matrice équipe). */
-    vue?: "B" | "C" | null;
+    /** Mise en page en test : "A" (mini-podium + liste + fiche), "B" (podium dans la liste + fiche) ou "C" (matrice équipe). */
+    vue?: "A" | "B" | "C" | null;
 };
 
 type Statut = "atteint" | "avance" | "juste" | "retard" | "encours" | "bonus";
@@ -198,7 +198,7 @@ export default function ClassementCourse({ lignes, periode, groupe, conseillerId
         </>
     );
 
-    if (vue === "B" || vue === "C") {
+    if (vue === "A" || vue === "B" || vue === "C") {
         const lignesVue: LigneVue[] = liste.map((l, i) => {
             const devant = i > 0 ? liste[i - 1] : null;
             const derriere = liste[i + 1];
@@ -218,7 +218,7 @@ export default function ClassementCourse({ lignes, periode, groupe, conseillerId
             ? conseillerId ? messageMotivation(classementVolume, conseillerId, unite, genres[conseillerId] ?? null) : messageEquipe(classementVolume, unite)
             : null;
         const props = { liste: lignesVue, conseillerId, photos, unite, periode, message, emojiDe, labelDe, entete };
-        return vue === "B" ? <VueB {...props} /> : <VueC {...props} />;
+        return vue === "A" ? <VueA {...props} /> : vue === "B" ? <VueB {...props} /> : <VueC {...props} />;
     }
 
     return (
