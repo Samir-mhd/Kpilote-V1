@@ -349,7 +349,6 @@ function Comparaison({ tels, variantes, profil, setProfil, options, setProtectio
     const autres: Ligne[] = [
         { label: "5G", val: (t) => (t.carac.fiveG ? "Oui" : "Non") },
         { label: "eSIM", val: (t) => (t.carac.esim ? "Oui" : "Non") },
-        { label: "Résistant à l'eau", val: (t) => (t.carac.etanche ? "Oui" : "Non") },
     ];
 
     /** Indices des meilleures valeurs d'une ligne ; vide si 1 seul modèle ou si toutes égales. */
