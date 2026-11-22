@@ -878,3 +878,8 @@ body::before {
 [data-sombre="1"] main .tuile-outil{background-color:rgba(205,30,37,.14);--tw-ring-color:rgba(205,30,37,.35)}
 [data-sombre="1"] main .tuile-outil:hover{background-color:rgba(205,30,37,.22)}
 [data-sombre="1"] main .tuile-outil .text-slate-500{color:#94a3b8}
+
+/* Classement : anneau d'objectif atteint en or qui pulse doucement */
+.anneau-or-classement{animation:anneauOrClassement 2.4s ease-in-out infinite}
+@keyframes anneauOrClassement{0%,100%{filter:drop-shadow(0 0 1px rgba(245,158,11,.35))}50%{filter:drop-shadow(0 0 6px rgba(251,191,36,.75))}}
+@media (prefers-reduced-motion:reduce){.anneau-or-classement{animation:none}}

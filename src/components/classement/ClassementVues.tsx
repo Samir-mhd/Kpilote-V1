@@ -8,7 +8,7 @@
  *  - C : liste « Les stars » à gauche, matrice d'anneaux de toute l'équipe à droite.
  * Les calculs (statuts, écarts, tri) viennent de ClassementCourse : seul l'affichage change.
  */
-import { useState } from "react";
+import { useId, useState } from "react";
 import CartoonAvatar from "@/components/avatar/CartoonAvatar";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { ChevronRight } from "lucide-react";
@@ -26,14 +26,17 @@ export type LigneVue = {
 };
 
 const COULEUR: Record<StatutVue, { hex: string; label: string; txt: string }> = {
-    atteint: { hex: "#8b5cf6", label: "objectif atteint", txt: "text-violet-600" },
+    atteint: { hex: "#f59e0b", label: "objectif atteint", txt: "text-amber-600" },
     avance: { hex: "#10b981", label: "dans les temps", txt: "text-emerald-600" },
-    juste: { hex: "#f59e0b", label: "un peu juste", txt: "text-amber-600" },
+    juste: { hex: "#f97316", label: "un peu juste", txt: "text-orange-600" },
     retard: { hex: "#f43f5e", label: "en retard", txt: "text-rose-600" },
     encours: { hex: "#94a3b8", label: "en cours", txt: "text-slate-500" },
     bonus: { hex: "#0ea5e9", label: "hors objectif", txt: "text-sky-600" },
 };
 const MEDAILLES = ["🥇", "🥈", "🥉"];
+/** Or brillant (objectif atteint) : dégradé utilisé pour les pastilles et barres. */
+const OR = "linear-gradient(135deg,#b45309,#fbbf24 40%,#fef3c7 50%,#f59e0b 60%,#b45309)";
+const fondStatut = (s: StatutVue) => (s === "atteint" ? OR : COULEUR[s].hex);
 
 type Commun = {
     liste: LigneVue[];
@@ -56,14 +59,29 @@ function Anneau({ o, taille, epais, emoji, label }: { o: ObjectifVue; taille: nu
     const C = 2 * Math.PI * R;
     const part = o.objectif > 0 ? Math.min(1, o.realise / o.objectif) : o.realise > 0 ? 1 : 0;
     const c = COULEUR[o.statut];
+    const idOr = `or-${useId().replace(/:/g, "")}`;
+    const or = o.statut === "atteint";
     const grand = taille >= 80;
     return (
         <div className="flex flex-col items-center text-center" title={`${label ?? o.code} : ${o.realise}${o.objectif > 0 ? ` / ${o.objectif}` : " (sans objectif)"}`}>
             <div className="relative" style={{ width: taille, height: taille }}>
-                <svg viewBox={`0 0 ${taille} ${taille}`} className="-rotate-90" style={{ width: taille, height: taille }}>
+                <svg viewBox={`0 0 ${taille} ${taille}`} className={`-rotate-90 ${or ? "anneau-or-classement" : ""}`} style={{ width: taille, height: taille }}>
+                    {or && (
+                        <defs>
+                            <linearGradient id={idOr} x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stopColor="#b45309" />
+                                <stop offset="35%" stopColor="#fbbf24" />
+                                <stop offset="50%" stopColor="#fef3c7">
+                                    <animate attributeName="offset" values="0.1;0.9;0.1" dur="2.4s" repeatCount="indefinite" />
+                                </stop>
+                                <stop offset="65%" stopColor="#f59e0b" />
+                                <stop offset="100%" stopColor="#b45309" />
+                            </linearGradient>
+                        </defs>
+                    )}
                     <circle cx={taille / 2} cy={taille / 2} r={R} fill="none" strokeWidth={epais} className="anneau-piste stroke-slate-100" />
                     <circle
-                        cx={taille / 2} cy={taille / 2} r={R} fill="none" stroke={c.hex} strokeWidth={epais}
+                        cx={taille / 2} cy={taille / 2} r={R} fill="none" stroke={or ? `url(#${idOr})` : c.hex} strokeWidth={epais}
                         strokeLinecap={part > 0 ? "round" : "butt"} strokeDasharray={`${part * C} ${C}`}
                     />
                 </svg>
@@ -78,7 +96,7 @@ function Anneau({ o, taille, epais, emoji, label }: { o: ObjectifVue; taille: nu
                     )}
                 </span>
                 {o.statut === "atteint" && taille >= 50 && (
-                    <span className="absolute -right-0.5 top-0 flex h-5 w-5 items-center justify-center rounded-full bg-violet-500 text-[10px] font-black text-white ring-2 ring-white">✓</span>
+                    <span className="absolute -right-0.5 top-0 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 text-[10px] font-black text-white ring-2 ring-white">★</span>
                 )}
             </div>
             {grand && label && (
@@ -96,7 +114,7 @@ function Legende({ periode }: { periode: Periode }) {
     return (
         <p className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-semibold text-slate-400">
             {statuts.map((s) => (
-                <span key={s} className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: COULEUR[s].hex }} />{COULEUR[s].label}</span>
+                <span key={s} className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: fondStatut(s) }} />{COULEUR[s].label}</span>
             ))}
         </p>
     );
@@ -220,7 +238,7 @@ export function VueA({ liste, conseillerId, photos, unite, periode, message, emo
                                                     <span
                                                         key={o.code}
                                                         className="h-1.5 w-8 rounded-full"
-                                                        style={{ background: COULEUR[o.statut].hex }}
+                                                        style={{ background: fondStatut(o.statut) }}
                                                         title={`${labelDe(o.code)} : ${o.realise}${o.objectif > 0 ? ` / ${o.objectif}` : ""} · ${COULEUR[o.statut].label}`}
                                                     />
                                                 ))}
