@@ -370,9 +370,34 @@ function Comparaison({ tels, variantes, profil, setProfil, options, setProtectio
     const toutes = [...prix, ...general, ...batterie, ...photo];
     const meilleursParLigne = new Map(toutes.map((l) => [l, meilleurs(l)]));
     const pointsForts = tels.map((_, i) => toutes.filter((l) => meilleursParLigne.get(l)!.has(i)).length);
-    const maxPoints = Math.max(...pointsForts);
-    const plusComplet = (i: number) => !seul && maxPoints > 0 && pointsForts[i] === maxPoints && pointsForts.filter((p) => p === maxPoints).length < tels.length;
-    const ligneTotal = prix[0];
+    // Point fort mis en avant (comparaison uniquement) : le critère où le téléphone devance
+    // seul les autres avec le plus grand écart relatif. Pas de badge sans avance nette (≥ 5 %).
+    const pouces = (t: TelephoneFree) => { const m = t.carac.ecran?.match(/(d+(?:[.,]d+)?)s*"/); return m ? Number(m[1].replace(",", ".")) : null; };
+    const CRITERES_FORTS: { badge: string; mieux: "haut" | "bas"; val: (t: TelephoneFree, v: VarianteTel) => number | null }[] = [
+        { badge: "🔋 Meilleure autonomie", mieux: "haut", val: (t) => t.carac.batterie },
+        { badge: "📸 Meilleur capteur photo", mieux: "haut", val: (t) => t.carac.capteurPrincipal },
+        { badge: "📱 Plus grand écran", mieux: "haut", val: (t) => pouces(t) },
+        { badge: "⚡ Recharge la plus rapide", mieux: "haut", val: (t) => t.carac.chargeFilaireW },
+        { badge: "💾 Plus de stockage", mieux: "haut", val: (_, v) => (v.stockage > 0 ? v.stockage : null) },
+        { badge: "🧠 Plus de mémoire vive", mieux: "haut", val: (t) => t.carac.ram },
+        { badge: "🔭 Meilleur zoom", mieux: "haut", val: (t) => t.carac.teleobjectif ?? 0 },
+        { badge: "🤳 Meilleur selfie", mieux: "haut", val: (t) => t.carac.selfie },
+        { badge: "🪶 Plus léger", mieux: "bas", val: (t) => t.carac.poids },
+    ];
+    const pointFort = tels.map((_, i) => {
+        if (seul) return null;
+        let meilleur: { badge: string; ecart: number } | null = null;
+        for (const c of CRITERES_FORTS) {
+            const vals = tels.map((t, j) => c.val(t, variantes[j]));
+            const moi = vals[i];
+            const autres = vals.filter((_, j) => j !== i);
+            if (moi == null || moi <= 0 || autres.some((x) => x == null)) continue;
+            const second = c.mieux === "haut" ? Math.max(...(autres as number[])) : Math.min(...(autres as number[]));
+            const ecart = c.mieux === "haut" ? (second > 0 ? (moi - second) / second : 1) : (second - moi) / second;
+            if (ecart >= 0.05 && (!meilleur || ecart > meilleur.ecart)) meilleur = { badge: c.badge, ecart };
+        }
+        return meilleur?.badge ?? null;
+    });
     const ligneOui = (txt: string) => txt === "Oui" || txt.startsWith("Oui,");
 
     return (
@@ -413,10 +438,10 @@ function Comparaison({ tels, variantes, profil, setProfil, options, setProtectio
                     {tels.map((t, i) => {
                         const v = variantes[i];
                         const f = flexDe(v, profil);
-                        const complet = plusComplet(i);
+                        const badge = pointFort[i];
                         return (
-                            <article key={t.id} className={`relative flex flex-col overflow-hidden rounded-[28px] bg-white shadow-sm ${complet ? "ring-2 ring-emerald-400" : "ring-1 ring-slate-200"}`}>
-                                {complet && <span className="absolute right-4 top-4 z-10 rounded-full bg-emerald-500 px-3 py-1 text-xs font-black text-white">🏆 Le plus complet</span>}
+                            <article key={t.id} className="relative flex flex-col overflow-hidden rounded-[28px] bg-white shadow-sm ring-1 ring-slate-200">
+                                {badge && <span className="absolute right-4 top-4 z-10 rounded-full bg-emerald-500 px-3 py-1 text-xs font-black text-white shadow-sm">{badge}</span>}
 
                                 <div className="flex items-center gap-5 bg-gradient-to-b from-slate-50 to-white px-5 pb-4 pt-6 sm:px-6">
                                     <img src={t.image} alt={t.nom} className="h-32 w-24 shrink-0 object-contain" />
@@ -436,7 +461,6 @@ function Comparaison({ tels, variantes, profil, setProfil, options, setProtectio
                                         <>
                                             <p className="flex flex-wrap items-baseline gap-x-2">
                                                 <span className="text-4xl font-black tabular-nums">{eur(mensuelTotal(v, profil, options))}<span className="text-sm font-bold text-white/70">/mois</span></span>
-                                                {meilleursParLigne.get(ligneTotal)!.has(i) && <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black uppercase text-emerald-700">le moins cher</span>}
                                             </p>
                                             {avecOptions && (
                                                 <p className="text-sm font-semibold text-white/85">
