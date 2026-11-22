@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import CartoonAvatar, { type AvatarEtat } from "@/components/avatar/CartoonAvatar";
 import { AVATAR_PHRASES } from "@/components/dashboard/HeroHeader";
-import type { ProchainBadge } from "@/services/badgesService";
 import { accorderPhrase, type Genre } from "@/utils/genre";
 
 type Props = {
@@ -17,8 +15,6 @@ type Props = {
     taux: number;
     /** null = variable désactivée pour ce conseiller (pas de tuile cagnotte). */
     cagnotte: { total: number; hier: number | null; flash: { key: number; montant: number; label?: string } | null } | null;
-    prochainBadge: ProchainBadge | null;
-    badgeHref: string;
     /** false = pas planifié aujourd'hui (off, congés…) : jamais de relance d'inactivité. */
     travailleAujourdhui?: boolean;
     genre?: Genre;
@@ -74,7 +70,7 @@ function situation(avatarEtat: AvatarEtat, taux: number, rang: number, realise: 
     return { etat: avatarEtat, phrases: AVATAR_PHRASES[avatarEtat] };
 }
 
-export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, taux, cagnotte, prochainBadge, badgeHref, travailleAujourdhui = true, genre = null }: Props) {
+export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, taux, cagnotte, travailleAujourdhui = true, genre = null }: Props) {
     const prenom = nom.split(" ")[0];
     // Heure relue chaque minute pour basculer à l'ouverture / la fermeture sans recharger.
     const [heure, setHeure] = useState(() => new Date().getHours());
@@ -119,23 +115,6 @@ export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, 
                     />
                     <div className="min-w-0">
                         <h1 className="text-xl font-black leading-tight sm:text-2xl">{titre}</h1>
-                        {prochainBadge && (
-                            <Link
-                                href={badgeHref}
-                                className="mt-3 inline-flex max-w-full items-center gap-2 rounded-full bg-white/10 py-1.5 pl-1.5 pr-3 text-xs font-bold text-white/85 transition-colors hover:bg-white/20"
-                            >
-                                <span
-                                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm"
-                                    style={{ background: `linear-gradient(135deg, ${prochainBadge.badge.de}, ${prochainBadge.badge.a})` }}
-                                >
-                                    {prochainBadge.badge.emoji}
-                                </span>
-                                <span className="truncate">
-                                    Prochain trophée : <span className="text-white">{prochainBadge.badge.label}</span>
-                                    <span className="text-white/50"> · {prochainBadge.badge.description}</span>
-                                </span>
-                            </Link>
-                        )}
                     </div>
                 </div>
 

@@ -49,7 +49,6 @@ import {
 import { creerFicheBoxRaccordement } from "@/services/boxRaccordement";
 import { creerForfait4PDiffere } from "@/services/forfait4P";
 import { getOrdreMissions } from "@/services/ordreMissionsService";
-import { calculerBadgesConseiller, prochainBadgeADebloquer, ProchainBadge } from "@/services/badgesService";
 import { PRODUITS_ORDRE, PRODUITS_HORS_ACTES, ProduitCode } from "@/utils/produits";
 
 const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
@@ -234,7 +233,6 @@ export default function Dashboard() {
     const boostTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [ordrePersonnalise, setOrdrePersonnalise] = useState<string[] | null>(null);
-    const [prochainBadge, setProchainBadge] = useState<ProchainBadge | null>(null);
     const [comboOuvert, setComboOuvert] = useState(false);
     const [comboSansVarianteOuvert, setComboSansVarianteOuvert] = useState(false);
     // Carte « Déclarer une vente » : actes cochés (noms de missions). 1 acte = vente simple
@@ -385,12 +383,6 @@ export default function Dashboard() {
             });
         }
 
-        // Prochain trophée à débloquer (widget Accueil) — non bloquant, best-effort.
-        if (conseillerId) {
-            calculerBadgesConseiller(conseillerId)
-                .then((etat) => setProchainBadge(prochainBadgeADebloquer(etat)))
-                .catch(() => setProchainBadge(null));
-        }
     }, [conseillerId]);
 
     // Realtime : toutes les modifications sur challenges impliquant ce conseiller
@@ -1125,8 +1117,6 @@ export default function Dashboard() {
                     objectif={objectifGlobal}
                     taux={tauxGlobal}
                     cagnotte={variableActivee ? { total: cagnotteTotal, hier: cagnotteHier, flash: cagnotteFlash } : null}
-                    prochainBadge={prochainBadge}
-                    badgeHref={`/dashboard/badges?id=${conseillerId}&nom=${encodeURIComponent(nom)}`}
                     travailleAujourdhui={travailleAujourdhui}
                     genre={genre}
                 />

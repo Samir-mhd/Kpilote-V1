@@ -13,7 +13,7 @@ import { getJoursTravail } from "@/services/planningService";
 import { getMissionsCompletes } from "@/services/missionsReelles";
 
 /**
- * "Ma variable" mise en avant (variante &variable=v2) : montant acquis, fin de mois à ton rythme,
+ * "Ma variable" mise en avant (variante &variable=v2) : montant acquis,
  * et surtout la variable "tous tes objectifs atteints" avec ce qu'il reste à vendre pour y arriver.
  * Tous les montants passent par calculerVariableConseiller (le vrai barème) ; box / assurances /
  * McAfee manquants sont valorisés à part, payés plus tard (M+1 / M+2).
@@ -72,7 +72,7 @@ export default function VariableSynthese({ conseillerId, mois, ventes, boost, ba
 
     const acquis = useMemo(() => calc(ventes) + totalExtra, [ventes, boost, bareme, bonusManuels, bonusVolumes, totalExtra]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Volumes projetés en fin de mois à ton rythme : volumes du mois × (jours planifiés du mois / jours déjà travaillés).
+    // Volumes projetés en fin de mois (sert au scénario « tous tes objectifs atteints ») : volumes du mois × (jours planifiés du mois / jours déjà travaillés).
     const projete = useMemo(() => {
         if (!jours || jours.travailles <= 0) return null;
         const facteur = (jours.travailles + jours.restants) / jours.travailles;
@@ -83,10 +83,6 @@ export default function VariableSynthese({ conseillerId, mois, ventes, boost, ba
         return { v, vol };
     }, [jours, ventes, bonusVolumes]);
 
-    const projection = useMemo(
-        () => (projete ? calc(projete.v, projete.vol) + totalExtra : null),
-        [projete, boost, bareme, bonusManuels, totalExtra] // eslint-disable-line react-hooks/exhaustive-deps
-    );
 
     const manque = (produit: string) => {
         const o = objectifs[produit];
@@ -126,13 +122,6 @@ export default function VariableSynthese({ conseillerId, mois, ventes, boost, ba
                     <p className="text-xs font-black uppercase tracking-[0.3em] text-white/70">Ta variable de {nomDuMois}</p>
                     <p className="mt-1 text-5xl font-black tabular-nums">{fmtEuro(acquis)}</p>
                     <p className="mt-1 text-sm font-semibold text-white/70">acquis à ce jour</p>
-                    <div className="mt-5 rounded-2xl bg-white/10 p-4 ring-1 ring-white/15">
-                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white/60">Fin de mois à ton rythme</p>
-                        <p className="mt-1 text-2xl font-black tabular-nums">{projection !== null ? fmtEuro(projection) : "…"}</p>
-                        {projection !== null && projection > acquis && (
-                            <p className="text-[11px] font-bold text-emerald-200">+{fmtEuro(projection - acquis)} d&apos;ici la fin du mois</p>
-                        )}
-                    </div>
                 </div>
             </div>
 
