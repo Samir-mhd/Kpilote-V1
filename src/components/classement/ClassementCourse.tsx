@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
-import PodiumTopPerformers from "@/components/dashboard/PodiumTopPerformers";
+import PodiumTopPerformers, { messageMotivation, messageEquipe } from "@/components/dashboard/PodiumTopPerformers";
+import { VueB, VueC, type LigneVue } from "@/components/classement/ClassementVues";
+import { useGenres } from "@/utils/genre";
 import { construireClassementPeriode } from "@/services/classementService";
 import { getJoursTravailPlageTous } from "@/services/planningService";
 import { getRealiseVentesComboParConseiller } from "@/services/variableConseiller";
@@ -31,6 +33,8 @@ type Props = {
     groupe: GroupeId;
     conseillerId: string;
     photos: Record<string, string | null>;
+    /** Mise en page en test : "B" (podium dans la liste + fiche) ou "C" (matrice équipe). */
+    vue?: "B" | "C" | null;
 };
 
 type Statut = "atteint" | "avance" | "juste" | "retard" | "encours" | "bonus";
@@ -74,7 +78,8 @@ function bornes(periode: Periode): { debut: Date; fin: Date } {
 
 type Objectif = { code: string; realise: number; objectif: number; statut: Statut; tenue: number };
 
-export default function ClassementCourse({ lignes, periode, groupe, conseillerId, photos }: Props) {
+export default function ClassementCourse({ lignes, periode, groupe, conseillerId, photos, vue = null }: Props) {
+    const genres = useGenres();
     const [mode, setMode] = useState<"volume" | "regularite">("volume");
     const [jours, setJours] = useState<Record<string, { ecoules: number; total: number }>>({});
     const [avant, setAvant] = useState<Record<string, Record<string, number>> | null>(null);
@@ -166,6 +171,56 @@ export default function ClassementCourse({ lignes, periode, groupe, conseillerId
         [...lignes].sort((a, b) => somme(avant[b.id]) - somme(avant[a.id])).forEach((l, i) => { rangAvant[l.id] = i + 1; });
     }
 
+    const entete = (
+        <>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">
+                {GROUPES.find((g) => g.id === groupe)?.label} · classement
+            </h2>
+            <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-black">
+                {(["volume", "regularite"] as const).map((m) => (
+                    <button
+                        key={m}
+                        onClick={() => setMode(m)}
+                        className={`rounded-lg px-3 py-1.5 transition-all ${mode === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                    >
+                        {m === "volume" ? "Volume" : "Régularité"}
+                    </button>
+                ))}
+            </div>
+        </div>
+        {mode === "regularite" && (
+            <p className="-mt-2 mb-3 text-xs text-slate-500">
+                Classé sur le nombre d&apos;objectifs tenus{periode === "jour" ? "" : " à date (selon le planning de chacun)"}.
+                Dépasser largement un objectif ne compense pas un autre objectif en retard.
+            </p>
+        )}
+        </>
+    );
+
+    if (vue === "B" || vue === "C") {
+        const lignesVue: LigneVue[] = liste.map((l, i) => {
+            const devant = i > 0 ? liste[i - 1] : null;
+            const derriere = liste[i + 1];
+            const prenomDevant = devant?.nom.split(" ")[0];
+            const ecart = mode === "volume"
+                ? devant ? (devant.score === l.score ? `à égalité avec ${prenomDevant}` : `à ${avecUnite(devant.score - l.score, unite)} de ${prenomDevant}`)
+                    : derriere && l.score > derriere.score ? `${avecUnite(l.score - derriere.score, unite)} d'avance` : ""
+                : `${l.atteints} / ${l.nbObjectifs} objectif${l.nbObjectifs > 1 ? "s" : ""} atteint${l.atteints > 1 ? "s" : ""}`;
+            return {
+                id: l.id, nom: l.nom, score: l.score, ecart,
+                mouvement: rangAvant[l.id] ? rangAvant[l.id] - (i + 1) : 0,
+                objectifs: l.objectifs.map((o) => ({ code: o.code, realise: o.realise, objectif: o.objectif, statut: o.statut })),
+            };
+        });
+        const classementVolume = parVolume.map((l) => ({ id: l.id, nom: l.nom, total: l.score }));
+        const message = classementVolume[0]?.total > 0
+            ? conseillerId ? messageMotivation(classementVolume, conseillerId, unite, genres[conseillerId] ?? null) : messageEquipe(classementVolume, unite)
+            : null;
+        const props = { liste: lignesVue, conseillerId, photos, unite, periode, message, emojiDe, labelDe, entete };
+        return vue === "B" ? <VueB {...props} /> : <VueC {...props} />;
+    }
+
     return (
         <div className="space-y-5">
             {/* Le podium suit le groupe choisi (toujours au volume). */}
@@ -177,28 +232,7 @@ export default function ClassementCourse({ lignes, periode, groupe, conseillerId
             />
 
             <section className="rounded-[24px] bg-white p-4 shadow-[0_4px_24px_rgba(15,23,42,.07)] sm:p-6">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">
-                        {GROUPES.find((g) => g.id === groupe)?.label} · classement
-                    </h2>
-                    <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-black">
-                        {(["volume", "regularite"] as const).map((m) => (
-                            <button
-                                key={m}
-                                onClick={() => setMode(m)}
-                                className={`rounded-lg px-3 py-1.5 transition-all ${mode === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
-                            >
-                                {m === "volume" ? "Volume" : "Régularité"}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-                {mode === "regularite" && (
-                    <p className="-mt-2 mb-3 text-xs text-slate-500">
-                        Classé sur le nombre d&apos;objectifs tenus{periode === "jour" ? "" : " à date (selon le planning de chacun)"}.
-                        Dépasser largement un objectif ne compense pas un autre objectif en retard.
-                    </p>
-                )}
+                {entete}
 
                 <ol className="space-y-2">
                     {liste.map((l, i) => {

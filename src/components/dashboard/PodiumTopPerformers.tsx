@@ -61,7 +61,7 @@ function pluriel(n: number, mot: string | null): string {
 }
 
 /** Message personnel : ce qu'il manque pour monter (ou garder sa place). */
-function messageMotivation(classement: Participant[], conseillerId: string, unite: string | null, genre: Genre = null): string | null {
+export function messageMotivation(classement: Participant[], conseillerId: string, unite: string | null, genre: Genre = null): string | null {
     const idx = classement.findIndex((c) => c.id === conseillerId);
     if (idx < 0) return null;
     const moi = classement[idx];
@@ -88,7 +88,7 @@ function messageMotivation(classement: Participant[], conseillerId: string, unit
 }
 
 /** Bandeau côté manager : avance du leader + qui est le plus proche d'entrer sur le podium. */
-function messageEquipe(classement: Participant[], unite: string | null): string | null {
+export function messageEquipe(classement: Participant[], unite: string | null): string | null {
     const [premier, second] = classement;
     const parts: string[] = [];
     if (second) {
