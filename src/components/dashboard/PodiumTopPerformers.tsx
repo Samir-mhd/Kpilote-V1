@@ -21,46 +21,39 @@ const QUAND: Record<Periode, string> = {
     mois: "ce mois-ci",
 };
 
-// Ordre visuel : 2e à gauche, 1er au centre, 3e à droite.
+const STARS: Record<Periode, string> = {
+    jour: "Les stars du jour",
+    semaine: "Les stars de la semaine",
+    mois: "Les stars du mois",
+};
+
+// Ordre visuel : 2e à gauche, 1er au centre, 3e à droite. Une carte « affiche » par place,
+// cadre or / argent / bronze, la plus haute au centre.
 const PLACES = [
     {
         rang: 2,
-        avatar: "w-24 sm:w-32",
-        marche: "h-24 sm:h-28",
-        bloc: "from-slate-200 via-slate-300 to-slate-500",
-        chiffre: "text-slate-600/80",
-        aura: "from-orange-400/50 via-amber-400/20",
+        medaille: "🥈",
+        hauteur: "h-[250px] sm:h-[330px]",
+        avatar: "w-24 sm:w-36",
+        cadre: "from-slate-200 via-slate-300 to-slate-500",
+        halo: "rgba(148,163,184,.40)",
     },
     {
         rang: 1,
-        avatar: "w-36 sm:w-48",
-        marche: "h-36 sm:h-40",
-        bloc: "from-amber-200 via-amber-400 to-orange-600",
-        chiffre: "text-amber-900/70",
-        aura: "from-orange-500/80 via-red-500/30",
+        medaille: "🥇",
+        hauteur: "h-[290px] sm:h-[390px]",
+        avatar: "w-28 sm:w-44",
+        cadre: "from-amber-200 via-yellow-400 to-amber-500",
+        halo: "rgba(251,191,36,.50)",
     },
     {
         rang: 3,
-        avatar: "w-24 sm:w-28",
-        marche: "h-16 sm:h-20",
-        bloc: "from-orange-200 via-orange-400 to-amber-800",
-        chiffre: "text-amber-950/60",
-        aura: "from-orange-400/40 via-amber-400/15",
+        medaille: "🥉",
+        hauteur: "h-[230px] sm:h-[300px]",
+        avatar: "w-20 sm:w-32",
+        cadre: "from-orange-300 via-orange-400 to-amber-700",
+        halo: "rgba(234,88,12,.38)",
     },
-];
-
-// Braises : positions fixes (pas de Math.random → rendu stable entre serveur et client).
-const BRAISES = [
-    { left: "8%",  delay: "0s",   duree: "4.2s", taille: 4 },
-    { left: "17%", delay: "1.6s", duree: "5.1s", taille: 3 },
-    { left: "27%", delay: "0.8s", duree: "3.8s", taille: 5 },
-    { left: "38%", delay: "2.4s", duree: "4.6s", taille: 3 },
-    { left: "46%", delay: "0.3s", duree: "3.5s", taille: 6 },
-    { left: "53%", delay: "1.9s", duree: "4.9s", taille: 4 },
-    { left: "61%", delay: "1.1s", duree: "4.1s", taille: 5 },
-    { left: "70%", delay: "2.8s", duree: "5.3s", taille: 3 },
-    { left: "81%", delay: "0.5s", duree: "4.4s", taille: 4 },
-    { left: "91%", delay: "2.1s", duree: "3.9s", taille: 3 },
 ];
 
 function pluriel(n: number, mot: string | null): string {
@@ -123,37 +116,25 @@ export default function PodiumTopPerformers({ classement, conseillerId, periode,
         ? null
         : conseillerId ? messageMotivation(classement, conseillerId, unite, genres[conseillerId] ?? null) : messageEquipe(classement, unite);
 
+    // Jauge d'écart avec la personne juste devant (conseiller connecté, hors 1re place).
+    const idxMoi = conseillerId ? classement.findIndex((c) => c.id === conseillerId) : -1;
+    const devant = idxMoi > 0 ? classement[idxMoi - 1] : null;
+    const jaugeEcart = devant && devant.total > 0 ? Math.min(100, (classement[idxMoi].total / devant.total) * 100) : null;
+
     return (
-        <section className="relative overflow-hidden rounded-[28px] bg-[radial-gradient(ellipse_at_top,#4a1d06_0%,#1c1917_45%,#0c0a09_100%)] shadow-[0_20px_60px_rgba(124,45,18,.35)]">
-            {/* Projecteurs derrière le n°1 */}
+        <section className="relative overflow-hidden rounded-[28px] bg-[#0d0f1a] shadow-[0_20px_60px_rgba(15,23,42,.35)]">
+            {/* Projecteurs : un faisceau central (n°1) et deux latéraux */}
             <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center">
-                <div className="h-[420px] w-[520px] bg-[conic-gradient(from_180deg_at_50%_0%,transparent_155deg,rgba(251,191,36,.18)_172deg,rgba(251,191,36,.28)_180deg,rgba(251,191,36,.18)_188deg,transparent_205deg)] motion-safe:animate-[podium-spot_6s_ease-in-out_infinite]" />
+                <div className="h-[460px] w-[560px] bg-[conic-gradient(from_180deg_at_50%_0%,transparent_160deg,rgba(255,255,255,.10)_180deg,transparent_200deg)] motion-safe:animate-[podium-spot_6s_ease-in-out_infinite]" />
             </div>
+            <div className="pointer-events-none absolute left-[18%] top-0 hidden h-[420px] w-[420px] -translate-x-1/2 bg-[conic-gradient(from_180deg_at_50%_0%,transparent_165deg,rgba(255,255,255,.06)_180deg,transparent_195deg)] sm:block" />
+            <div className="pointer-events-none absolute left-[82%] top-0 hidden h-[420px] w-[420px] -translate-x-1/2 bg-[conic-gradient(from_180deg_at_50%_0%,transparent_165deg,rgba(255,255,255,.06)_180deg,transparent_195deg)] sm:block" />
 
-            {/* Braises qui montent */}
-            <div className="pointer-events-none absolute inset-0">
-                {BRAISES.map((b, i) => (
-                    <span
-                        key={i}
-                        className="absolute bottom-0 rounded-full bg-orange-400 opacity-0 shadow-[0_0_8px_2px_rgba(251,146,60,.8)] motion-safe:animate-[podium-braise_var(--duree)_ease-in_infinite]"
-                        style={{
-                            left: b.left,
-                            width: b.taille,
-                            height: b.taille,
-                            animationDelay: b.delay,
-                            ["--duree" as string]: b.duree,
-                        }}
-                    />
-                ))}
-            </div>
-
-            <div className="relative px-4 pt-7 sm:px-8">
-                <p className="text-center text-[11px] font-black uppercase tracking-[0.35em] text-amber-300/80">
-                    🔥 Top performers
+            <div className="relative px-3 pb-6 pt-7 sm:px-8 sm:pb-8">
+                <p className="text-center text-[10px] font-black uppercase tracking-[0.2em] text-amber-300 sm:text-[11px] sm:tracking-[0.35em]">
+                    Top performers · {QUAND[periode]}
                 </p>
-                <h2 className="mt-1 text-center text-2xl font-black text-white sm:text-3xl">
-                    Qui met le feu {QUAND[periode]} ?
-                </h2>
+                <h2 className="mt-1 text-center text-2xl font-black text-white sm:text-3xl">{STARS[periode]}</h2>
 
                 {podiumVide ? (
                     <div className="flex flex-col items-center py-14 text-center">
@@ -162,54 +143,45 @@ export default function PodiumTopPerformers({ classement, conseillerId, periode,
                         <p className="mt-1 text-sm text-amber-200/70">{unite ? `La première ${unite} prend la couronne.` : "Le premier à se lancer prend la couronne."}</p>
                     </div>
                 ) : (
-                    <div className="mt-12 flex items-end justify-center gap-2 sm:mt-14 sm:gap-5">
+                    <div className="mt-8 flex items-end justify-center gap-2 sm:gap-6">
                         {PLACES.map((place) => {
                             const c = parRang[place.rang];
                             if (!c) return null;
                             const first = place.rang === 1;
                             const isMoi = !!conseillerId && c.id === conseillerId;
                             return (
-                                <div key={c.id} className="flex min-w-0 flex-1 flex-col items-center sm:max-w-[200px]">
-                                    {/* Avatar en feu + aura */}
-                                    <div className={`relative ${place.avatar}`}>
-                                        <div
-                                            className={`absolute inset-[-12%] rounded-full bg-radial ${place.aura} to-transparent blur-xl motion-safe:animate-[podium-aura_1.8s_ease-in-out_infinite]`}
-                                            style={{ animationDelay: `${place.rang * 0.3}s` }}
-                                        />
-                                        {first && (
-                                            <span className="absolute -top-7 left-1/2 z-10 -translate-x-1/2 text-4xl drop-shadow-[0_4px_12px_rgba(251,191,36,.7)] motion-safe:animate-[podium-couronne_2.4s_ease-in-out_infinite] sm:-top-9 sm:text-5xl">
-                                                👑
-                                            </span>
-                                        )}
-                                        <CartoonAvatar
-                                            prenom={c.nom}
-                                            etat="en_feu"
-                                            className="relative aspect-square h-auto w-full object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,.5)]"
-                                        />
+                                <div
+                                    key={c.id}
+                                    className={`relative min-w-0 flex-1 rounded-[24px] bg-gradient-to-b ${place.cadre} p-[3px] sm:max-w-[256px] sm:rounded-[28px]`}
+                                    style={{ boxShadow: `0 30px 80px ${place.halo}` }}
+                                >
+                                    <div className={`relative flex ${place.hauteur} flex-col items-center overflow-hidden rounded-[21px] bg-gradient-to-b from-[#1b1f33] to-[#10121d] px-2 pt-4 sm:rounded-[25px] sm:px-5 sm:pt-5`}>
+                                        <span className="absolute left-2 top-2 text-lg sm:left-4 sm:top-4 sm:text-3xl">{place.medaille}</span>
                                         {isMoi && (
-                                            <span className="absolute -bottom-1 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-green-500 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-white shadow-lg ring-2 ring-white/80">
+                                            <span className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white sm:bottom-auto sm:left-auto sm:right-4 sm:top-5 sm:translate-x-0 sm:px-2.5 sm:py-1 sm:text-[10px]">
                                                 C&apos;est toi
                                             </span>
                                         )}
-                                    </div>
-
-                                    {/* Nom + ventes */}
-                                    <div className="mt-3 w-full text-center">
-                                        <p className={`truncate font-black ${first ? "text-lg text-amber-200 sm:text-xl" : "text-sm text-white sm:text-base"}`}>
+                                        <div className={`relative mt-7 sm:mt-4 ${place.avatar}`}>
+                                            {first && (
+                                                <span className="absolute -top-6 left-1/2 z-10 -translate-x-1/2 text-2xl drop-shadow-[0_4px_12px_rgba(251,191,36,.7)] motion-safe:animate-[podium-couronne_2.4s_ease-in-out_infinite] sm:-top-8 sm:text-4xl">
+                                                    👑
+                                                </span>
+                                            )}
+                                            <CartoonAvatar
+                                                prenom={c.nom}
+                                                etat="en_feu"
+                                                className="relative aspect-square h-auto w-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,.5)]"
+                                            />
+                                        </div>
+                                        <p className={`mt-2 w-full truncate text-center font-black ${first ? "text-base text-amber-200 sm:text-xl" : "text-sm text-white sm:text-lg"}`}>
                                             {c.nom}
                                         </p>
                                         <p className="leading-none">
-                                            <span className={`font-black tabular-nums text-white ${first ? "text-4xl sm:text-5xl" : "text-2xl sm:text-3xl"}`}>
-                                                {c.total}
-                                            </span>
-                                            {unite && <span className="ml-1 text-xs font-bold text-white/50">{c.total > 1 ? `${unite}s` : unite}</span>}
+                                            <span className={`font-black tabular-nums text-white ${first ? "text-3xl sm:text-5xl" : "text-2xl sm:text-4xl"}`}>{c.total}</span>
+                                            {unite && <span className="ml-1 hidden text-sm font-bold text-white/50 sm:inline">{c.total > 1 ? `${unite}s` : unite}</span>}
                                         </p>
-                                    </div>
-
-                                    {/* Marche */}
-                                    <div className={`relative mt-3 w-full overflow-hidden rounded-t-2xl bg-gradient-to-b ${place.bloc} ${place.marche} shadow-[inset_0_2px_0_rgba(255,255,255,.6)]`}>
-                                        <div className="absolute inset-0 bg-[linear-gradient(110deg,transparent_30%,rgba(255,255,255,.45)_45%,transparent_60%)] motion-safe:animate-[podium-reflet_4s_ease-in-out_infinite]" />
-                                        <span className={`absolute inset-x-0 top-2 text-center font-black ${place.chiffre} ${first ? "text-6xl sm:text-7xl" : "text-4xl sm:text-5xl"}`}>
+                                        <span className="pointer-events-none absolute -bottom-5 right-1 text-[90px] font-black leading-none text-white/[.06] sm:-bottom-6 sm:right-2 sm:text-[120px]">
                                             {place.rang}
                                         </span>
                                     </div>
@@ -218,13 +190,18 @@ export default function PodiumTopPerformers({ classement, conseillerId, periode,
                         })}
                     </div>
                 )}
-            </div>
 
-            {message && (
-                <div className="relative border-t border-white/10 bg-white/[0.06] px-5 py-3.5 text-center text-sm font-bold text-amber-100 backdrop-blur">
-                    {message}
-                </div>
-            )}
+                {message && (
+                    <div className="relative mx-auto mt-6 flex max-w-2xl items-center gap-3 rounded-2xl bg-white/[.06] px-4 py-3 ring-1 ring-white/10 sm:mt-8 sm:px-5">
+                        <p className="flex-1 text-sm font-bold text-white/90">{message}</p>
+                        {jaugeEcart !== null && (
+                            <div className="hidden h-2 w-32 shrink-0 rounded-full bg-white/10 sm:block" aria-hidden="true">
+                                <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-amber-300" style={{ width: `${jaugeEcart}%` }} />
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
         </section>
     );
 }
