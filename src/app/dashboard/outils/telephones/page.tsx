@@ -507,7 +507,6 @@ function Comparaison({ tels, variantes, profil, setProfil, options, setProtectio
                                                         <span className="text-slate-500">{l.label}</span>
                                                         <span className={`flex items-center gap-1.5 text-right tabular-nums ${top ? "font-black text-emerald-600" : "font-bold text-slate-800"}`}>
                                                             {binaire ? (ligneOui(txt) ? <Check size={16} className="text-emerald-500" /> : <Minus size={16} className="text-slate-300" />) : txt}
-                                                            {top && <span className="rounded-full bg-emerald-50 px-1.5 text-[10px] font-black text-emerald-600">top</span>}
                                                         </span>
                                                     </div>
                                                 );
