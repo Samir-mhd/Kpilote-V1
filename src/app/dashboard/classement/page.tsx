@@ -331,7 +331,8 @@ function ClassementInner() {
                     groupe={groupe}
                     conseillerId={conseillerId}
                     photos={photos}
-                    vue={(["A", "B", "C"] as const).find((v) => v === searchParams.get("vue")) ?? null}
+                    // Vue A par défaut ; &vue=B / &vue=C (variantes testées), &vue=liste = ancienne mise en page.
+                    vue={searchParams.get("vue") === "liste" ? null : (["B", "C"] as const).find((v) => v === searchParams.get("vue")) ?? "A"}
                 />
             )}
         </div>
