@@ -17,11 +17,11 @@ const SELECTION_VIDE: ComboSansVarianteSelection = {
 };
 
 const ITEMS: { cle: keyof ComboSansVarianteSelection; label: string; emoji: string }[] = [
-    { cle: "box", label: "Box", emoji: "📦" },
-    { cle: "forfait", label: "Forfait", emoji: "📱" },
+    { cle: "box", label: "Box", emoji: "💻" },
+    { cle: "forfait", label: "Forfait", emoji: "📶" },
     { cle: "telephone", label: "Téléphone", emoji: "📲" },
     { cle: "mcafee", label: "McAfee", emoji: "🛡️" },
-    { cle: "mcafeeMobile", label: "McAfee Mobile", emoji: "📶" },
+    { cle: "mcafeeMobile", label: "McAfee Mobile", emoji: "🔐" },
     { cle: "assurance", label: "Assurance", emoji: "✅" },
     { cle: "canal", label: "Canal+", emoji: "📺" },
 ];

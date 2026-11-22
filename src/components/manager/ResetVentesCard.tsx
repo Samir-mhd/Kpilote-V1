@@ -8,8 +8,8 @@ type Conseiller = { id: string; nom: string };
 type Props = { conseillers: Conseiller[] };
 
 const PRODUITS = [
-    { code: "box",        label: "Box",       emoji: "📦" },
-    { code: "forfaits",   label: "Forfaits",  emoji: "📱" },
+    { code: "box",        label: "Box",       emoji: "💻" },
+    { code: "forfaits",   label: "Forfaits",  emoji: "📶" },
     { code: "telephones", label: "Téléphones",emoji: "📲" },
     { code: "mcafee",     label: "McAfee",    emoji: "🛡️" },
     { code: "assurance",  label: "Assurance", emoji: "✅" },

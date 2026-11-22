@@ -40,8 +40,8 @@ const CHAMPS_RYTHME: (keyof VenteConseiller)[] = [
 
 // Objectifs qui comptent dans la variable (nom de mission → emoji / libellé).
 const OBJECTIFS_VARIABLE: { produit: string; emoji: string; libelle: (n: number) => string }[] = [
-    { produit: "Box", emoji: "📦", libelle: () => "box" },
-    { produit: "Forfaits", emoji: "📱", libelle: (n) => `forfait${n > 1 ? "s" : ""}` },
+    { produit: "Box", emoji: "💻", libelle: () => "box" },
+    { produit: "Forfaits", emoji: "📶", libelle: (n) => `forfait${n > 1 ? "s" : ""}` },
     { produit: "Téléphones", emoji: "📲", libelle: (n) => `smartphone${n > 1 ? "s" : ""}` },
     { produit: "Assurance", emoji: "🛡️", libelle: (n) => `assurance${n > 1 ? "s" : ""}` },
     { produit: "Assurance Essentielle", emoji: "🧩", libelle: (n) => `assurance${n > 1 ? "s" : ""} essentielle${n > 1 ? "s" : ""}` },

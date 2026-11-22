@@ -4,7 +4,7 @@ import type { ProduitCode } from "@/utils/produits";
 export type ComboCode = "mcafee_mobile" | "assurance_essentielle" | "canal_plus";
 
 export const COMBO_META: Record<ComboCode, { label: string; emoji: string }> = {
-    mcafee_mobile: { label: "McAfee Mobile", emoji: "📶" },
+    mcafee_mobile: { label: "McAfee Mobile", emoji: "🔐" },
     assurance_essentielle: { label: "Assurance Ess.", emoji: "🧩" },
     canal_plus: { label: "Canal+", emoji: "📺" },
 };

@@ -17,7 +17,7 @@ export default function BadgeCenter() {
     },
     {
       id: "badge-box",
-      emoji: "📦",
+      emoji: "💻",
       titre: "Expert Box",
       description: "Badge lie aux ventes Box.",
       active: true,

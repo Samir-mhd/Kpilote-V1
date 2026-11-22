@@ -124,13 +124,13 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="mb-5 flex items-center justify-between">
-                    <h3 className="text-lg font-black text-white">📱💻🛡️✅ Vente combo</h3>
+                    <h3 className="text-lg font-black text-white">🎁 Vente combo</h3>
                     <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/60 hover:bg-white/20">✕</button>
                 </div>
                 <p className="mb-5 text-xs text-white/40">Coche tout ce qui fait partie de cette même vente — chaque item crédite sa carte et ta cagnotte.</p>
 
                 <div className="space-y-5">
-                    {voir("box") && <Groupe titre="📦 Box">
+                    {voir("box") && <Groupe titre="💻 Box">
                         {boxOptions.map((o) => (
                             <Puce key={o.cle} actif={s.box === o.cle} onClick={() => setS((p) => ({ ...p, box: p.box === o.cle ? null : o.cle, canal: p.box === o.cle ? p.canal : (o.cle === "box_ultra" ? p.canal : null) }))}>
                                 {o.label} · {fmtEuro(o.montant)}
@@ -159,7 +159,7 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
                         </Groupe>
                     )}
 
-                    {voir("forfaits") && <Groupe titre="📱 Forfait">
+                    {voir("forfaits") && <Groupe titre="📶 Forfait">
                         {forfaitOptions.map((o) => (
                             <Puce key={o.cle} actif={s.forfait === o.cle} onClick={() => setS((p) => ({ ...p, forfait: p.forfait === o.cle ? null : o.cle }))}>
                                 {o.label} · {fmtEuro(o.montant)}
@@ -200,7 +200,7 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
                     </Groupe>}
 
                     {bonusMcafeeMobile.length > 0 && (voir("mcafee") || voir("forfaits")) && (
-                        <Groupe titre="📶 McAfee Mobile">
+                        <Groupe titre="🔐 McAfee Mobile">
                             {bonusMcafeeMobile.map((b) => (
                                 <Puce key={b.id} actif={s.mcafeeMobileId === b.id} onClick={() => setS((p) => ({ ...p, mcafeeMobileId: p.mcafeeMobileId === b.id ? null : b.id }))}>
                                     {b.label}

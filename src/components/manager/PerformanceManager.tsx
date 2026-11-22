@@ -31,12 +31,12 @@ export default function PerformanceManager({
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
 
         <StatBadge
-          label="📦 Box"
+          label="💻 Box"
           value={champion.box}
         />
 
         <StatBadge
-          label="📱 Forfaits"
+          label="📶 Forfaits"
           value={champion.forfaits}
         />
 

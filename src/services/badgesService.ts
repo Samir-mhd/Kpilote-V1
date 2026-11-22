@@ -60,7 +60,7 @@ export const PRODUIT_BADGES: Badge[] = Object.entries(PALIERS_PRODUIT).flatMap((
 
 export const BOX_BADGES: Badge[] = [
     { code: "box_premier", label: "Premier raccordement", emoji: "🔌", de: "#a7f3d0", a: "#059669", description: "1ère box raccordée avec succès" },
-    { code: "box_closer", label: "Closer Box", emoji: "📦", de: "#93c5fd", a: "#2563eb", description: "10 box raccordées cumulées" },
+    { code: "box_closer", label: "Closer Box", emoji: "💻", de: "#93c5fd", a: "#2563eb", description: "10 box raccordées cumulées" },
     { code: "box_sans_faute", label: "Sans faute", emoji: "🛡️", de: "#fecaca", a: "#dc2626", description: "0 box perdue sur les 3 derniers mois clôturés" },
     { code: "box_roi_4p", label: "Roi du 4P", labelF: "Reine du 4P", emoji: "👑", de: "#ddd6fe", a: "#7c3aed", description: "25 abonnés 4P cumulés (box + forfait)" },
 ];

@@ -43,7 +43,7 @@ export function CompositionVariable({
     const cb = contributionBox;
     const familles: Famille[] = [
         {
-            id: "forfaits", emoji: "📱", titre: "Forfaits", provenance: "vendus ce mois-ci", lignes: [
+            id: "forfaits", emoji: "📶", titre: "Forfaits", provenance: "vendus ce mois-ci", lignes: [
                 { label: ventes ? `Prime forfait — ${ventes.forfait_free_serie} Free / Série Free · ${ventes.forfait_free_max} Free Max` : "Prime forfait", montant: detail.prime_forfait },
                 { label: "Boost individuel forfait", montant: detail.boost_individuel_forfait },
                 { label: "Boost collectif forfait", montant: detail.boost_collectif_forfait },
@@ -58,7 +58,7 @@ export function CompositionVariable({
             ],
         },
         {
-            id: "box", emoji: "📦", titre: "Box", provenance: `vendues en ${nomMois(moisVenteBox)}, raccordées`, lignes: [
+            id: "box", emoji: "💻", titre: "Box", provenance: `vendues en ${nomMois(moisVenteBox)}, raccordées`, lignes: [
                 { label: `${cb?.nbRaccordees ? `${cb.nbRaccordees} box raccordées` : "Box raccordées"}`, montant: cb?.primeBox ?? 0 },
                 { label: "Boost individuel box", montant: cb?.boostIndividuel ?? 0 },
                 { label: "Prime box (déclarée)", montant: detail.prime_box },
@@ -211,7 +211,7 @@ export function DejaEnRoute({ conseillerId, mois, bareme }: { conseillerId: stri
                         <span className="font-black tabular-nums text-slate-900">{fmtEuro(data.assurance)}</span>
                     </li>
                     <li className="flex justify-between gap-3 rounded-xl bg-white/70 px-3 py-2">
-                        <span className="text-slate-600">📦 {data.nbBox} box déjà raccordée{data.nbBox > 1 ? "s" : ""} <span className="text-slate-400">· payé en {m2}</span></span>
+                        <span className="text-slate-600">💻 {data.nbBox} box déjà raccordée{data.nbBox > 1 ? "s" : ""} <span className="text-slate-400">· payé en {m2}</span></span>
                         <span className="font-black tabular-nums text-slate-900">{fmtEuro(data.box)}</span>
                     </li>
                     {data.quatreP > 0 && (

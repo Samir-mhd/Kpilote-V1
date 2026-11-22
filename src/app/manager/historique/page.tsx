@@ -32,7 +32,7 @@ const HEATMAP_COLORS = [
 ];
 
 const PROD_EMOJI: Record<string, string> = {
-    box: "📦", forfait: "📱", forfaits: "📱",
+    box: "💻", forfait: "📶", forfaits: "📶",
     mcafee: "🛡️", assurance: "🔐", téléphone: "📲", telephone: "📲",
 };
 

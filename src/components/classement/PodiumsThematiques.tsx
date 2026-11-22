@@ -84,8 +84,8 @@ export default function PodiumsThematiques({ conseillerId }: { conseillerId: str
             unite: () => "art./vente",
             valeurs: stats.filter((s) => s.total >= 10).map((s) => ({ id: s.id, valeur: Math.round(s.moyenneArticles * 100) / 100 })),
         },
-        { id: "box", emoji: "📦", titre: "Box", sousTitre: "Le plus de box", unite: () => "box", valeurs: stats.map((s) => ({ id: s.id, valeur: s.produits.box ?? 0 })) },
-        { id: "forfaits", emoji: "📱", titre: "Forfaits", sousTitre: "Le plus de forfaits", unite: pl("forfait"), valeurs: stats.map((s) => ({ id: s.id, valeur: s.produits.forfaits ?? 0 })) },
+        { id: "box", emoji: "💻", titre: "Box", sousTitre: "Le plus de box", unite: () => "box", valeurs: stats.map((s) => ({ id: s.id, valeur: s.produits.box ?? 0 })) },
+        { id: "forfaits", emoji: "📶", titre: "Forfaits", sousTitre: "Le plus de forfaits", unite: pl("forfait"), valeurs: stats.map((s) => ({ id: s.id, valeur: s.produits.forfaits ?? 0 })) },
         { id: "telephones", emoji: "📲", titre: "Téléphones", sousTitre: "Le plus de téléphones", unite: pl("téléphone"), valeurs: stats.map((s) => ({ id: s.id, valeur: s.produits.telephones ?? 0 })) },
         { id: "avis", emoji: "⭐", titre: "Avis Google", sousTitre: "Le plus d'avis récoltés", unite: () => "avis", valeurs: stats.map((s) => ({ id: s.id, valeur: s.produits.avis_google ?? 0 })) },
     ];

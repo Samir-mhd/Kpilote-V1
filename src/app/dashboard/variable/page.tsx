@@ -259,7 +259,7 @@ function VariableInner() {
                                 onClick={() => setOnglet("box")}
                                 className={`rounded-2xl px-4 py-2.5 text-sm font-bold transition-all ${onglet === "box" ? "bg-white text-slate-900" : "bg-white/8 text-white/60 hover:bg-white/15"}`}
                             >
-                                📦 Mes box
+                                💻 Mes box
                             </button>
                             <button
                                 onClick={() => setOnglet("historique")}

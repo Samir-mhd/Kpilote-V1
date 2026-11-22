@@ -49,11 +49,11 @@ export default function ClassementManager({
 
                 <p className="text-slate-500 mt-1">
 
-                  📦 {conseiller.box}
+                  💻 {conseiller.box}
 
                   {" • "}
 
-                  📱 {conseiller.forfaits}
+                  📶 {conseiller.forfaits}
 
                   {" • "}
 

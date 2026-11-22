@@ -219,7 +219,7 @@ export default function BadgesManagerPage() {
             <Section titre="📅 Semaines produit parfaites" badges={[...PRODUIT_STREAK_BADGES, ...ext("semaines")]} parBadge={parBadge} photos={photos} />
             <Section titre="🎯 Jours parfaits" badges={[...JOUR_PARFAIT_BADGES, SEMAINE_PARFAITE_BADGE, ...ext("jours")]} parBadge={parBadge} photos={photos} />
             <Section titre="🏅 Maîtrise produit" badges={produitAffiches} parBadge={parBadge} photos={photos} />
-            <Section titre="📦 Box & 4P" badges={[...BOX_BADGES, ...ext("box")]} parBadge={parBadge} photos={photos} />
+            <Section titre="💻 Box & 4P" badges={[...BOX_BADGES, ...ext("box")]} parBadge={parBadge} photos={photos} />
             <Section titre="🎯 Défis du jour" badges={[...DEFI_JOUR_BADGES, ...ext("defisjour")]} parBadge={parBadge} photos={photos} />
             <p className="text-xs text-slate-400">👻 Cartes secrètes : invisibles pour le conseiller tant que la dernière carte de leur groupe n&apos;est pas validée.</p>
         </main>

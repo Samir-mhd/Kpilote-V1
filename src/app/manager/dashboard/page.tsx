@@ -25,7 +25,7 @@ function jourStr(d: Date): string {
 // McAfee Mobile / Assurance essentielle / Canal+ : ventes combo, pas de ligne dans `ventes`
 // (voir services/variableConseiller.ts getRealiseVentesCombo) — traités à part de PRODUITS_CLASSEMENT.
 const ITEMS_COMBO = [
-    { code: "mcafee_mobile", label: "McAfee Mobile", emoji: "📶" },
+    { code: "mcafee_mobile", label: "McAfee Mobile", emoji: "🔐" },
     { code: "assurance_essentielle", label: "Assurance Essentielle", emoji: "🧩" },
     { code: "canal_plus", label: "Canal+", emoji: "📺" },
 ] as const;

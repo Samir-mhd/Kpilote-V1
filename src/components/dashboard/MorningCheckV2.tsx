@@ -335,7 +335,7 @@ export default function MorningCheckV2({ nom, conseillerId, isReset = false, onV
                                     {aRelancer.length === 0 && <p className="text-sm text-white/50">Tout a été vendu ces derniers jours 👏</p>}
                                     {briefing?.boxUrgentes && (
                                         <div className="rounded-xl bg-rose-500/10 px-3 py-2 ring-1 ring-rose-400/25">
-                                            <p className="text-sm font-black text-rose-100">📦 {briefing.boxUrgentes.nb} box à raccorder <span className="ml-1 rounded bg-rose-500/25 px-1.5 text-[11px]">J-{briefing.boxUrgentes.jours}</span></p>
+                                            <p className="text-sm font-black text-rose-100">💻 {briefing.boxUrgentes.nb} box à raccorder <span className="ml-1 rounded bg-rose-500/25 px-1.5 text-[11px]">J-{briefing.boxUrgentes.jours}</span></p>
                                             <p className="text-[11px] text-rose-200/70">Avant le {briefing.boxUrgentes.limite.toLocaleDateString("fr-FR")}, sinon non payées.</p>
                                         </div>
                                     )}

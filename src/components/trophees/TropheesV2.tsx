@@ -105,7 +105,7 @@ export default function TropheesV2({ conseillerId, info, etat }: { conseillerId:
                 extensions("semaines", code), PRODUIT_STREAK_BADGES[i].label)),
         },
         {
-            id: "box", titre: "📦 Box & 4P", cols: 6,
+            id: "box", titre: "💻 Box & 4P", cols: 6,
             regles: "Basé sur ton suivi « Mes box » : raccordements, volume de box raccordées, aucune box perdue sur 3 mois clôturés, abonnés 4P cumulés (box + forfait).",
             groupes: [groupe("box", [
                 { badge: BOX_BADGES[0], obtenuLe: d["box_premier"], valeur: etat.nbBoxRaccordees, seuil: 1, nouveau: nouveau("box_premier") },

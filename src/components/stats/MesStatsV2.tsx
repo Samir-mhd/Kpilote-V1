@@ -22,12 +22,12 @@ const HEURES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
 const HEAT = ["bg-slate-100 text-slate-300", "bg-violet-100 text-violet-500", "bg-violet-300 text-violet-800", "bg-violet-500 text-white", "bg-violet-700 text-white"];
 
 const PRODUITS: { code: string; label: string; emoji: string }[] = [
-    { code: "box", label: "Box", emoji: "📦" },
-    { code: "forfaits", label: "Forfaits", emoji: "📱" },
+    { code: "box", label: "Box", emoji: "💻" },
+    { code: "forfaits", label: "Forfaits", emoji: "📶" },
     { code: "telephones", label: "Téléphones", emoji: "📲" },
     { code: "mcafee", label: "McAfee", emoji: "🛡️" },
     { code: "assurance", label: "Assurance", emoji: "✅" },
-    { code: "mcafee_mobile", label: "McAfee Mobile", emoji: "📶" },
+    { code: "mcafee_mobile", label: "McAfee Mobile", emoji: "🔐" },
     { code: "assurance_essentielle", label: "Assurance Ess.", emoji: "🧩" },
     { code: "canal_plus", label: "Canal+", emoji: "📺" },
 ];

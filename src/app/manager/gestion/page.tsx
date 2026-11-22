@@ -602,7 +602,7 @@ export default function GestionEquipePage() {
                                 }`}
                             >
                                 <div className="flex items-start gap-3">
-                                    <span className="text-2xl">📦</span>
+                                    <span className="text-2xl">💻</span>
                                     <div>
                                         <p className="font-black text-slate-800">Conserver l'historique</p>
                                         <p className="mt-1 text-xs text-slate-500">
