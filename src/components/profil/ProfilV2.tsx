@@ -262,8 +262,8 @@ export default function ProfilV2({ conseillerId, nom }: { conseillerId: string; 
                                             <span aria-hidden="true">{p.emoji}</span> {p.nombre} <span className="font-semibold text-slate-400">{p.label}</span>
                                         </span>
                                     ))}
-                                    {recap.combos.mcafee_mobile > 0 && <span className="rounded-xl bg-white px-3 py-1.5 text-sm font-black text-slate-800 ring-1 ring-slate-200">🛡️ {recap.combos.mcafee_mobile} <span className="font-semibold text-slate-400">McAfee Mobile</span></span>}
-                                    {recap.combos.assurance_essentielle > 0 && <span className="rounded-xl bg-white px-3 py-1.5 text-sm font-black text-slate-800 ring-1 ring-slate-200">✅ {recap.combos.assurance_essentielle} <span className="font-semibold text-slate-400">Assu. essentielle</span></span>}
+                                    {recap.combos.mcafee_mobile > 0 && <span className="rounded-xl bg-white px-3 py-1.5 text-sm font-black text-slate-800 ring-1 ring-slate-200">🔐 {recap.combos.mcafee_mobile} <span className="font-semibold text-slate-400">McAfee Mobile</span></span>}
+                                    {recap.combos.assurance_essentielle > 0 && <span className="rounded-xl bg-white px-3 py-1.5 text-sm font-black text-slate-800 ring-1 ring-slate-200">⛑️ {recap.combos.assurance_essentielle} <span className="font-semibold text-slate-400">Assu. essentielle</span></span>}
                                     {recap.combos.canal_plus > 0 && <span className="rounded-xl bg-white px-3 py-1.5 text-sm font-black text-slate-800 ring-1 ring-slate-200">📺 {recap.combos.canal_plus} <span className="font-semibold text-slate-400">Canal+</span></span>}
                                 </div>
 

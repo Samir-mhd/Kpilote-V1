@@ -65,7 +65,7 @@ export default function ClassementManager({
 
                   {" • "}
 
-                  ✅ {conseiller.assurance}
+                  🛟 {conseiller.assurance}
 
                 </p>
 

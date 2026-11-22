@@ -7,7 +7,7 @@ import { getCoeffAvisGoogle } from "@/services/avisGoogleConfig";
 import { getRealiseVentesComboMoisCourant, getRealiseVentesCombo, RealiseVentesCombo } from "@/services/variableConseiller";
 import { calculerObjectifs, EtatObjectif } from "@/engine/objectifEngine";
 import { periodeSemaineEffective } from "@/utils/periodes";
-import { PRODUITS_ORDRE, COMBOS_DANS_TOTAL, type ProduitCode } from "@/utils/produits";
+import { PRODUITS_ORDRE, type ProduitCode } from "@/utils/produits";
 import { supabase } from "@/lib/supabase";
 
 /** McAfee Mobile, Assurance essentielle, Canal+ : pas de ligne dans `ventes` (déclarés via les
@@ -140,7 +140,9 @@ async function calcul(
  */
 /** avecCombos : ajoute McAfee Mobile et Assurance essentielle (marqués sansCarte) pour qu'ils
  *  comptent dans les totaux "actes du jour" de l'Accueil, sans avoir de carte. */
-export async function getMissionsReelles(conseillerId: string, avecCombos = false) {
+/** avecCanal (Accueil uniquement) : ajoute aussi Canal+ (sansCarte + horsTotal : affiché dans les
+ *  objectifs du jour, jamais compté dans les actes du jour). */
+export async function getMissionsReelles(conseillerId: string, avecCombos = false, avecCanal = false) {
     const now   = new Date();
     const annee = now.getFullYear();
     const mois  = now.getMonth() + 1;
@@ -152,7 +154,7 @@ export async function getMissionsReelles(conseillerId: string, avecCombos = fals
     const [resultats, ventesJour, objSemaineParConseiller, ventesSemaine, joursRestantsSemaine, planifieAujourdhui, comboJour, comboSemaine] = await Promise.all([
         // Ventes combo : jamais de carte sur l'Accueil. Avec avecCombos, McAfee Mobile et Assurance
         // essentielle sont calculés (pour les totaux) ; Canal+ reste toujours exclu.
-        calcul(conseillerId, annee, mois, getVentesDuMois, avecCombos ? ["canal_plus"] : CODES_VENTES_COMBO),
+        calcul(conseillerId, annee, mois, getVentesDuMois, avecCombos ? (avecCanal ? [] : ["canal_plus"]) : CODES_VENTES_COMBO),
         getVentesDuJour(conseillerId),
         getObjectifsSemaineFiges([conseillerId], debut, fin),
         getVentesDepuisLundi(conseillerId, debut),
@@ -179,8 +181,8 @@ export async function getMissionsReelles(conseillerId: string, avecCombos = fals
     });
 
     // Ventes combo : réalisé lu dans variable_actes_jour (pas de ligne dans la table ventes).
-    if (comboJour) COMBOS_DANS_TOTAL.forEach((c) => { realiseJour[c] = comboJour[c] ?? 0; });
-    if (comboSemaine) COMBOS_DANS_TOTAL.forEach((c) => { realiseSemaine[c] = comboSemaine[c] ?? 0; });
+    if (comboJour) CODES_VENTES_COMBO.forEach((c) => { realiseJour[c] = comboJour[c] ?? 0; });
+    if (comboSemaine) CODES_VENTES_COMBO.forEach((c) => { realiseSemaine[c] = comboSemaine[c] ?? 0; });
 
     const objSemaine = objSemaineParConseiller[conseillerId] ?? {};
 
@@ -213,7 +215,9 @@ export async function getMissionsReelles(conseillerId: string, avecCombos = fals
             // Reste de la semaine figée entièrement compressé sur aujourd'hui — le jour suivant
             // appartient à une autre semaine figée (recalcul indépendant), pas de lissage possible.
             dernierJourSemaine: joursRestantsSemaine === 1,
-            sansCarte: (COMBOS_DANS_TOTAL as readonly string[]).includes(code),
+            sansCarte: (CODES_VENTES_COMBO as readonly string[]).includes(code),
+            // Canal+ : objectif affiché, mais pas un acte commercial du total.
+            horsTotal: code === "canal_plus",
         };
     });
 }

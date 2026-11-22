@@ -209,7 +209,7 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
                         </Groupe>
                     )}
 
-                    {voir("assurance") && <Groupe titre="✅ Assurance">
+                    {voir("assurance") && <Groupe titre="🛟 Assurance">
                         <Puce actif={s.assurance === "nouveau_mobile"} onClick={() => setS((p) => ({ ...p, assurance: p.assurance === "nouveau_mobile" ? null : "nouveau_mobile" }))}>
                             Nouveau Mobile · {fmtEuro(bareme.assurance_nouveau_mobile)}
                         </Puce>

@@ -72,7 +72,7 @@ export function CompositionVariable({
             ],
         },
         {
-            id: "assurances", emoji: "🛡️", titre: "Assurances", provenance: `vendues en ${nomMois(moisVenteAssurance)}`, lignes: [
+            id: "assurances", emoji: "🛟", titre: "Assurances", provenance: `vendues en ${nomMois(moisVenteAssurance)}`, lignes: [
                 { label: `Nouveau Mobile${contributionAssurance?.nbNouveauMobile ? ` — ${contributionAssurance.nbNouveauMobile}` : ""}`, montant: contributionAssurance?.montantNouveauMobile ?? 0 },
                 { label: `Essentielle${contributionAssurance?.nbEssentielle ? ` — ${contributionAssurance.nbEssentielle}` : ""}`, montant: contributionAssurance?.montantEssentielle ?? 0 },
                 { label: "Assurance (déclarée)", montant: detail.prime_assurance },
@@ -207,7 +207,7 @@ export function DejaEnRoute({ conseillerId, mois, bareme }: { conseillerId: stri
             {data && (
                 <ul className="mt-3 space-y-2 text-sm">
                     <li className="flex justify-between gap-3 rounded-xl bg-white/70 px-3 py-2">
-                        <span className="text-slate-600">🛡️ {data.nbAssurance} assurance{data.nbAssurance > 1 ? "s" : ""} <span className="text-slate-400">· payé en {m1}</span></span>
+                        <span className="text-slate-600">🛟 {data.nbAssurance} assurance{data.nbAssurance > 1 ? "s" : ""} <span className="text-slate-400">· payé en {m1}</span></span>
                         <span className="font-black tabular-nums text-slate-900">{fmtEuro(data.assurance)}</span>
                     </li>
                     <li className="flex justify-between gap-3 rounded-xl bg-white/70 px-3 py-2">

@@ -5,7 +5,7 @@ import { toBlob } from "html-to-image";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
 import { getBilanSoir, PerfBilan, CODES_ACTES_BILAN, CODES_SUIVI_BILAN } from "@/services/bilanSoirService";
 
-const EMOJI: Record<string, string> = { box: "💻", forfaits: "📶", telephones: "📲", mcafee: "🛡️", assurance: "✅", avis_google: "⭐", recap_commercial: "📋", mcafee_mobile: "🔐", assurance_essentielle: "🧩" };
+const EMOJI: Record<string, string> = { box: "💻", forfaits: "📶", telephones: "📲", mcafee: "🛡️", assurance: "🛟", avis_google: "⭐", recap_commercial: "📋", mcafee_mobile: "🔐", assurance_essentielle: "⛑️" };
 const NOM: Record<string, [string, string]> = {
     box: ["Box", "Box"], forfaits: ["Forfait", "Forfaits"], telephones: ["Téléphone", "Téléphones"], mcafee: ["McAfee", "McAfee"],
     assurance: ["Assurance", "Assurances"], mcafee_mobile: ["McAfee Mobile", "McAfee Mobile"],

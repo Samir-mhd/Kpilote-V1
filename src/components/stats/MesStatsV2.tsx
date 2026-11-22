@@ -26,9 +26,9 @@ const PRODUITS: { code: string; label: string; emoji: string }[] = [
     { code: "forfaits", label: "Forfaits", emoji: "📶" },
     { code: "telephones", label: "Téléphones", emoji: "📲" },
     { code: "mcafee", label: "McAfee", emoji: "🛡️" },
-    { code: "assurance", label: "Assurance", emoji: "✅" },
+    { code: "assurance", label: "Assurance", emoji: "🛟" },
     { code: "mcafee_mobile", label: "McAfee Mobile", emoji: "🔐" },
-    { code: "assurance_essentielle", label: "Assurance Ess.", emoji: "🧩" },
+    { code: "assurance_essentielle", label: "Assurance Ess.", emoji: "⛑️" },
     { code: "canal_plus", label: "Canal+", emoji: "📺" },
 ];
 // Comptés dans les actes (comme le classement). Canal+ : affiché par produit, hors total d'actes.

@@ -51,7 +51,7 @@ export default function PerformanceManager({
         />
 
         <StatBadge
-          label="✅ Assurance"
+          label="🛟 Assurance"
           value={champion.assurance}
         />
 

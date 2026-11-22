@@ -43,8 +43,8 @@ const OBJECTIFS_VARIABLE: { produit: string; emoji: string; libelle: (n: number)
     { produit: "Box", emoji: "💻", libelle: () => "box" },
     { produit: "Forfaits", emoji: "📶", libelle: (n) => `forfait${n > 1 ? "s" : ""}` },
     { produit: "Téléphones", emoji: "📲", libelle: (n) => `smartphone${n > 1 ? "s" : ""}` },
-    { produit: "Assurance", emoji: "🛡️", libelle: (n) => `assurance${n > 1 ? "s" : ""}` },
-    { produit: "Assurance Essentielle", emoji: "🧩", libelle: (n) => `assurance${n > 1 ? "s" : ""} essentielle${n > 1 ? "s" : ""}` },
+    { produit: "Assurance", emoji: "🛟", libelle: (n) => `assurance${n > 1 ? "s" : ""}` },
+    { produit: "Assurance Essentielle", emoji: "⛑️", libelle: (n) => `assurance${n > 1 ? "s" : ""} essentielle${n > 1 ? "s" : ""}` },
     { produit: "McAfee", emoji: "🔒", libelle: () => "McAfee" },
 ];
 

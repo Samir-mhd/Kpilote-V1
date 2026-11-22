@@ -12,7 +12,7 @@ const PRODUITS = [
     { code: "forfaits",   label: "Forfaits",  emoji: "📶" },
     { code: "telephones", label: "Téléphones",emoji: "📲" },
     { code: "mcafee",     label: "McAfee",    emoji: "🛡️" },
-    { code: "assurance",  label: "Assurance", emoji: "✅" },
+    { code: "assurance",  label: "Assurance", emoji: "🛟" },
 ];
 
 type Etape = "formulaire" | "confirmation" | "succes";

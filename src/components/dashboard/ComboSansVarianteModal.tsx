@@ -22,7 +22,7 @@ const ITEMS: { cle: keyof ComboSansVarianteSelection; label: string; emoji: stri
     { cle: "telephone", label: "Téléphone", emoji: "📲" },
     { cle: "mcafee", label: "McAfee", emoji: "🛡️" },
     { cle: "mcafeeMobile", label: "McAfee Mobile", emoji: "🔐" },
-    { cle: "assurance", label: "Assurance", emoji: "✅" },
+    { cle: "assurance", label: "Assurance", emoji: "🛟" },
     { cle: "canal", label: "Canal+", emoji: "📺" },
 ];
 

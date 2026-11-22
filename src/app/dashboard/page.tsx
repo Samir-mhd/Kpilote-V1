@@ -57,7 +57,8 @@ const MANAGER_UUID = "00000000-0000-0000-0000-000000000001";
 const PRODUITS_COMBO = ["box", "forfaits", "telephones", "mcafee", "assurance"];
 const NOMS_ACTES: Record<string, string> = { "Téléphones": "Téléphone", "Forfaits": "Forfait" };
 function nomActe(produit: string): string { return NOMS_ACTES[produit] ?? produit; }
-function emojiProduit(produit: string): string { return PRODUITS_ORDRE.find((p) => p.label === produit)?.emoji ?? "•"; }
+const EMOJIS_COMBO: Record<string, string> = { "McAfee Mobile": "🔐", "Assurance Essentielle": "⛑️", "Canal+": "📺" };
+function emojiProduit(produit: string): string { return PRODUITS_ORDRE.find((p) => p.label === produit)?.emoji ?? EMOJIS_COMBO[produit] ?? "•"; }
 function libellePlusUn(produit: string): string {
     const n = produit.toLowerCase();
     if (n === "spiderhome") return "+1 historisation";
@@ -67,7 +68,7 @@ function libellePlusUn(produit: string): string {
 }
 
 // Ordre par défaut des cartes Accueil (personnalisable par chaque conseiller depuis Profil).
-const ORDRE_ACCUEIL_DEFAUT = ["box", "mcafee", "telephones", "assurance", "forfaits", "avis_google", "recap_commercial", "spiderhome"];
+const ORDRE_ACCUEIL_DEFAUT = ["box", "mcafee", "telephones", "assurance", "forfaits", "avis_google", "recap_commercial", "spiderhome", "mcafee_mobile", "assurance_essentielle", "canal_plus"];
 
 type MissionDashboard = {
     produit: string;
@@ -78,6 +79,8 @@ type MissionDashboard = {
     dernierJourSemaine?: boolean;
     /** McAfee Mobile / Assurance essentielle : comptés dans les actes du jour, sans carte. */
     sansCarte?: boolean;
+    /** Canal+ : affiché dans les objectifs du jour, hors total des actes. */
+    horsTotal?: boolean;
 };
 
 /** Date locale au format YYYY-MM-DD (pas UTC — important pour les fuseaux horaires). */
@@ -252,7 +255,7 @@ export default function Dashboard() {
 
     async function chargerMissions() {
         if (!conseillerId) return;
-        const data = await getMissionsReelles(conseillerId, true);
+        const data = await getMissionsReelles(conseillerId, true, true);
         setMissions(data);
 
         // Borne de départ = heure du cerebro check (après validation), pas minuit
@@ -498,7 +501,7 @@ export default function Dashboard() {
             .filter((b) => b.categorie === "autres_primes" && normaliser(b.label).includes("mcafee"))
             .map((b) => b.id)
     );
-    const missionsCommerciales = missions.filter((m) => !estHistorisation(m.produit));
+    const missionsCommerciales = missions.filter((m) => !estHistorisation(m.produit) && !m.horsTotal);
     const realiseGlobal = missionsCommerciales.reduce((t, m) => t + m.realise, 0);
     const objectifGlobal = missionsCommerciales.reduce((t, m) => t + m.objectif, 0);
     const tauxGlobal = objectifGlobal > 0 ? Math.round((realiseGlobal / objectifGlobal) * 100) : 0;
@@ -671,7 +674,7 @@ export default function Dashboard() {
     }
 
     function produitCode(nom: string): string {
-        return PRODUITS_ORDRE.find((p) => p.label === nom)?.code ?? normaliser(nom).replace(/ /g, "_");
+        return PRODUITS_ORDRE.find((p) => p.label === nom)?.code ?? normaliser(nom).replace(/\+/g, " plus").replace(/ /g, "_");
     }
 
     // Ordre par défaut des cartes Accueil : Box - McAfee / Téléphones - Assurance / Forfaits - Avis Google - Spiderhome
@@ -721,7 +724,7 @@ export default function Dashboard() {
         if (n === "forfaits" && !champMasque("assurance_essentielle")) {
             questions.push({
                 id: "assurance_essentielle",
-                emoji: "🛡️",
+                emoji: "⛑️",
                 question: "As-tu vendu une assurance essentielle ?",
                 options: [{ label: "Assurance essentielle", montant: bareme.assurance_essentielle, champ: "assurance_essentielle" }],
             });
@@ -892,7 +895,7 @@ export default function Dashboard() {
 
     // Cartes objectifs — partagées par les deux mises en page (seul l'affichage change en compact).
     function cartesMissions(compact: boolean, anneau = false) {
-        return ordonnerAccueil(missions.filter((m) => !m.sansCarte)).map((mission) => (
+        return ordonnerAccueil(missions.filter((m) => anneau || !m.sansCarte)).map((mission) => (
             <MissionCard
                 key={mission.produit}
                 compact={compact}
@@ -1350,7 +1353,7 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 {(() => {
-                                    const cartes = missions.filter((m) => !m.sansCarte && m.objectif > 0);
+                                    const cartes = missions.filter((m) => m.objectif > 0);
                                     const atteints = cartes.filter((m) => m.realise >= m.objectif).length;
                                     return cartes.length > 0 ? (
                                         <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">{atteints} / {cartes.length} atteints</span>

@@ -6,7 +6,7 @@ import { getMissionsReelles, codeDepuisNom } from "@/services/missionsReelles";
 import { CODES_ACTES_BILAN, CODES_SUIVI_BILAN } from "@/services/bilanSoirService";
 import { marquerJourneeValidee } from "@/services/resetService";
 
-const EMOJI: Record<string, string> = { box: "💻", forfaits: "📶", telephones: "📲", mcafee: "🛡️", assurance: "✅", avis_google: "⭐", recap_commercial: "📋", mcafee_mobile: "🔐", assurance_essentielle: "🧩" };
+const EMOJI: Record<string, string> = { box: "💻", forfaits: "📶", telephones: "📲", mcafee: "🛡️", assurance: "🛟", avis_google: "⭐", recap_commercial: "📋", mcafee_mobile: "🔐", assurance_essentielle: "⛑️" };
 const CODES = [...CODES_ACTES_BILAN, ...CODES_SUIVI_BILAN] as string[];
 
 /** Fin de journée : le conseiller confirme ses ventes du jour puis est déconnecté (retour à l'accueil).
