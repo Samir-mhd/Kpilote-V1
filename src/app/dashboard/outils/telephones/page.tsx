@@ -250,7 +250,10 @@ export default function ComparateurTelephonesPage() {
                                                             tél. {eur(f.mensuel)}{forfait > 0 && <> + forfait {eur(forfait)}</>}{assurance && assuranceDe(v) && <> + assurance {eur(assuranceDe(v)!.prix)}</>}
                                                         </p>
                                                     )}
-                                                    <p className="text-[11px] font-semibold text-slate-600">{eur(f.premierLoyer)} au départ</p>
+                                                    <p className="text-[11px] font-semibold text-slate-600">
+                                                        {eur(f.premierLoyer)} au départ
+                                                        {f.optionAchat != null && <> · option d&apos;achat {eur(f.optionAchat)}</>}
+                                                    </p>
                                                 </>
                                             ) : <p className="text-sm font-bold text-slate-400">Non disponible</p>}
                                         </div>
