@@ -407,10 +407,6 @@ function Comparaison({ tels, variantes, profil, setProfil, options, setProtectio
                 <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                         <h2 className="text-xl font-black text-white sm:text-2xl">{seul ? "Fiche téléphone" : `Comparaison de ${tels.length} modèles`}</h2>
-                        {/* Résumé discret des réglages actifs (le détail est derrière l’icône). */}
-                        <p className="truncate text-xs font-semibold text-white/70">
-                            {[profil === "abonne" ? "Déjà abonné" : "Nouveau client", options.forfait > 0 && `forfait ${eur(options.forfait)}`, options.assurance && "protection"].filter(Boolean).join(" · ")}
-                        </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                         <button
