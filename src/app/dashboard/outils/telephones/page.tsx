@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useEffect, useMemo, useState } from "react";
-import { Search, X, ExternalLink, Check, RefreshCw, Minus, Smartphone, Battery, Camera, Wifi } from "lucide-react";
+import { Search, X, ExternalLink, Check, RefreshCw, Minus, Smartphone, Battery, Camera, Wifi, SlidersHorizontal } from "lucide-react";
 import type { CatalogueTelephones, TelephoneFree, VarianteTel, PrixFlex } from "@/services/telephonesFreeService";
 
 type Profil = "prospect" | "abonne";
@@ -312,6 +312,7 @@ function Comparaison({ tels, variantes, profil, setProfil, options, setProtectio
     }, [onClose]);
 
     const seul = tels.length === 1;
+    const [reglages, setReglages] = useState(false);
     const avecOptions = options.forfait > 0 || options.assurance;
 
     const prix: Ligne[] = [
@@ -402,9 +403,30 @@ function Comparaison({ tels, variantes, profil, setProfil, options, setProtectio
 
     return (
         <div className="fixed inset-0 z-50 flex flex-col bg-slate-100">
-            <div className={`flex shrink-0 flex-wrap items-center justify-between gap-3 ${ROUGE} px-4 py-3 sm:px-8 sm:py-4`}>
-                <h2 className="text-xl font-black text-white sm:text-2xl">{seul ? "Fiche téléphone" : `Comparaison de ${tels.length} modèles`}</h2>
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className={`shrink-0 ${ROUGE} px-4 py-3 sm:px-8 sm:py-4`}>
+                <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                        <h2 className="text-xl font-black text-white sm:text-2xl">{seul ? "Fiche téléphone" : `Comparaison de ${tels.length} modèles`}</h2>
+                        {/* Résumé discret des réglages actifs (le détail est derrière l’icône). */}
+                        <p className="truncate text-xs font-semibold text-white/70">
+                            {[profil === "abonne" ? "Déjà abonné" : "Nouveau client", options.forfait > 0 && `forfait ${eur(options.forfait)}`, options.assurance && "protection"].filter(Boolean).join(" · ")}
+                        </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                        <button
+                            onClick={() => setReglages((o) => !o)}
+                            aria-expanded={reglages}
+                            aria-label={reglages ? "Masquer les réglages" : "Afficher les réglages"}
+                            title={reglages ? "Masquer les réglages" : "Afficher les réglages"}
+                            className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${reglages ? `bg-white ${ROUGE_TXT}` : "bg-white/15 text-white hover:bg-white/25"}`}
+                        >
+                            <SlidersHorizontal size={18} />
+                        </button>
+                        <button onClick={onClose} aria-label="Fermer" className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-white hover:bg-white/25"><X size={20} /></button>
+                    </div>
+                </div>
+                {reglages && (
+                    <div className="mt-3 flex flex-wrap items-center justify-end gap-2 sm:gap-3">
                     <select
                         value={options.forfait}
                         onChange={(e) => setForfait(Number(e.target.value))}
@@ -427,8 +449,8 @@ function Comparaison({ tels, variantes, profil, setProfil, options, setProtectio
                                 className={`rounded-lg px-3 py-1.5 text-xs font-black sm:px-4 sm:text-sm ${profil === p ? `bg-white ${ROUGE_TXT}` : "text-white/80"}`}>{l}</button>
                         ))}
                     </div>
-                    <button onClick={onClose} aria-label="Fermer" className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-white hover:bg-white/25"><X size={20} /></button>
-                </div>
+                    </div>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto">
