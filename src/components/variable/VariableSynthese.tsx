@@ -113,47 +113,62 @@ export default function VariableSynthese({ conseillerId, mois, ventes, boost, ba
 
     const nomDuMois = new Date(Number(mois.slice(0, 4)), Number(mois.slice(5, 7)) - 1, 1).toLocaleDateString("fr-FR", { month: "long" });
 
+    const totalObjectifs = scenario.ceMois + scenario.aVenir;
+    const pctAcquis = totalObjectifs > 0 ? Math.min(100, (acquis / totalObjectifs) * 100) : 0;
+    const pctRepere = totalObjectifs > 0 ? Math.min(100, (scenario.ceMois / totalObjectifs) * 100) : 0;
+
+    // Une seule jauge : acquis à ce jour → variable avec tous les objectifs atteints.
     return (
-        <section className="grid gap-4 lg:grid-cols-[1fr_1.25fr]">
-            {/* ── Acquis + rythme ───────────────────────────────────── */}
-            <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-violet-700 via-fuchsia-700 to-violet-900 p-6 text-white shadow-[0_20px_60px_rgba(124,58,237,.30)]">
-                <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
-                <div className="relative">
-                    <p className="text-xs font-black uppercase tracking-[0.3em] text-white/70">Ta variable de {nomDuMois}</p>
-                    <p className="mt-1 text-5xl font-black tabular-nums">{fmtEuro(acquis)}</p>
-                    <p className="mt-1 text-sm font-semibold text-white/70">acquis à ce jour</p>
-                </div>
-            </div>
-
-            {/* ── Objectifs atteints (mis en avant) ──────────────────── */}
-            <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-amber-300 via-amber-400 to-orange-500 p-6 text-amber-950 shadow-[0_20px_60px_rgba(245,158,11,.35)]">
-                <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/30 blur-3xl" />
-                <div className="relative">
-                    <p className="text-xs font-black uppercase tracking-[0.3em] text-amber-900/70">🎯 Avec tous tes objectifs atteints</p>
-                    <p className="mt-1 text-5xl font-black tabular-nums sm:text-6xl">{fmtEuro(scenario.ceMois + scenario.aVenir)}</p>
-                    <p className="mt-1 text-sm font-bold text-amber-900/80">
-                        {fmtEuro(scenario.ceMois)} en {nomDuMois}
-                        {scenario.aVenir > 0 && <> · +{fmtEuro(scenario.aVenir)} payés les mois suivants (box, assurances, McAfee)</>}
-                    </p>
-
-                    <div className="mt-5 rounded-2xl bg-white/45 p-4 ring-1 ring-white/50">
-                        <p className="text-[11px] font-black uppercase tracking-[0.15em] text-amber-900/70">
-                            {restants.length > 0 ? "Il te reste pour y arriver" : "Ce mois-ci"}
-                        </p>
-                        {!objectifsCharges ? (
-                            <p className="mt-1 text-sm font-semibold text-amber-900/70">…</p>
-                        ) : restants.length === 0 ? (
-                            <p className="mt-1 text-sm font-black">🎉 Tous tes objectifs du mois sont atteints !</p>
-                        ) : (
-                            <ul className="mt-2 flex flex-wrap gap-2">
-                                {restants.map((o) => (
-                                    <li key={o.produit} className="rounded-xl bg-white/80 px-3 py-1.5 text-sm font-black text-amber-950 shadow-sm">
-                                        <span aria-hidden="true">{o.emoji}</span> {o.n} {o.libelle(o.n)}
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
+        <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-violet-700 via-fuchsia-700 to-violet-900 p-6 text-white shadow-[0_20px_60px_rgba(124,58,237,.30)] sm:p-7">
+            <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+            <div className="relative">
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                        <p className="text-xs font-black uppercase tracking-[0.25em] text-white/70">Ta variable de {nomDuMois} · acquis à ce jour</p>
+                        <p className="mt-1 text-5xl font-black tabular-nums sm:text-6xl">{fmtEuro(acquis)}</p>
                     </div>
+                    <div className="sm:text-right">
+                        <p className="text-xs font-black uppercase tracking-[0.25em] text-amber-200">🎯 Avec tous tes objectifs</p>
+                        <p className="mt-1 text-3xl font-black tabular-nums text-amber-300 sm:text-4xl">{objectifsCharges ? fmtEuro(totalObjectifs) : "…"}</p>
+                    </div>
+                </div>
+
+                <div
+                    className="relative mt-6 h-5 rounded-full bg-white/15"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(pctAcquis)}
+                    aria-label="Part de la variable possible déjà acquise"
+                >
+                    <div className="h-full rounded-full bg-gradient-to-r from-amber-300 to-amber-400 transition-[width] duration-700" style={{ width: `${pctAcquis}%` }} />
+                    {scenario.aVenir > 0 && <div className="absolute -top-1 h-7 w-[2px] bg-white/70" style={{ left: `${pctRepere}%` }} />}
+                </div>
+                <div className="mt-2 flex flex-wrap justify-between gap-x-4 gap-y-1 text-[11px] font-bold text-white/70">
+                    <span>{Math.round(pctAcquis)} % du possible</span>
+                    {objectifsCharges && (
+                        <span>
+                            {scenario.aVenir > 0 ? "Repère : " : ""}{fmtEuro(scenario.ceMois)} en {nomDuMois}
+                            {scenario.aVenir > 0 && <> · +{fmtEuro(scenario.aVenir)} payés les mois suivants (box, assurances, McAfee)</>}
+                        </span>
+                    )}
+                </div>
+
+                <div className="mt-5 flex flex-wrap items-center gap-2">
+                    {!objectifsCharges ? (
+                        <span className="text-sm font-semibold text-white/70">…</span>
+                    ) : restants.length === 0 ? (
+                        <span className="text-sm font-black">🎉 Tous tes objectifs du mois sont atteints !</span>
+                    ) : (
+                        <>
+                            <span className="text-xs font-black uppercase tracking-wider text-white/70">Il te reste :</span>
+                            {restants.map((o) => (
+                                <span key={o.produit} className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-black ring-1 ring-white/20">
+                                    <span aria-hidden="true">{o.emoji}</span> {o.n} {o.libelle(o.n)}
+                                </span>
+                            ))}
+                        </>
+                    )}
                 </div>
             </div>
         </section>

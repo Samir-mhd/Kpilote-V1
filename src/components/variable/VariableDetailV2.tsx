@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { DetailVariable, BaremeVariable, ContributionAssurance, getContributionAssuranceMoisAffiche } from "@/services/variableConseiller";
+import { DetailVariable, BaremeVariable, VenteConseiller, ContributionAssurance, getContributionAssuranceMoisAffiche } from "@/services/variableConseiller";
 import { ContributionBoxMoisPaiement, getContributionBoxMoisPaiement, nomMois } from "@/services/boxRaccordement";
 import { ContributionForfait4P, getContributionForfait4PMoisPaiement } from "@/services/forfait4P";
 
@@ -16,6 +16,11 @@ function moisPlus(mois: string, delta: number) {
 }
 
 type Ligne = { label: string; montant: number };
+/** Couleur fixe par famille (barre découpée + pastille de légende). */
+const COULEURS_FAMILLE: Record<string, string> = {
+    smartphones: "#7c3aed", forfaits: "#2563eb", box: "#059669", "4p": "#d97706",
+    assurances: "#0891b2", options: "#db2777", qualite: "#ca8a04", bonus: "#64748b",
+};
 type Famille = { id: string; emoji: string; titre: string; provenance: string; lignes: Ligne[] };
 
 /**
@@ -23,21 +28,23 @@ type Famille = { id: string; emoji: string; titre: string; provenance: string; l
  * total), chaque famille dépliable. Une seule couleur : la barre dit "combien", le libellé dit "quoi".
  */
 export function CompositionVariable({
-    detail, contributionBox, contributionForfait4P, contributionAssurance, moisVenteBox, moisVenteAssurance,
+    detail, contributionBox, contributionForfait4P, contributionAssurance, moisVenteBox, moisVenteAssurance, ventes,
 }: {
     detail: DetailVariable;
+    /** Volumes du mois, pour afficher les quantités dans le détail. */
+    ventes?: VenteConseiller;
     contributionBox: ContributionBoxMoisPaiement | null;
     contributionForfait4P: ContributionForfait4P | null;
     contributionAssurance: ContributionAssurance | null;
     moisVenteBox: string;
     moisVenteAssurance: string;
 }) {
-    const [ouverte, setOuverte] = useState<string | null>(null);
+    const [detailVisible, setDetailVisible] = useState(false);
     const cb = contributionBox;
     const familles: Famille[] = [
         {
             id: "forfaits", emoji: "📱", titre: "Forfaits", provenance: "vendus ce mois-ci", lignes: [
-                { label: "Prime forfait", montant: detail.prime_forfait },
+                { label: ventes ? `Prime forfait — ${ventes.forfait_free_serie} Free / Série Free · ${ventes.forfait_free_max} Free Max` : "Prime forfait", montant: detail.prime_forfait },
                 { label: "Boost individuel forfait", montant: detail.boost_individuel_forfait },
                 { label: "Boost collectif forfait", montant: detail.boost_collectif_forfait },
                 { label: "Up-sell forfait (migration)", montant: detail.prime_migration_forfait },
@@ -45,7 +52,7 @@ export function CompositionVariable({
         },
         {
             id: "smartphones", emoji: "📲", titre: "Smartphones", provenance: "vendus ce mois-ci", lignes: [
-                { label: "Prime smartphone", montant: detail.prime_smartphone },
+                { label: ventes ? `Prime smartphone — ${ventes.smartphones} smartphone${ventes.smartphones > 1 ? "s" : ""}` : "Prime smartphone", montant: detail.prime_smartphone },
                 { label: "Boost individuel smartphone", montant: detail.boost_individuel_smartphone },
                 { label: "Boost collectif smartphone", montant: detail.boost_collectif_smartphone },
             ],
@@ -100,71 +107,60 @@ export function CompositionVariable({
         .filter((f) => f.total > 0)
         .sort((a, b) => b.total - a.total);
     const total = avecMontant.reduce((t, f) => t + f.total, 0);
-    const detailOuvert = avecMontant.find((f) => f.id === ouverte);
 
-    // Mosaïque : une tuile par famille, triées par montant ; la première (la plus grosse) est mise
-    // en avant sur deux colonnes. Le détail de la tuile choisie s'ouvre sous la mosaïque.
+    // Barre découpée par famille (couleur fixe par famille, toujours accompagnée de son libellé),
+    // puis une ligne par famille. Un clic sur la carte déplie le détail de toutes les familles.
     return (
-        <section className="rounded-[24px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)] sm:p-6">
-            <div className="flex items-baseline justify-between gap-3">
-                <h2 className="text-base font-black text-slate-900">D&apos;où vient ta variable</h2>
-                <p className="text-lg font-black tabular-nums text-violet-700">{fmtEuro(total)}</p>
+        <section
+            role="button"
+            tabIndex={0}
+            aria-expanded={detailVisible}
+            onClick={() => setDetailVisible((v) => !v)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetailVisible((v) => !v); } }}
+            className={`cursor-pointer rounded-[24px] bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,.07)] transition-all hover:shadow-[0_8px_30px_rgba(15,23,42,.12)] sm:p-6 ${detailVisible ? "ring-2 ring-violet-300" : "ring-1 ring-slate-200"}`}
+        >
+            <div className="flex items-center justify-between gap-3">
+                <h2 className="text-base font-black text-slate-900">D&apos;où viennent tes {fmtEuro(total)}</h2>
+                {avecMontant.length > 0 && (
+                    <span className="flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-700">
+                        {detailVisible ? "Masquer le détail" : "Voir le détail"}
+                        <ChevronDown size={13} className={`transition-transform ${detailVisible ? "rotate-180" : ""}`} />
+                    </span>
+                )}
             </div>
             {avecMontant.length === 0 ? (
                 <p className="py-6 text-center text-sm text-slate-400">Pas encore de montant ce mois-ci.</p>
             ) : (
                 <>
-                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                        {avecMontant.map((f, i) => {
-                            const estOuverte = ouverte === f.id;
-                            const part = total > 0 ? Math.round((f.total / total) * 100) : 0;
-                            const premiere = i === 0;
-                            return (
-                                <button
-                                    key={f.id}
-                                    onClick={() => setOuverte(estOuverte ? null : f.id)}
-                                    aria-expanded={estOuverte}
-                                    className={`rounded-2xl p-3.5 text-left transition-all ${premiere ? "col-span-2" : ""} ${
-                                        estOuverte ? "bg-violet-600 text-white ring-2 ring-violet-300"
-                                        : premiere ? "bg-violet-50 ring-1 ring-violet-200 hover:bg-violet-100"
-                                        : "bg-slate-50 ring-1 ring-slate-100 hover:bg-slate-100"
-                                    }`}
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <p className={`text-sm font-black ${estOuverte ? "text-white" : "text-slate-800"}`}>
-                                            <span aria-hidden="true">{f.emoji}</span> {f.titre}
-                                        </p>
-                                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-black tabular-nums ${estOuverte ? "bg-white/20 text-white" : "bg-white text-violet-700"}`}>
-                                            {part} %
-                                        </span>
-                                    </div>
-                                    <p className={`mt-1.5 font-black tabular-nums ${premiere ? "text-3xl" : "text-xl"} ${estOuverte ? "text-white" : "text-slate-900"}`}>
-                                        {fmtEuro(f.total)}
-                                    </p>
-                                    <p className={`mt-0.5 flex items-center justify-between gap-1 text-[11px] font-semibold ${estOuverte ? "text-white/75" : "text-slate-400"}`}>
-                                        <span className="truncate">{f.provenance}</span>
-                                        <ChevronDown size={13} className={`shrink-0 transition-transform ${estOuverte ? "rotate-180" : ""}`} />
-                                    </p>
-                                </button>
-                            );
-                        })}
+                    <div className="mt-4 flex h-4 gap-[2px] overflow-hidden rounded-full">
+                        {avecMontant.map((f) => (
+                            <div key={f.id} style={{ width: `${(f.total / total) * 100}%`, background: COULEURS_FAMILLE[f.id] ?? "#64748b" }} title={`${f.titre} : ${fmtEuro(f.total)}`} />
+                        ))}
                     </div>
-
-                    {detailOuvert && (
-                        <div className="mt-3 rounded-2xl bg-violet-50 p-4 ring-1 ring-violet-100">
-                            <p className="mb-2 text-xs font-black uppercase tracking-[0.15em] text-violet-700">
-                                {detailOuvert.emoji} {detailOuvert.titre} · détail
-                            </p>
-                            <ul className="space-y-1">
-                                {detailOuvert.lignes.map((l, i) => (
-                                    <li key={i} className="flex justify-between gap-3 text-sm">
-                                        <span className="text-slate-600">{l.label}</span>
-                                        <span className="font-black tabular-nums text-slate-900">{fmtEuro(l.montant)}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
+                    <div className={`mt-4 ${detailVisible ? "space-y-3" : "space-y-2.5"}`}>
+                        {avecMontant.map((f) => (
+                            <div key={f.id}>
+                                <div className="flex items-center gap-3">
+                                    <span className="h-3 w-3 shrink-0 rounded-sm" style={{ background: COULEURS_FAMILLE[f.id] ?? "#64748b" }} />
+                                    <span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-800">
+                                        <span aria-hidden="true">{f.emoji}</span> {f.titre} <span className="text-xs font-semibold text-slate-400">· {f.provenance}</span>
+                                    </span>
+                                    <span className="text-xs font-bold tabular-nums text-slate-400">{Math.round((f.total / total) * 100)} %</span>
+                                    <span className="w-24 text-right text-sm font-black tabular-nums text-slate-900">{fmtEuro(f.total)}</span>
+                                </div>
+                                {detailVisible && (
+                                    <ul className="ml-6 mt-1.5 rounded-xl bg-slate-50 px-3 py-1.5 ring-1 ring-slate-100">
+                                        {f.lignes.map((l, i) => (
+                                            <li key={i} className="flex items-center justify-between gap-3 py-1 text-[13px]">
+                                                <span className="font-semibold text-slate-600">{l.label}</span>
+                                                <span className="font-bold tabular-nums text-slate-700">{fmtEuro(l.montant)}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        ))}
+                    </div>
                 </>
             )}
         </section>

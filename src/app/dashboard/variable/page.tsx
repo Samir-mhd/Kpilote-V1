@@ -296,6 +296,7 @@ function VariableInner() {
                             contributionAssurance={contributionAssurance}
                             moisVenteBox={moisVenteBoxPayee}
                             moisVenteAssurance={moisVenteAssurance}
+                            ventes={ventes}
                         />
                         <DejaEnRoute conseillerId={conseillerId} mois={mois} bareme={bareme} />
                     </div>
