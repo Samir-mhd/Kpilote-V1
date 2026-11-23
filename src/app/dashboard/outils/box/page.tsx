@@ -18,8 +18,6 @@ import {
 const ROUGE = "#cd1e25";
 const eur = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 const lire = (s: string) => { const n = Number(s.replace(",", ".").replace(/[^\d.]/g, "")); return Number.isFinite(n) ? n : 0; };
-/** Protection mobile Free : prix selon la valeur du téléphone (grille du comparateur). */
-const PROTECTIONS_FREE = [4.99, 8.99, 12.99, 13.99, 14.99, 16.99, 19.99, 22.99];
 
 type ServiceActuel = { on: boolean; offre: string; prix: number };
 type LigneA = { label: string; prix: number };
@@ -105,14 +103,12 @@ function Calculatrice() {
     const [forfaitsFree, setForfaitsFree] = useState<string[] | null>(null); // null = autant que chez le client
     const [choixFree, setChoixFree] = useState<Partial<Record<CodeService, string>>>({}); // id d'offre cochée ; absent = non pris
     const [garderAutres, setGarderAutres] = useState(true);
-    const [protectionFree, setProtectionFree] = useState<number | null>(null); // prix ; 0 = non ; null = comme aujourd'hui
     const [mes, setMes] = useState(true);
 
     const [etape, setEtape] = useState(1);
 
     const freebox = FREEBOX.find((b) => b.id === freeboxId)!;
     const forfaitsFreeEffectifs = forfaitsFree ?? forfaitsActuels.map(() => "free_5g");
-    const protectionFreePrix = protectionFree ?? (protectionActuelle.on ? 8.99 : 0);
 
     const lignesActuel: LigneA[] = useMemo(() => {
         const l: LigneA[] = [];
@@ -141,7 +137,6 @@ function Calculatrice() {
         ...forfaitsFreeEffectifs.map((id, i) => ({ label: FORFAITS_FREE.find((f) => f.id === id)!.nom, prix: prixForfaitFree(id, freeboxId, i) })),
         ...servicesFree.filter((s) => s.offre).map((s) => ({ label: `${s.label} ${s.offres.length > 1 ? s.offre!.label : ""}`.trim(), prix: s.offre!.prix })),
         ...(garderAutres ? autres.filter((a) => a.prix > 0).map((a) => ({ label: a.label || "Autre", prix: { an1: a.prix, an2: a.prix } })) : []),
-        ...(protectionFreePrix > 0 ? [{ label: "Protection mobile Free", prix: { an1: protectionFreePrix, an2: protectionFreePrix } }] : []),
     ];
 
     const mensuelActuel = lignesActuel.reduce((t, l) => t + l.prix, 0);
@@ -158,7 +153,7 @@ function Calculatrice() {
 
     function reinitialiser() {
         setBoxActuelle(0); setForfaitsActuels([0]); setServices(servicesInitiaux()); setAutres([]); setProtectionActuelle({ on: false, prix: 0 });
-        setFreeboxId("ultra"); setForfaitsFree(null); setChoixFree({}); setGarderAutres(true); setProtectionFree(null); setMes(true); setEtape(1);
+        setFreeboxId("ultra"); setForfaitsFree(null); setChoixFree({}); setGarderAutres(true); setMes(true); setEtape(1);
     }
 
     /* ── Saisie : aujourd'hui ── */
@@ -340,18 +335,6 @@ function Calculatrice() {
                 </>
             )}
 
-            <Titre c="Protection mobile Free" />
-            <div className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 ${protectionFreePrix > 0 ? "bg-red-50 ring-1 ring-red-200" : "bg-slate-50 ring-1 ring-slate-200"}`}>
-                <Coche on={protectionFreePrix > 0} label="Protection mobile Free" onClick={() => setProtectionFree(protectionFreePrix > 0 ? 0 : 8.99)} />
-                <span className="flex-1 text-sm font-bold text-slate-800">🛟 Protection</span>
-                {protectionFreePrix > 0 && (
-                    <select aria-label="Prix de la protection Free" value={protectionFreePrix} onChange={(e) => setProtectionFree(Number(e.target.value))}
-                        className="rounded-lg bg-white px-2 py-1.5 text-sm font-black text-slate-900 outline-none ring-1 ring-slate-200">
-                        {PROTECTIONS_FREE.map((p) => <option key={p} value={p}>{eur(p)}</option>)}
-                    </select>
-                )}
-            </div>
-            {protectionFreePrix > 0 && <p className="mt-1 text-[11px] font-semibold text-slate-400">Prix selon la valeur du téléphone (même grille que le comparateur).</p>}
         </>
     );
 
@@ -378,7 +361,7 @@ function Calculatrice() {
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3 print:hidden">
             <div>
                 <Link href={`/dashboard/outils${qs}`} className="text-[11px] font-black uppercase tracking-[0.25em] hover:underline" style={{ color: ROUGE }}>Outils</Link>
-                <h1 className="text-3xl font-black text-slate-900">Calculatrice box</h1>
+                <h1 className="flex items-center gap-3 text-3xl font-black text-slate-900">Calculatrice box <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black uppercase tracking-wider text-amber-700 ring-1 ring-amber-300">Bêta</span></h1>
             </div>
             <div className="flex items-center gap-3">
                 <p className="text-xs font-semibold text-slate-400">Tarifs free.fr · à confirmer au moment de la vente</p>

@@ -1363,7 +1363,7 @@ export default function Dashboard() {
                                 {[
                                     { href: "/dashboard/outils/telephones", Icone: Smartphone, titre: "Comparateur téléphones", texte: "Prix Free Flex et comptant, jusqu'à 3 modèles" },
                                     { href: "/dashboard/outils/odr", Icone: Ticket, titre: "Coupons ODR", texte: "Coupons de remboursement, impression en 1 clic" },
-                                    { href: "/dashboard/outils/box", Icone: Calculator, titre: "Calculatrice box", texte: "Comparer l'offre du client et l'offre Free" },
+                                    { href: "/dashboard/outils/box", Icone: Calculator, titre: "Calculatrice box (bêta)", texte: "Comparer l'offre du client et l'offre Free" },
                                 ].map(({ href, Icone, titre, texte }) => (
                                     <Link key={href} href={`${href}${`?id=${encodeURIComponent(conseillerId)}&nom=${encodeURIComponent(nom)}`}`} className="tuile-outil group flex items-center gap-3 rounded-2xl bg-red-50/60 p-3 ring-1 ring-red-100 transition-all hover:-translate-y-0.5 hover:bg-red-50">
                                         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#cd1e25] text-white"><Icone size={18} /></span>
