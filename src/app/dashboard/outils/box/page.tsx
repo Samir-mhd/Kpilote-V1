@@ -36,13 +36,6 @@ function servicesInitiaux(): Record<CodeService, ServiceActuel> {
     return r;
 }
 
-/** Offre Free proposée par défaut : même niveau que le client si possible, sinon la plus proche. */
-function offreParDefaut(code: CodeService, offreClient: string, boxId: string): string {
-    const offres = offresFree(code, boxId);
-    if (offres.some((o) => o.id === offreClient)) return offreClient;
-    const rang = SERVICES.find((s) => s.code === code)!.offres.find((o) => o.id === offreClient)?.rang ?? 1;
-    return [...offres].sort((a, b) => Math.abs(a.rang - rang) - Math.abs(b.rang - rang))[0].id;
-}
 
 /* ───────────── Champs ───────────── */
 
@@ -110,7 +103,7 @@ function Calculatrice() {
     // ── Chez Free ──
     const [freeboxId, setFreeboxId] = useState("ultra");
     const [forfaitsFree, setForfaitsFree] = useState<string[] | null>(null); // null = autant que chez le client
-    const [choixFree, setChoixFree] = useState<Partial<Record<CodeService, string>>>({}); // id d'offre ou "aucun"
+    const [choixFree, setChoixFree] = useState<Partial<Record<CodeService, string>>>({}); // id d'offre cochée ; absent = non pris
     const [garderAutres, setGarderAutres] = useState(true);
     const [protectionFree, setProtectionFree] = useState<number | null>(null); // prix ; 0 = non ; null = comme aujourd'hui
     const [mes, setMes] = useState(true);
@@ -135,11 +128,12 @@ function Calculatrice() {
     }, [boxActuelle, forfaitsActuels, services, autres, protectionActuelle]);
 
     /** Abonnements repris chez Free : offre choisie (par défaut le même niveau) ou « aucun ». */
-    const servicesFree = SERVICES.filter((s) => services[s.code].on).map((s) => {
+    const servicesFree = SERVICES.map((s) => {
         const offres = offresFree(s.code, freeboxId);
-        const choisi = choixFree[s.code] ?? offreParDefaut(s.code, services[s.code].offre, freeboxId);
-        const offre = choisi === "aucun" ? null : offres.find((o) => o.id === choisi) ?? offres[0];
-        return { code: s.code, label: s.label, emoji: s.emoji, offres, choisi: offre?.id ?? "aucun", offre };
+        const choisi = choixFree[s.code];
+        const offre = choisi ? offres.find((o) => o.id === choisi) ?? offres[0] : null;
+        const inclus = offres.filter((o) => o.prix.an1 === 0 && o.prix.an2 === 0).map((o) => o.label);
+        return { code: s.code, label: s.label, emoji: s.emoji, offres, choisi: offre?.id ?? null, offre, inclus };
     });
 
     const lignesFree: LigneF[] = [
@@ -295,33 +289,45 @@ function Calculatrice() {
             <Ajouter c="Ajouter un forfait Free" onClick={() => setForfaitsFree([...forfaitsFreeEffectifs, "free_5g"])} />
 
             <Titre c="Abonnements chez Free" />
-            {servicesFree.length === 0 ? (
-                <p className="rounded-xl bg-slate-50 px-3.5 py-3 text-sm font-semibold text-slate-400 ring-1 ring-slate-200">Coche les abonnements du client pour les retrouver ici.</p>
-            ) : (
-                <div className="space-y-2">
-                    {servicesFree.map((s) => (
-                        <div key={s.code} className={`rounded-xl px-3.5 py-2.5 ${s.offre ? "bg-slate-50 ring-1 ring-slate-200" : "bg-white ring-1 ring-slate-100"}`}>
+            <div className="space-y-2">
+                {servicesFree.map((s) => {
+                    const on = !!s.offre;
+                    const basculer = () => setChoixFree((x) => {
+                        const n = { ...x };
+                        if (on) delete n[s.code];
+                        else n[s.code] = (s.offres.find((o) => o.prix.an1 === 0 && o.prix.an2 === 0) ?? s.offres[0]).id;
+                        return n;
+                    });
+                    return (
+                        <div key={s.code} className={`rounded-xl px-3.5 py-2.5 ${on ? "bg-red-50 ring-1 ring-red-200" : "bg-slate-50 ring-1 ring-slate-200"}`}>
                             <div className="flex items-center gap-3">
-                                <span className={`flex-1 text-sm font-bold ${s.offre ? "text-slate-800" : "text-slate-400 line-through"}`}>{s.emoji} {s.label}</span>
-                                {s.offre ? <PrixF p={s.offre.prix} /> : <span className="text-xs font-bold text-slate-400">Non repris</span>}
+                                <Coche on={on} label={`${s.label} chez Free`} onClick={basculer} />
+                                <button type="button" onClick={basculer} className={`min-w-0 flex-1 text-left text-sm font-bold ${on ? "text-slate-900" : "text-slate-500"}`}>
+                                    {s.emoji} {s.label}
+                                    {s.inclus.length > 0 && <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700 ring-1 ring-emerald-200">{s.inclus.join(", ")} inclus avec l&apos;{freebox.nom.replace("Freebox ", "")}</span>}
+                                </button>
+                                {s.offre && <PrixF p={s.offre.prix} />}
                             </div>
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                                {[...s.offres.map((o) => ({ id: o.id, label: o.label })), { id: "aucun", label: "Ne pas reprendre" }].map((o) => {
-                                    const on = s.choisi === o.id;
-                                    return (
-                                        <button key={o.id} type="button" onClick={() => setChoixFree((x) => ({ ...x, [s.code]: o.id }))}
-                                            className={`rounded-full px-2.5 py-1 text-[11px] font-black ${on ? "text-white" : "bg-white text-slate-600 ring-1 ring-slate-200"}`}
-                                            style={on ? { background: ROUGE } : undefined}>
-                                            {o.label}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            {s.offre?.prix.note && <p className="mt-1 text-[11px] font-semibold text-slate-400">{s.offre.prix.note}</p>}
+                            {on && s.offres.length > 1 && (
+                                <div className="mt-2 flex flex-wrap gap-1.5 pl-8">
+                                    {s.offres.map((o) => {
+                                        const actif = s.choisi === o.id;
+                                        const gratuit = o.prix.an1 === 0 && o.prix.an2 === 0;
+                                        return (
+                                            <button key={o.id} type="button" onClick={() => setChoixFree((x) => ({ ...x, [s.code]: o.id }))}
+                                                className={`rounded-full px-2.5 py-1 text-[11px] font-black ${actif ? "text-white" : "bg-white text-slate-600 ring-1 ring-slate-200"}`}
+                                                style={actif ? { background: ROUGE } : undefined}>
+                                                {o.label} · {gratuit ? "inclus" : eur(o.prix.an1)}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            {s.offre?.prix.note && <p className="mt-1 pl-8 text-[11px] font-semibold text-slate-400">{s.offre.prix.note}</p>}
                         </div>
-                    ))}
-                </div>
-            )}
+                    );
+                })}
+            </div>
 
             {autres.some((a) => a.prix > 0) && (
                 <>

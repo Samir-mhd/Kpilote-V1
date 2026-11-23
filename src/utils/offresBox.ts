@@ -89,7 +89,8 @@ export function offresFree(code: CodeService, boxId: string): OffreFree[] {
         case "canal":
             return [
                 { id: "canal_chaine", label: "CANAL+ La Chaîne", prix: ultra ? p(0, 0, 0, "inclus dans l'Ultra") : p(15.99, 15.99, essentielOuPop ? 3 : 0, essentielOuPop ? "3 mois inclus" : undefined), rang: 1 },
-                { id: "canal_100", label: "100 % CANAL+ (promo abonnés Freebox)", prix: p(19.99, 19.99, 0, "promo 24 mois, engagement 24 mois"), rang: 3 },
+                { id: "canal_sport", label: "CANAL+ Sport", prix: p(19.99, 19.99, 0, ultra ? "offre abonnés Freebox · sans engagement avec l'Ultra" : "offre abonnés Freebox"), rang: 2 },
+                ...(ultra ? [{ id: "canal_ultra", label: "CANAL+ à 7 €", prix: p(7, 7, 0, "au lieu de 22 € · réservé à l'Ultra · sans engagement"), rang: 2 }] : []),
             ];
         case "bein":
             return [{ id: "bein", label: "beIN Sports", prix: p(15), rang: 1 }];
