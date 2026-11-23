@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 const OUTILS = [
     { href: "/dashboard/outils/telephones", emoji: "📱", titre: "Comparateur téléphones", texte: "Prix Free Flex et comptant, caractéristiques, comparaison jusqu'à 3 modèles." },
     { href: "/dashboard/outils/odr", emoji: "🧾", titre: "Coupons ODR", texte: "Les coupons de remboursement de mobile.free.fr, à imprimer en 1 clic." },
+    { href: "/dashboard/outils/box", emoji: "🧮", titre: "Calculatrice box", texte: "Ce que paie le client aujourd'hui face à l'offre Free : box, forfaits, abonnements, économie." },
 ];
 
 function Contenu() {
