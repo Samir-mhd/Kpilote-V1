@@ -1275,8 +1275,7 @@ export default function Dashboard() {
                 <div className="space-y-6">
                     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_1fr]">
                         {/* ── Déclarer une vente : 1 acte = vente simple, plusieurs = vente combo ── */}
-                        <section className="relative overflow-hidden rounded-[24px] bg-white p-5 pt-6 shadow-[0_10px_30px_rgba(15,23,42,.09)] ring-1 ring-slate-200/80">
-                            <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500" />
+                        <section className="carte-accueil relative overflow-hidden rounded-[24px] border-2 border-slate-900 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,.08)]">
                             <div className="mb-4 flex items-center gap-3">
                                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-xl">✍️</span>
                                 <div>
@@ -1318,22 +1317,22 @@ export default function Dashboard() {
                                 return (
                                     <div className={`mt-4 flex flex-wrap items-center gap-3 rounded-2xl p-3 ${combo ? "bg-gradient-to-r from-amber-50 via-orange-50 to-pink-50 ring-1 ring-orange-200" : "bg-slate-50 ring-1 ring-slate-200"}`}>
                                         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                                            {combo && <span className="rounded-full bg-gradient-to-r from-amber-400 to-pink-500 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-white">🎁 Combo</span>}
+                                            {combo && <span className="rounded-full bg-gradient-to-r from-amber-400 to-pink-500 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-white">🎁 Combo</span>}
                                             {choisis.map((m) => {
                                                 const multiple = PRODUITS_MULTIPLES.includes(produitCode(m.produit));
                                                 const n = quantiteActe(m.produit);
                                                 return (
-                                                    <span key={m.produit} className="inline-flex items-center gap-1 rounded-full bg-white py-0.5 pl-2.5 pr-1 text-xs font-black text-slate-700 ring-1 ring-slate-200">
+                                                    <span key={m.produit} className="inline-flex items-center gap-1.5 rounded-full bg-white py-1 pl-3.5 pr-1.5 text-base font-black text-slate-700 ring-1 ring-slate-200">
                                                         {emojiProduit(m.produit)} {nomActe(m.produit)}
                                                         {multiple && (
-                                                            <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-slate-100 px-0.5">
-                                                                <button type="button" aria-label={`Un ${nomActe(m.produit)} de moins`} onClick={() => reglerQuantite(m.produit, n - 1)} disabled={n <= 1} className="flex h-5 w-5 items-center justify-center rounded-full text-sm leading-none hover:bg-white disabled:opacity-30">−</button>
-                                                                <span className="w-4 text-center tabular-nums">{n}</span>
-                                                                <button type="button" aria-label={`Un ${nomActe(m.produit)} de plus`} onClick={() => reglerQuantite(m.produit, n + 1)} className="flex h-5 w-5 items-center justify-center rounded-full text-sm leading-none hover:bg-white">+</button>
+                                                            <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-1">
+                                                                <button type="button" aria-label={`Un ${nomActe(m.produit)} de moins`} onClick={() => reglerQuantite(m.produit, n - 1)} disabled={n <= 1} className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none hover:bg-white disabled:opacity-30">−</button>
+                                                                <span className="w-5 text-center tabular-nums">{n}</span>
+                                                                <button type="button" aria-label={`Un ${nomActe(m.produit)} de plus`} onClick={() => reglerQuantite(m.produit, n + 1)} className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none hover:bg-white">+</button>
                                                             </span>
                                                         )}
-                                                        <button type="button" aria-label={`Retirer ${nomActe(m.produit)}`} onClick={() => basculerActe(m.produit)} className="flex h-5 w-5 items-center justify-center rounded-full hover:bg-slate-100">
-                                                            <X size={12} className="text-slate-400" />
+                                                        <button type="button" aria-label={`Retirer ${nomActe(m.produit)}`} onClick={() => basculerActe(m.produit)} className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100">
+                                                            <X size={16} className="text-slate-400" />
                                                         </button>
                                                     </span>
                                                 );
@@ -1352,8 +1351,7 @@ export default function Dashboard() {
                         </section>
 
                         {/* ── Outils : accès direct (le menu est trop petit pour naviguer) ── */}
-                        <section className="relative overflow-hidden rounded-[24px] bg-white p-5 pt-6 shadow-[0_10px_30px_rgba(15,23,42,.09)] ring-1 ring-slate-200/80">
-                            <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-[#cd1e25] to-rose-500" />
+                        <section className="carte-accueil relative overflow-hidden rounded-[24px] border-2 border-slate-900 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,.08)]">
                             <div className="mb-4 flex items-center gap-3">
                                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-xl">🧰</span>
                                 <div>
@@ -1381,8 +1379,7 @@ export default function Dashboard() {
 
                     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_1fr]">
                         {/* ── Objectifs du jour en anneaux (la jauge avance à chaque vente) ── */}
-                        <section className="relative overflow-hidden rounded-[24px] bg-white p-5 pt-6 shadow-[0_10px_30px_rgba(15,23,42,.09)] ring-1 ring-slate-200/80">
-                            <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-violet-500 to-fuchsia-500" />
+                        <section className="carte-accueil relative overflow-hidden rounded-[24px] border-2 border-slate-900 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,.08)]">
                             <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                                 <div className="flex items-center gap-3">
                                     <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-xl">🎯</span>

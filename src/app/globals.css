@@ -883,3 +883,6 @@ body::before {
 .anneau-or-classement{animation:anneauOrClassement 2.4s ease-in-out infinite}
 @keyframes anneauOrClassement{0%,100%{filter:drop-shadow(0 0 1px rgba(245,158,11,.35))}50%{filter:drop-shadow(0 0 6px rgba(251,191,36,.75))}}
 @media (prefers-reduced-motion:reduce){.anneau-or-classement{animation:none}}
+
+/* Accueil : contour des cartes lisible en mode sombre */
+[data-sombre="1"] main .carte-accueil{border-color:rgba(226,232,240,.55)}

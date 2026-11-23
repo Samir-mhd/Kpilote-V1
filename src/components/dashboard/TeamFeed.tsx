@@ -563,8 +563,7 @@ function FeedCondense({ entries, conseillerId, dbError }: { entries: Entry[]; co
     const nbVentes = entries.filter((e) => !e.reset).reduce((t, e) => t + e.quantite, 0);
 
     return (
-        <div className="relative overflow-hidden rounded-[24px] bg-white p-5 pt-6 shadow-[0_10px_30px_rgba(15,23,42,.09)] ring-1 ring-slate-200/80">
-            <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-400 to-teal-500" />
+        <div className="carte-accueil relative overflow-hidden rounded-[24px] border-2 border-slate-900 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,.08)]">
             <div className="mb-4 flex items-center gap-2.5">
                 <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-green-500" />
                 <p className="flex-1 text-sm font-black text-slate-900">En direct de l&apos;équipe</p>
