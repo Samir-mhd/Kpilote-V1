@@ -359,7 +359,7 @@ function Calculatrice() {
     const bloc = (titre: string, mois: number, an: number, detail?: string) => (
         <div className="min-w-0 flex-1">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-white/75">{titre}</p>
-            <p className="text-3xl font-black tabular-nums sm:text-4xl">{pret ? `${mois >= 0 ? "−" : "+"}${eur(Math.abs(mois))}` : "—"}<span className="text-sm font-bold text-white/75">/mois</span></p>
+            <p className="text-3xl font-black tabular-nums sm:text-4xl">{pret ? `${mois >= 0 ? "" : "+"}${eur(Math.abs(mois))}` : "—"}<span className="text-sm font-bold text-white/75">/mois</span></p>
             <p className="text-sm font-bold text-white/85">{pret ? (an >= 0 ? `soit ${eur(an)} économisés sur l'année` : `soit ${eur(-an)} de plus sur l'année`) : " "}</p>
             {detail && <p className="text-[11px] font-semibold text-white/70">{detail}</p>}
         </div>
