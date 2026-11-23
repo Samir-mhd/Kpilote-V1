@@ -82,7 +82,10 @@ type Props = {
 };
 
 export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValider, produits, quantites = {} }: Props) {
-    const voir = (code: string) => !produits || produits.includes(code);
+    const [ajoutes, setAjoutes] = useState<string[]>([]);
+    const voir = (code: string) => !produits || produits.includes(code) || ajoutes.includes(code);
+    const CODES_COMBO = ["box", "forfaits", "telephones", "mcafee", "assurance"];
+    const masques = produits ? CODES_COMBO.filter((c) => !produits.includes(c) && !ajoutes.includes(c)) : [];
     const [s, setS] = useState<ComboSelection>(() => ({
         ...SELECTION_VIDE,
         // Forfaits annoncés depuis l'Accueil : pré-remplis en Série (le plus courant), à ajuster en Max.
@@ -211,6 +214,14 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
                             <Puce actif={s.quatreP} onClick={() => setS((p) => ({ ...p, quatreP: !p.quatreP }))}>
                                 Vente 4P · {fmtEuro(bareme.cross_sell_4p)}
                             </Puce>
+                            {s.quatreP && nbForfaits === 0 && (
+                                <p className="w-full rounded-xl bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-200 ring-1 ring-amber-400/30">
+                                    La 4P ne déclare pas le forfait. S&apos;il est vendu maintenant, ajoute-le
+                                    {!voir("forfaits") ? (
+                                        <> : <button type="button" onClick={() => { setAjoutes((a) => [...a, "forfaits"]); setS((p) => ({ ...p, forfaits: { ...p.forfaits, forfait_free_serie: 1 } })); }} className="font-black text-amber-300 underline">+ Ajouter un forfait</button></>
+                                    ) : " dans Forfaits ci-dessus."}
+                                </p>
+                            )}
                         </Groupe>
                     )}
 
@@ -262,6 +273,20 @@ export default function ComboVenteModal({ bareme, bonusManuels, onClose, onValid
                             onChange={(n) => setS((p) => ({ ...p, assurances: { ...p.assurances, essentielle: n } }))}
                         />
                     </Groupe>}
+
+                    {masques.length > 0 && (
+                        <div className="rounded-2xl border border-dashed border-white/15 p-3">
+                            <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-white/40">Ajouter un produit à cette vente</p>
+                            <div className="flex flex-wrap gap-2">
+                                {masques.map((c) => (
+                                    <button key={c} type="button" onClick={() => setAjoutes((a) => [...a, c])}
+                                        className="rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-black text-white/70 hover:bg-white/10">
+                                        + {LIBELLES[c]}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="mt-6 flex items-center justify-between gap-4 rounded-2xl bg-white/5 p-4">

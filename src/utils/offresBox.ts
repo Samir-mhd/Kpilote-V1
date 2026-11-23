@@ -36,10 +36,10 @@ export const SERVICES: { code: CodeService; label: string; emoji: string; offres
 /** Prix d'une ligne chez Free : 1re année, à partir de la 2e année, mois offerts la 1re année. */
 export type PrixFree = { an1: number; an2: number; moisOfferts?: number; note?: string };
 
-/** Freebox (sans engagement). La Pop S est à 29,99 € en boutique. */
+/** Freebox (sans engagement). */
 export type Freebox = { id: string; nom: string; prix: PrixFree; inclusLabels: string[] };
 export const FREEBOX: Freebox[] = [
-    { id: "pop_s", nom: "Freebox Pop S", prix: { an1: 29.99, an2: 29.99, note: "prix boutique" }, inclusLabels: [] },
+    { id: "pop_s", nom: "Freebox Pop S", prix: { an1: 24.99, an2: 29.99 }, inclusLabels: [] },
     { id: "pop", nom: "Freebox Pop", prix: { an1: 29.99, an2: 39.99 }, inclusLabels: [] },
     { id: "ultra_essentiel", nom: "Freebox Ultra Essentiel", prix: { an1: 39.99, an2: 49.99 }, inclusLabels: ["TV by CANAL", "Eurosport 1"] },
     { id: "ultra", nom: "Freebox Ultra", prix: { an1: 49.99, an2: 59.99 },
