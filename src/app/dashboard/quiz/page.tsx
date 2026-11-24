@@ -6,6 +6,7 @@
  * Questions : src/data/quizQuestions.ts · Réponses : src/services/quizService.ts.
  */
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Check, X, ExternalLink, Trophy, Flame, Timer, ArrowRight, RotateCcw, Lock, Zap } from "lucide-react";
 import { QUESTIONS, THEMES_QUIZ, NIVEAUX_QUIZ, SOURCES_QUIZ, QUIZ_VERIFIE_LE, type QuestionQuiz, type NiveauQuiz } from "@/data/quizQuestions";
@@ -87,7 +88,7 @@ function Quiz() {
     const entete = (
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
             <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.25em]" style={{ color: ROUGE }}>Quiz</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.25em]" style={{ color: ROUGE }}><Link href={`/dashboard/outils?id=${encodeURIComponent(conseillerId)}&nom=${encodeURIComponent(sp.get("nom") ?? "")}`} className="hover:underline">Outils</Link> · Quiz</p>
                 <h1 className="text-3xl font-black text-slate-900">Teste tes connaissances</h1>
             </div>
             <div className="flex flex-wrap items-center gap-2">

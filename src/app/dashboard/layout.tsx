@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import {
-    Home, BarChart3, Swords, Trophy, User, LineChart, Euro, Award, Moon, Wrench, Brain,
+    Home, BarChart3, Swords, Trophy, User, LineChart, Euro, Award, Moon, Wrench,
 } from "lucide-react";
 import ValiderJourneeModal from "@/components/dashboard/ValiderJourneeModal";
 import PhotoAvatar from "@/components/avatar/PhotoAvatar";
@@ -24,7 +24,6 @@ const menus = [
     { label: "Trophées",      href: "/dashboard/badges",        Icon: Award },
     { label: "Profil",        href: "/dashboard/profil",        Icon: User },
     { label: "Outils",        href: "/dashboard/outils",        Icon: Wrench },
-    { label: "Quiz",          href: "/dashboard/quiz",          Icon: Brain },
     { label: "Bilan du soir", href: "/dashboard/bilan",         Icon: Moon },
 ];
 
