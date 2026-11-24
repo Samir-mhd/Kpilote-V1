@@ -2,7 +2,8 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useEffect, useMemo, useState } from "react";
-import { Search, X, ExternalLink, Check, RefreshCw, Minus, Smartphone, Battery, Camera, Wifi, SlidersHorizontal } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Search, X, ExternalLink, Check, RefreshCw, Minus, Smartphone, Battery, Camera, Wifi, SlidersHorizontal, Printer } from "lucide-react";
 import type { CatalogueTelephones, TelephoneFree, VarianteTel, PrixFlex } from "@/services/telephonesFreeService";
 
 type Profil = "prospect" | "abonne";
@@ -58,6 +59,8 @@ export default function ComparateurTelephonesPage() {
     const avecOptions = forfait > 0 || assurance;
 
     const [actualisation, setActualisation] = useState<"" | "en_cours" | "ok" | "erreur">("");
+    const [prenom, setPrenom] = useState("");
+    useEffect(() => { setPrenom((new URLSearchParams(window.location.search).get("nom") ?? "").trim().split(/\s+/)[0] ?? ""); }, []);
 
     useEffect(() => {
         fetch("/api/telephones")
@@ -290,7 +293,7 @@ export default function ComparateurTelephonesPage() {
             )}
 
             {ouvert && choisis.length > 0 && (
-                <Comparaison tels={choisis} variantes={choisis.map(variante)} profil={profil} setProfil={setProfil} options={options} setProtection={setAssurance} setForfait={setForfait} onClose={() => setOuvert(false)} />
+                <Comparaison tels={choisis} variantes={choisis.map(variante)} profil={profil} setProfil={setProfil} options={options} setProtection={setAssurance} setForfait={setForfait} onClose={() => setOuvert(false)} majLe={data?.majLe ?? null} prenom={prenom} />
             )}
         </div>
     );
@@ -300,10 +303,11 @@ export default function ComparateurTelephonesPage() {
 
 type Ligne = { label: string; val: (t: TelephoneFree, v: VarianteTel) => string; num?: (t: TelephoneFree, v: VarianteTel) => number | null; mieux?: "bas" | "haut" };
 
-function Comparaison({ tels, variantes, profil, setProfil, options, setProtection, setForfait, onClose }: {
+function Comparaison({ tels, variantes, profil, setProfil, options, setProtection, setForfait, onClose, majLe, prenom }: {
     tels: TelephoneFree[]; variantes: VarianteTel[]; profil: Profil; setProfil: (p: Profil) => void; options: Options;
     /** Interrupteur Protection dans l'en-tête : évite de revenir en arrière si on l'a oubliée. */
     setProtection: (actif: boolean) => void; setForfait: (montant: number) => void; onClose: () => void;
+    majLe: string | null; prenom: string;
 }) {
     useEffect(() => {
         const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -403,12 +407,17 @@ function Comparaison({ tels, variantes, profil, setProfil, options, setProtectio
 
     return (
         <div className="fixed inset-0 z-50 flex flex-col bg-slate-100">
+            <ImpressionSelection tels={tels} variantes={variantes} profil={profil} options={options} majLe={majLe} prenom={prenom} />
             <div className={`shrink-0 ${ROUGE} px-4 py-3 sm:px-8 sm:py-4`}>
                 <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                         <h2 className="text-xl font-black text-white sm:text-2xl">{seul ? "Fiche téléphone" : `Comparaison de ${tels.length} modèles`}</h2>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
+                        <button onClick={() => window.print()} aria-label="Imprimer" title="Imprimer la sélection pour le client"
+                            className="flex h-10 items-center gap-2 rounded-xl bg-white/15 px-3 text-sm font-black text-white hover:bg-white/25">
+                            <Printer size={18} /><span className="hidden sm:inline">Imprimer</span>
+                        </button>
                         <button
                             onClick={() => setReglages((o) => !o)}
                             aria-expanded={reglages}
@@ -541,3 +550,176 @@ function Comparaison({ tels, variantes, profil, setProfil, options, setProtectio
         </div>
     );
 }
+
+/* ─── Impression client (A4) : fiche si 1 modèle, cartes si 2 ou 3. Jamais nommé « devis ». ─── */
+
+const dateHeure = (d: Date) =>
+    d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) + " à " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }).replace(":", "h");
+
+function ImpressionSelection({ tels, variantes, profil, options, majLe, prenom }: {
+    tels: TelephoneFree[]; variantes: VarianteTel[]; profil: Profil; options: Options; majLe: string | null; prenom: string;
+}) {
+    const [monte, setMonte] = useState(false);
+    const [edition, setEdition] = useState(() => new Date());
+    useEffect(() => {
+        setMonte(true);
+        const maj = () => setEdition(new Date());
+        window.addEventListener("beforeprint", maj);
+        return () => window.removeEventListener("beforeprint", maj);
+    }, []);
+    if (!monte) return null;
+
+    const avecOptions = options.forfait > 0 || options.assurance;
+    const libProfil = profil === "abonne" ? "déjà abonné" : "nouveau client";
+    const prixLe = majLe ? dateHeure(new Date(majLe)) : dateHeure(edition);
+    const edite = <>Édité le {dateHeure(edition)}{prenom && <> par <b>{prenom}</b></>}</>;
+    const detail = (v: VarianteTel) => {
+        const f = flexDe(v, profil); const a = assuranceDe(v);
+        if (!f || !avecOptions) return null;
+        return [`téléphone ${eur(f.mensuel)}`, options.forfait > 0 && `forfait ${eur(options.forfait)}`, options.assurance && a && `protection ${eur(a.prix)}`].filter(Boolean).join(" + ");
+    };
+    const mentions = (
+        <p className="ip-small">
+            Document non contractuel, remis à titre d&apos;information. Prix et offres en vigueur le {prixLe}, susceptibles d&apos;évoluer à tout moment.
+            Free Flex : location avec option d&apos;achat sur 24 mois, sous réserve d&apos;acceptation du dossier ; le 1<sup>er</sup> loyer est réglé à la souscription.
+            {avecOptions && <> Forfait et protection indiqués selon les conditions en vigueur à cette date.</>}
+            {" "}Offres de remboursement soumises à conditions et valables jusqu&apos;aux dates indiquées, dans la limite des stocks disponibles. Photos non contractuelles.
+        </p>
+    );
+
+    const seul = tels.length === 1;
+    const t0 = tels[0], v0 = variantes[0], f0 = flexDe(v0, profil);
+
+    return createPortal(
+        <div id="impression-tel">
+            <style>{CSS_IMPRESSION}</style>
+            {seul ? (
+                <div className="ip-page">
+                    <div className="ip-hd">
+                        <div><p className="ip-sur">Votre sélection</p><p className="ip-titre">Récapitulatif téléphone</p></div>
+                        <p className="ip-small ip-droite">{edite}<br />Prix relevés le {prixLe}</p>
+                    </div>
+                    <div className="ip-hero">
+                        <img src={t0.image} alt="" />
+                        <div style={{ flex: 1 }}>
+                            <p className="ip-marque">{t0.marque}</p>
+                            <p className="ip-nom-xl">{t0.nom}</p>
+                            <p className="ip-gris">{[v0.stockage > 0 && go(v0.stockage), t0.couleurs?.map((c) => c.nom).join(", ")].filter(Boolean).join(" · ")}</p>
+                            {f0 ? (
+                                <div className="ip-rouge">
+                                    <p className="ip-rouge-sur">Free Flex · 24 mois · {libProfil}{options.forfait > 0 && " + forfait"}{options.assurance && " + protection"}</p>
+                                    <p className="ip-rouge-prix">{eur(mensuelTotal(v0, profil, options))}<span>/mois</span></p>
+                                    {detail(v0) && <p className="ip-rouge-det">{detail(v0)}</p>}
+                                    <p className="ip-rouge-det">{eur(f0.premierLoyer)} au départ · option d&apos;achat {eur(f0.optionAchat)}</p>
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
+                    <p className="ip-h3">Prix</p>
+                    <table className="ip-table"><tbody>
+                        {f0 && <>
+                            <tr><td>Free Flex — 1<sup>er</sup> loyer</td><td>{eur(f0.premierLoyer)}</td></tr>
+                            <tr><td>Free Flex — mensualité téléphone (24 mois)</td><td>{eur(f0.mensuel)}</td></tr>
+                            {options.forfait > 0 && <tr><td>Forfait</td><td>{eur(options.forfait)}/mois</td></tr>}
+                            {options.assurance && assuranceDe(v0) && <tr><td>Protection</td><td>{eur(assuranceDe(v0)!.prix)}/mois</td></tr>}
+                            <tr><td>Option d&apos;achat en fin de contrat</td><td>{eur(f0.optionAchat)}</td></tr>
+                        </>}
+                        <tr><td>Prix comptant</td><td>{eur(v0.comptant)}</td></tr>
+                        {v0.comptantApresRemb != null && v0.comptantApresRemb !== v0.comptant && <tr><td>Comptant après remboursement</td><td>{eur(v0.comptantApresRemb)}</td></tr>}
+                    </tbody></table>
+                    {v0.offres.length > 0 && <>
+                        <p className="ip-h3">Offres du moment</p>
+                        <table className="ip-table"><tbody>
+                            {v0.offres.map((o, j) => <tr key={j}><td>{o.titre}</td><td className="ip-gris">{o.fin ? `jusqu'au ${new Date(o.fin).toLocaleDateString("fr-FR")}` : ""}</td></tr>)}
+                        </tbody></table>
+                    </>}
+                    <p className="ip-h3">En bref</p>
+                    <table className="ip-table"><tbody>
+                        {t0.carac.ecran && <tr><td>Écran</td><td>{t0.carac.ecran}</td></tr>}
+                        {t0.carac.photo && <tr><td>Photo</td><td>{t0.carac.photo}</td></tr>}
+                        {t0.carac.batterie && <tr><td>Batterie</td><td>{t0.carac.batterie.toLocaleString("fr-FR")} mAh</td></tr>}
+                    </tbody></table>
+                    <div className="ip-foot">{mentions}</div>
+                </div>
+            ) : (
+                <div className="ip-page ip-page-c">
+                    <div className="ip-hd-c">
+                        <p className="ip-titre-c">Votre sélection<span style={{ color: "#cd1e25" }}>.</span></p>
+                        <p className="ip-small ip-droite">{edite}</p>
+                    </div>
+                    <p className="ip-gris" style={{ margin: "6px 0 26px" }}>Prix en date du {prixLe} — Free Flex sur 24 mois, {libProfil}{options.forfait > 0 && ", forfait inclus"}{options.assurance && ", protection incluse"}</p>
+                    {tels.map((t, i) => {
+                        const v = variantes[i]; const f = flexDe(v, profil);
+                        return (
+                            <div key={t.id} className="ip-card">
+                                <img src={t.image} alt="" />
+                                <div>
+                                    <p className="ip-marque">{t.marque}</p>
+                                    <p className="ip-nom">{t.nom}</p>
+                                    <p className="ip-gris" style={{ fontSize: 12, marginBottom: 8 }}>{[v.stockage > 0 && go(v.stockage), t.carac.ecran?.split(" ")[0], t.carac.batterie && `${t.carac.batterie.toLocaleString("fr-FR")} mAh`].filter(Boolean).join(" · ")}</p>
+                                    <div className="ip-ligne"><span>Comptant</span><b>{eur(v.comptant)}</b></div>
+                                    {v.comptantApresRemb != null && v.comptantApresRemb !== v.comptant && <div className="ip-ligne"><span>Après remboursement</span><b>{eur(v.comptantApresRemb)}</b></div>}
+                                    {v.offres.length > 0 && <p className="ip-offres">{v.offres.map((o) => o.titre.trim() + (o.fin ? ` (jusqu'au ${new Date(o.fin).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })})` : "")).join(" · ")}</p>}
+                                </div>
+                                {f ? (
+                                    <div className="ip-rouge ip-rouge-c">
+                                        <p className="ip-rouge-prix">{eur(mensuelTotal(v, profil, options))}<span>/mois</span></p>
+                                        <p className="ip-rouge-det" style={{ marginBottom: 6 }}>{detail(v) ?? "pendant 24 mois"}</p>
+                                        <div className="ip-ligne ip-ligne-b"><span>Au départ</span><b>{eur(f.premierLoyer)}</b></div>
+                                        <div className="ip-ligne ip-ligne-b"><span>Option d&apos;achat</span><b>{eur(f.optionAchat)}</b></div>
+                                    </div>
+                                ) : <div className="ip-gris">Free Flex non disponible</div>}
+                            </div>
+                        );
+                    })}
+                    <div className="ip-foot">{mentions}</div>
+                </div>
+            )}
+        </div>,
+        document.body,
+    );
+}
+
+const CSS_IMPRESSION = `
+#impression-tel{display:none}
+@media print{
+  @page{size:A4;margin:0}
+  html,body{background:#fff!important}
+  body>*:not(#impression-tel){display:none!important}
+  #impression-tel{display:block;color:#18181b;font-family:inherit;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+#impression-tel .ip-page{width:210mm;height:296mm;padding:15mm 15mm 11mm;display:flex;flex-direction:column;overflow:hidden;font-variant-numeric:tabular-nums}
+#impression-tel .ip-page-c{padding:16mm 17mm 11mm}
+#impression-tel .ip-small{font-size:9.5px;line-height:1.5;color:#71717a}
+#impression-tel .ip-droite{text-align:right}
+#impression-tel .ip-gris{color:#71717a;font-weight:600}
+#impression-tel .ip-hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #18181b;padding-bottom:14px}
+#impression-tel .ip-sur{font-size:10px;letter-spacing:.25em;font-weight:800;text-transform:uppercase;color:#cd1e25}
+#impression-tel .ip-titre{font-size:24px;font-weight:900;margin-top:4px}
+#impression-tel .ip-hero{display:flex;gap:36px;align-items:center;margin:34px 0 22px}
+#impression-tel .ip-hero img{width:220px;height:280px;object-fit:contain}
+#impression-tel .ip-marque{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:#71717a}
+#impression-tel .ip-nom-xl{font-size:32px;font-weight:900;line-height:1.05}
+#impression-tel .ip-nom{font-size:20px;font-weight:900;line-height:1.1}
+#impression-tel .ip-rouge{background:#cd1e25;color:#fff;border-radius:18px;padding:20px 24px;margin-top:16px}
+#impression-tel .ip-rouge-sur{font-size:10px;letter-spacing:.16em;font-weight:800;opacity:.8;text-transform:uppercase}
+#impression-tel .ip-rouge-prix{font-size:42px;font-weight:900;line-height:1.1}
+#impression-tel .ip-rouge-prix span{font-size:14px;opacity:.8;font-weight:700}
+#impression-tel .ip-rouge-det{font-size:12.5px;font-weight:600;opacity:.92}
+#impression-tel .ip-h3{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#a1a1aa;font-weight:800;margin:20px 0 4px}
+#impression-tel .ip-table{width:100%;border-collapse:collapse;font-size:13px}
+#impression-tel .ip-table td{padding:8px 0;border-bottom:1px solid #ececf0}
+#impression-tel .ip-table td:last-child{text-align:right;font-weight:700}
+#impression-tel .ip-foot{margin-top:auto;border-top:1px solid #e4e4e7;padding-top:10px}
+#impression-tel .ip-hd-c{display:flex;justify-content:space-between;align-items:flex-end}
+#impression-tel .ip-titre-c{font-size:30px;font-weight:900;letter-spacing:-.02em}
+#impression-tel .ip-card{display:grid;grid-template-columns:105px 1fr 200px;gap:20px;align-items:center;border:1.5px solid #18181b;border-radius:16px;padding:14px 16px 14px 20px;margin-bottom:14px;break-inside:avoid}
+#impression-tel .ip-card img{width:105px;height:125px;object-fit:contain}
+#impression-tel .ip-ligne{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2px 0}
+#impression-tel .ip-ligne span{color:#71717a}
+#impression-tel .ip-ligne-b span{color:rgba(255,255,255,.8)}
+#impression-tel .ip-offres{margin-top:6px;font-size:10.5px;font-weight:600;color:#a8161c}
+#impression-tel .ip-rouge-c{margin-top:0;padding:14px 16px;border-radius:14px}
+#impression-tel .ip-rouge-c .ip-rouge-prix{font-size:28px}
+#impression-tel .ip-rouge-c .ip-rouge-det{font-size:11px}
+`;
