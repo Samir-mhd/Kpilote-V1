@@ -45,6 +45,11 @@ const menu = [
         icon: "euro" as const,
     },
     {
+        label: "Outils",
+        href: "/manager/outils",
+        icon: "wrench" as const,
+    },
+    {
         label: "Historique",
         href: "/manager/historique",
         icon: "bell" as const,

@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { tracerOutil } from "@/services/outilsUsage";
 import { Search, X, ExternalLink, Check, RefreshCw, Minus, Smartphone, Battery, Camera, Wifi, SlidersHorizontal, Printer } from "lucide-react";
 import type { CatalogueTelephones, TelephoneFree, VarianteTel, PrixFlex } from "@/services/telephonesFreeService";
 
@@ -61,6 +62,7 @@ export default function ComparateurTelephonesPage() {
     const [actualisation, setActualisation] = useState<"" | "en_cours" | "ok" | "erreur">("");
     const [prenom, setPrenom] = useState("");
     useEffect(() => { setPrenom((new URLSearchParams(window.location.search).get("nom") ?? "").trim().split(/\s+/)[0] ?? ""); }, []);
+    useEffect(() => { tracerOutil("telephones", "ouverture"); }, []);
 
     useEffect(() => {
         fetch("/api/telephones")
@@ -414,7 +416,7 @@ function Comparaison({ tels, variantes, profil, setProfil, options, setProtectio
                         <h2 className="text-xl font-black text-white sm:text-2xl">{seul ? "Fiche téléphone" : `Comparaison de ${tels.length} modèles`}</h2>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                        <button onClick={() => window.print()} aria-label="Imprimer" title="Imprimer la sélection pour le client"
+                        <button onClick={() => { tracerOutil("telephones", "impression"); window.print(); }} aria-label="Imprimer" title="Imprimer la sélection pour le client"
                             className="flex h-10 items-center gap-2 rounded-xl bg-white/15 px-3 text-sm font-black text-white hover:bg-white/25">
                             <Printer size={18} /><span className="hidden sm:inline">Imprimer</span>
                         </button>

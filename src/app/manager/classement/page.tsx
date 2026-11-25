@@ -296,6 +296,7 @@ export default function ClassementPage() {
                     groupe={groupe}
                     conseillerId=""
                     photos={photos}
+                    vue="A"
                 />
             ) : (
                 <>

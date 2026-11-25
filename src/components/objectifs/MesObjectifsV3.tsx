@@ -9,6 +9,7 @@ import { getRealiseVentesCombo } from "@/services/variableConseiller";
 import { periodeSemaineEffective, joursPeriode } from "@/utils/periodes";
 import { PRODUITS_ORDRE } from "@/utils/produits";
 import { COMBO_META, ComboCode } from "@/utils/classementGroupes";
+import AnneauObjectif from "@/components/ui/AnneauObjectif";
 
 /**
  * Variante "par horizon" de Mes objectifs (&objectifs=v3) : tout se lit en Semaine / Mois.
@@ -45,61 +46,9 @@ function pct(h: { realise: number; objectif: number }) {
     return h.objectif > 0 ? Math.round((h.realise / h.objectif) * 100) : 0;
 }
 
-// Couleur d'une jauge : violet = atteint, vert = dans les temps (≥ repère), ambre / rouge sinon.
-function couleur(realise: number, objectif: number, repere: number): { barre: string; texte: string; trait: string } {
-    if (objectif > 0 && realise >= objectif) return { barre: "bg-violet-500", texte: "text-violet-600", trait: "#8b5cf6" };
-    if (realise >= repere) return { barre: "bg-emerald-500", texte: "text-emerald-600", trait: "#10b981" };
-    if (realise >= repere * 0.85) return { barre: "bg-amber-400", texte: "text-amber-600", trait: "#f59e0b" };
-    return { barre: "bg-rose-500", texte: "text-rose-600", trait: "#f43f5e" };
-}
 
-// Semaine : pas de rythme à comparer → neutre tant que pas atteint, violet une fois atteint.
-function couleurNeutre(realise: number, objectif: number): { barre: string; texte: string; trait: string } {
-    if (objectif > 0 && realise >= objectif) return { barre: "bg-violet-500", texte: "text-violet-600", trait: "#8b5cf6" };
-    return { barre: "bg-indigo-300", texte: "text-indigo-600", trait: "#a5b4fc" };
-}
 
-function Anneau({ valeur, couleurTrait, taille = 92 }: { valeur: number; couleurTrait: string; taille?: number }) {
-    const r = taille / 2 - 7;
-    const circ = 2 * Math.PI * r;
-    return (
-        <svg width={taille} height={taille} viewBox={`0 0 ${taille} ${taille}`} style={{ transform: "rotate(-90deg)" }} aria-hidden="true">
-            <circle cx={taille / 2} cy={taille / 2} r={r} fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="8" />
-            <circle
-                cx={taille / 2} cy={taille / 2} r={r} fill="none" stroke={couleurTrait} strokeWidth="8" strokeLinecap="round"
-                strokeDasharray={circ} strokeDashoffset={circ * (1 - Math.min(valeur, 100) / 100)}
-                style={{ transition: "stroke-dashoffset .8s cubic-bezier(.4,0,.2,1)" }}
-            />
-        </svg>
-    );
-}
 
-function MiniBarre({ label, h, repere }: { label: string; h: Horizon; repere?: number }) {
-    if (!h || (h.objectif === 0 && h.realise === 0)) {
-        return (
-            <div className="flex items-center gap-2 text-[11px]">
-                <span className="w-3 font-black text-slate-300">{label}</span>
-                <div className="h-1.5 flex-1 rounded-full bg-slate-100" />
-                <span className="w-12 text-right text-slate-300">—</span>
-            </div>
-        );
-    }
-    const p = pct(h);
-    const c = repere !== undefined ? couleur(h.realise, h.objectif, repere) : couleurNeutre(h.realise, h.objectif);
-    const posRepere = repere !== undefined && h.objectif > 0 ? Math.min((repere / h.objectif) * 100, 100) : null;
-    return (
-        <div className="flex items-center gap-2 text-[11px]">
-            <span className="w-3 font-black text-slate-400">{label}</span>
-            <div className="relative h-1.5 flex-1 rounded-full bg-slate-100">
-                <div className={`h-full rounded-full ${c.barre} transition-all duration-700`} style={{ width: `${Math.min(p, 100)}%` }} />
-                {posRepere !== null && h.realise < h.objectif && (
-                    <div className="absolute -top-1 h-3.5 w-0.5 rounded bg-slate-700" style={{ left: `${posRepere}%` }} />
-                )}
-            </div>
-            <span className="w-12 text-right font-bold tabular-nums text-slate-600">{h.realise}/{h.objectif}</span>
-        </div>
-    );
-}
 
 export default function MesObjectifsV3({ conseillerId }: { conseillerId: string; nom: string }) {
     const [cartes, setCartes] = useState<Carte[]>([]);
@@ -204,18 +153,12 @@ export default function MesObjectifsV3({ conseillerId }: { conseillerId: string;
                 <div className="relative mt-5 grid gap-3 sm:grid-cols-2">
                     {horizons.map((x) => {
                         const p = pct(x.h);
-                        const c = x.repere !== null ? couleur(x.h.realise, x.h.objectif, x.repere) : couleurNeutre(x.h.realise, x.h.objectif);
                         return (
                             <div key={x.label} className="flex items-center gap-4 rounded-2xl bg-white/[0.06] p-4 ring-1 ring-white/10">
-                                <div className="relative shrink-0">
-                                    <Anneau valeur={p} couleurTrait={c.trait} />
-                                    <span className="absolute inset-0 flex items-center justify-center text-lg font-black tabular-nums">{`${p}%`}</span>
-                                </div>
+                                <div className="shrink-0"><AnneauObjectif realise={x.h.realise} objectif={x.h.objectif} taille={92} sousTexte={false} sombre /></div>
                                 <div className="min-w-0">
                                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/50">{x.label}</p>
-                                    <p className="mt-0.5 text-2xl font-black tabular-nums">
-                                        {x.h.realise}<span className="text-base font-bold text-white/40"> / {x.h.objectif}</span>
-                                    </p>
+                                    <p className="mt-0.5 text-2xl font-black tabular-nums">{p}%</p>
                                     <p className="text-xs font-semibold text-white/55">{x.sous}</p>
                                 </div>
                             </div>
@@ -270,14 +213,13 @@ export default function MesObjectifsV3({ conseillerId }: { conseillerId: string;
                                             )}
                                         </div>
 
-                                        <p className="mt-2 leading-none">
-                                            <span className="text-3xl font-black tabular-nums text-slate-900">{c.mois.realise}</span>
-                                            <span className="text-sm font-bold text-slate-400"> / {c.mois.objectif} ce mois</span>
-                                        </p>
-
-                                        <div className="mt-3 space-y-1.5">
-                                            <MiniBarre label="S" h={c.semaine} />
-                                            <MiniBarre label="M" h={{ realise: c.mois.realise, objectif: c.mois.objectif }} repere={avecRythme ? c.mois.attendu : undefined} />
+                                        <div className="mt-3 grid grid-cols-2 gap-2">
+                                            {c.semaine ? (
+                                                <AnneauObjectif realise={c.semaine.realise} objectif={c.semaine.objectif} label="Semaine" taille={76} />
+                                            ) : (
+                                                <div className="flex flex-col items-center justify-center text-center text-[11px] font-bold text-slate-300">Semaine<br />sans objectif</div>
+                                            )}
+                                            <AnneauObjectif realise={c.mois.realise} objectif={c.mois.objectif} label="Mois" taille={76} />
                                         </div>
 
                                         {/* Mini-historique : 3 mois précédents + projection du mois en cours */}

@@ -6,9 +6,10 @@
  * Vue A (deux colonnes, par défaut) et vue B (parcours en 3 étapes, &vue=B).
  * Tarifs relevés sur free.fr : src/utils/offresBox.ts.
  */
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { tracerOutil } from "@/services/outilsUsage";
 import { Check, Plus, X, PiggyBank, ArrowLeft, ArrowRight, Printer, RotateCcw } from "lucide-react";
 import {
     SERVICES, FREEBOX, FORFAITS_FREE, MISE_EN_SERVICE, offresFree, prixForfaitFree,
@@ -90,6 +91,8 @@ function Calculatrice() {
     const sp = useSearchParams();
     const vue = sp.get("vue") === "B" ? "B" : "A";
     const qs = `?id=${encodeURIComponent(sp.get("id") ?? "")}&nom=${encodeURIComponent(sp.get("nom") ?? "")}`;
+    const baseOutils = usePathname().startsWith("/manager") ? "/manager/outils" : "/dashboard/outils";
+    useEffect(() => { tracerOutil("box", "ouverture"); }, []);
 
     // ── Aujourd'hui ──
     const [boxActuelle, setBoxActuelle] = useState(0);
@@ -360,7 +363,7 @@ function Calculatrice() {
     const enTete = (
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3 print:hidden">
             <div>
-                <Link href={`/dashboard/outils${qs}`} className="text-[11px] font-black uppercase tracking-[0.25em] hover:underline" style={{ color: ROUGE }}>Outils</Link>
+                <Link href={baseOutils === "/manager/outils" ? baseOutils : `${baseOutils}${qs}`} className="text-[11px] font-black uppercase tracking-[0.25em] hover:underline" style={{ color: ROUGE }}>Outils</Link>
                 <h1 className="flex items-center gap-3 text-3xl font-black text-slate-900">Calculatrice box <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black uppercase tracking-wider text-amber-700 ring-1 ring-amber-300">Bêta</span></h1>
             </div>
             <div className="flex items-center gap-3">
