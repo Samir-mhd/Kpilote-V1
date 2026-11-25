@@ -224,7 +224,7 @@ export function DefiJourBandeau({ conseillerId, nom }: { conseillerId: string; n
                     <div className="w-full sm:w-64">
                         <div className="flex justify-between text-xs font-black">
                             <span className={refuse ? "text-slate-500" : "text-white/80"}>Progression</span>
-                            <span className="tabular-nums">{Math.min(realise, defi.cible)} / {defi.cible}</span>
+                            <span className={`tabular-nums ${refuse ? "text-slate-900" : ""}`}>{Math.min(realise, defi.cible)} / {defi.cible}</span>
                         </div>
                         <div className={`mt-1 h-2.5 overflow-hidden rounded-full ${refuse ? "bg-slate-100" : "bg-white/25"}`}>
                             <div className={`h-full rounded-full transition-[width] duration-700 ${refuse ? "bg-violet-500" : "bg-white"}`} style={{ width: `${pct}%` }} />
