@@ -176,6 +176,7 @@ function Contenu() {
                                                 <p className="text-sm font-black text-slate-900">{OP[o.op].nom} · {o.nom}</p>
                                                 <div className="flex flex-wrap items-center gap-x-3">
                                                     {o.puis && <span className="text-xs font-bold tabular-nums text-slate-500">{o.moisPromo} mois, puis {eur(o.puis)}</span>}
+                                                    {o.prixBbox != null && <span className="text-xs font-bold tabular-nums text-slate-500">client Bbox : {eur(o.prixBbox)}</span>}
                                                     <LienOffre url={o.url} op={o.op} />
                                                 </div>
                                             </div>

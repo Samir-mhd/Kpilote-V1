@@ -34,6 +34,7 @@ export type OffreMobileConc = {
     puis?: number;
     moisPromo?: number;
     fin?: string;
+    prixBbox?: number;      // Bouygues : prix pour un client Bbox (remise foyer B.iG)
     url: string;
 };
 export type ReleveOperateur = {
@@ -323,6 +324,43 @@ async function lireByouMobile(): Promise<{ mobile: OffreMobileConc[]; page: stri
     return { mobile, page };
 }
 
+type PlanBtMobile = {
+    name: string; urlKey?: string; categories?: string[]; obligationLabel?: string; dataEnvelope?: string;
+    details?: { price?: { initial?: number }; discounts?: { value: number; isIncitation: boolean; marketingTypes?: string[] }[] };
+};
+
+/** Forfaits Bouygues Telecom (SIM seule, sans engagement ; mêmes prix avec engagement 24 mois). */
+async function lireBouyguesMobile(): Promise<{ mobile: OffreMobileConc[]; page: string }> {
+    const page = "https://www.bouyguestelecom.fr/forfaits-mobiles/avec-engagement";
+    const flux = fluxNext(await lire(page));
+    const mobile: OffreMobileConc[] = [];
+    const vus = new Set<string>();
+    // La page contient plusieurs listes « products » : on les parcourt toutes.
+    for (let i = flux.indexOf('"products":['); i >= 0; i = flux.indexOf('"products":[', i + 1)) {
+        for (const p of tableauJson<PlanBtMobile>(flux.slice(i), "products") ?? []) {
+            const cats = p?.categories ?? [];
+            const initial = p?.details?.price?.initial;
+            // Mini et Mega (plan_simo_multiligne) sont réservés aux clients Bbox + forfait : exclus.
+            if (!p?.name || !p.dataEnvelope || typeof initial !== "number" || !cats.includes("plan_simo") || cats.includes("plan_simo_multiligne")
+                || !/sans engagement/i.test(p.obligationLabel ?? "")) continue;
+            const nom = p.name.replace(/\s*SIM seule/i, "").replace(/\s*5G$/i, "").replace(/(\d)Go/, "$1 Go").trim();
+            if (vus.has(nom)) continue;
+            vus.add(nom);
+            // Prix public = prix de base - remises sans condition ; la remise « foyer » (B.iG) = prix client Bbox.
+            const remises = (p.details?.discounts ?? []).filter((d) => !d.isIncitation);
+            const foyer = remises.filter((d) => d.marketingTypes?.includes("FOYER")).reduce((s, d) => s + d.value, 0);
+            const autres = remises.filter((d) => !d.marketingTypes?.includes("FOYER")).reduce((s, d) => s + d.value, 0);
+            const prix = arrondi(initial - autres);
+            mobile.push({
+                nom, go: volumeGo(p.dataEnvelope), prix,
+                ...(foyer > 0 ? { prixBbox: arrondi(prix - foyer) } : {}),
+                url: p.urlKey ? `${page}#${p.urlKey}` : page,
+            });
+        }
+    }
+    return { mobile, page };
+}
+
 /* ───────────── Validation & point d'entrée ───────────── */
 
 function valider(r: ReleveOperateur, attendu: { box: boolean; mobile: boolean }): ReleveOperateur {
@@ -349,8 +387,8 @@ export async function lireOperateur(op: OperateurId): Promise<ReleveOperateur> {
         case "red":
             return valider(await lireRed(), { box: true, mobile: true });
         case "bt": {
-            const { bt, page } = await lireBouyguesBox();
-            return valider({ op, box: bt, mobile: [], releveLe: maintenant, source: { box: page } }, { box: true, mobile: false });
+            const [{ bt, page }, mob] = await Promise.all([lireBouyguesBox(), lireBouyguesMobile()]);
+            return valider({ op, box: bt, mobile: mob.mobile, releveLe: maintenant, source: { box: page, mobile: mob.page } }, { box: true, mobile: true });
         }
         case "byou": {
             const [{ byou, page }, mob] = await Promise.all([lireBouyguesBox(), lireByouMobile()]);

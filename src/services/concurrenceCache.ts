@@ -11,7 +11,7 @@ import { lireOperateur, OPERATEURS, type OperateurId, type ReleveOperateur } fro
 export const DUREE_CONCURRENCE_S = 12 * 60 * 60;
 
 const caches = Object.fromEntries(
-    OPERATEURS.map((op) => [op, unstable_cache(() => lireOperateur(op), [`concurrence-${op}-v1`], { revalidate: DUREE_CONCURRENCE_S, tags: ["concurrence"] })]),
+    OPERATEURS.map((op) => [op, unstable_cache(() => lireOperateur(op), [`concurrence-${op}-v2`], { revalidate: DUREE_CONCURRENCE_S, tags: ["concurrence"] })]),
 ) as Record<OperateurId, () => Promise<ReleveOperateur>>;
 
 export type EtatOperateur = ReleveOperateur | { op: OperateurId; erreur: string };
