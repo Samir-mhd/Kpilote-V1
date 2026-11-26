@@ -13,6 +13,7 @@ import { readTheme, applyTheme } from "@/components/dashboard/ThemePicker";
 import { supabase } from "@/lib/supabase";
 import MenuCompact from "@/components/ui/MenuCompact";
 import { useModeSombre } from "@/components/ui/modeSombre";
+import BoutonModeSombre from "@/components/ui/BoutonModeSombre";
 
 const menus = [
     { label: "Accueil",       href: "/dashboard",              Icon: Home },
@@ -28,7 +29,7 @@ const menus = [
 ];
 
 // Menu isolé pour que son useSearchParams soit wrappé dans Suspense
-function SidebarInner({ sombre, basculerSombre }: { sombre: boolean; basculerSombre: () => void }) {
+function SidebarInner() {
     const pathname = usePathname();
     const params = useSearchParams();
     const id = params.get("id") ?? "";
@@ -82,7 +83,6 @@ function SidebarInner({ sombre, basculerSombre }: { sombre: boolean; basculerSom
                         🌙 Valider ma journée
                     </button>
                 )}
-                <button onClick={basculerSombre} className="mb-1.5 flex w-full items-center justify-center rounded-xl bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-300 transition-colors hover:bg-white/10 hover:text-white">{sombre ? "☀️ Mode clair" : "🌙 Mode sombre"}</button>
                 <div className="flex items-center gap-2 py-1">
                     <PhotoAvatar nom={nom} photoUrl={photoUrl} size={26} />
                     <p className="min-w-0 flex-1 truncate text-xs font-black text-white">{nom}</p>
@@ -111,8 +111,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     return (
         <div data-sombre={sombre ? "1" : undefined} className="flex min-h-screen bg-slate-50">
+            <BoutonModeSombre sombre={sombre} basculer={basculerSombre} />
             <Suspense fallback={null}>
-                <SidebarInner sombre={sombre} basculerSombre={basculerSombre} />
+                <SidebarInner />
             </Suspense>
             <main className="flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-7xl py-7 pl-20 pr-6">
