@@ -8,6 +8,7 @@ const OUTILS = [
     { href: "/dashboard/outils/telephones", emoji: "📱", titre: "Comparateur téléphones", texte: "Prix Free Flex et comptant, caractéristiques, comparaison jusqu'à 3 modèles." },
     { href: "/dashboard/outils/odr", emoji: "🧾", titre: "Coupons ODR", texte: "Les coupons de remboursement de mobile.free.fr, à imprimer en 1 clic." },
     { href: "/dashboard/outils/box", emoji: "🧮", titre: "Calculatrice box (bêta)", texte: "Ce que paie le client aujourd'hui face à l'offre Free : box, forfaits, abonnements, économie." },
+    { href: "/dashboard/outils/concurrence", emoji: "🔭", titre: "Concurrence", texte: "Les offres box et mobile du moment chez Orange, Sosh, SFR, RED, Bouygues et B&You." },
     { href: "/dashboard/quiz", emoji: "🧠", titre: "Quiz", texte: "Teste tes connaissances box, mobile et gestion : 135 questions, mode Expert à débloquer." },
 ];
 
