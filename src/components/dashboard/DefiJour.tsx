@@ -210,24 +210,24 @@ export function DefiJourBandeau({ conseillerId, nom }: { conseillerId: string; n
         <>
             <section className={`relative overflow-hidden rounded-[22px] p-4 ${
                 reussi ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
-                : refuse ? "bg-white ring-1 ring-slate-200"
+                : refuse ? "bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500 text-white shadow-[0_10px_30px_rgba(192,38,211,.3)]"
                 : "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-[0_10px_30px_rgba(124,58,237,.3)]"
             }`}>
                 <div className="flex flex-wrap items-center gap-4">
                     <span className="text-2xl" aria-hidden="true">{reussi ? "🏆" : refuse ? "⭐" : "🎯"}</span>
                     <div className="min-w-0 flex-1">
-                        <p className={`text-[11px] font-black uppercase tracking-[0.2em] ${refuse ? "text-slate-400" : "text-white/75"}`}>
+                        <p className={`text-[11px] font-black uppercase tracking-[0.2em] text-white/75`}>
                             {reussi ? "Défi du jour remporté !" : refuse ? "Priorité du jour" : "Défi du jour"}
                         </p>
-                        <p className={`text-lg font-black ${refuse ? "text-slate-900" : ""}`}>{defi.libelle}</p>
+                        <p className="text-lg font-black">{defi.libelle}</p>
                     </div>
                     <div className="w-full sm:w-64">
                         <div className="flex justify-between text-xs font-black">
-                            <span className={refuse ? "text-slate-500" : "text-white/80"}>Progression</span>
-                            <span className={`tabular-nums ${refuse ? "text-slate-900" : ""}`}>{Math.min(realise, defi.cible)} / {defi.cible}</span>
+                            <span className="text-white/80">Progression</span>
+                            <span className="tabular-nums">{Math.min(realise, defi.cible)} / {defi.cible}</span>
                         </div>
-                        <div className={`mt-1 h-2.5 overflow-hidden rounded-full ${refuse ? "bg-slate-100" : "bg-white/25"}`}>
-                            <div className={`h-full rounded-full transition-[width] duration-700 ${refuse ? "bg-violet-500" : "bg-white"}`} style={{ width: `${pct}%` }} />
+                        <div className={`mt-1 h-2.5 overflow-hidden rounded-full bg-white/25`}>
+                            <div className={`h-full rounded-full transition-[width] duration-700 bg-white`} style={{ width: `${pct}%` }} />
                         </div>
                     </div>
                 </div>

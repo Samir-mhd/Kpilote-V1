@@ -3,8 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { Calculator, Check, ChevronRight, Smartphone, Ticket, X } from "lucide-react";
+import { X } from "lucide-react";
 import HeroCompact from "@/components/dashboard/HeroCompact";
 import MorningCheckV2 from "@/components/dashboard/MorningCheckV2";
 import { DefiJourBandeau } from "@/components/dashboard/DefiJour";
@@ -925,6 +924,13 @@ export default function Dashboard() {
                 anneau={anneau}
                 emoji={emojiProduit(mission.produit)}
                 onDeclencheur={anneau ? enregistreurPour(mission.produit) : undefined}
+                tuile={anneau ? {
+                    choisi: actesChoisis.includes(mission.produit),
+                    onBasculer: mission.sansCarte ? undefined : () => basculerActe(mission.produit),
+                    libelle: mission.sansCarte
+                        ? (produitCode(mission.produit) === "canal_plus" ? "Proposé après une box" : "Dans une vente combo")
+                        : libellePlusUn(mission.produit),
+                } : undefined}
                 titre={mission.produit}
                 realise={mission.realise}
                 objectif={mission.objectif}
@@ -1145,6 +1151,7 @@ export default function Dashboard() {
                     cagnotte={variableActivee ? { total: cagnotteTotal, hier: cagnotteHier, flash: cagnotteFlash } : null}
                     travailleAujourdhui={travailleAujourdhui}
                     genre={genre}
+                    lienOutils={`/dashboard/outils?id=${encodeURIComponent(conseillerId)}&nom=${encodeURIComponent(nom)}`}
                 />
             )}
 
@@ -1272,125 +1279,14 @@ export default function Dashboard() {
             )}
 
             {(
-                <div className="space-y-6">
-                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_1fr]">
-                        {/* ── Déclarer une vente : 1 acte = vente simple, plusieurs = vente combo ── */}
-                        <section className="carte-accueil relative overflow-hidden rounded-[24px] border-2 border-slate-900 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,.08)]">
-                            <div className="mb-4 flex items-center gap-3">
-                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-xl">✍️</span>
-                                <div>
-                                    <h2 className="text-lg font-black leading-tight text-slate-900">Déclarer une vente</h2>
-                                    <p className="text-xs font-semibold text-slate-400">Touche tes actes puis valide · à partir de 2, c&apos;est une vente combo</p>
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {ordonnerAccueil(missions.filter((m) => !m.sansCarte)).map((m) => {
-                                    const actif = actesChoisis.includes(m.produit);
-                                    return (
-                                        <button
-                                            key={m.produit}
-                                            type="button"
-                                            aria-pressed={actif}
-                                            onClick={() => basculerActe(m.produit)}
-                                            className={`inline-flex items-center gap-2 rounded-full px-5 py-3 text-base font-black transition-all active:scale-95 ${actif ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
-                                        >
-                                            {actif ? <Check size={18} strokeWidth={3.5} /> : <span className="text-lg leading-none">{emojiProduit(m.produit)}</span>}
-                                            {nomActe(m.produit)}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            {(() => {
-                                const choisis = ordonnerAccueil(missions.filter((m) => !m.sansCarte && actesChoisis.includes(m.produit)));
-                                if (choisis.length === 0) {
-                                    return (
-                                        <div className="mt-4 rounded-2xl border-2 border-dashed border-slate-200 px-4 py-3.5 text-center text-sm font-bold text-slate-400">
-                                            Touche un ou plusieurs actes · à partir de 2, c&apos;est une vente combo 🎁
-                                        </div>
-                                    );
-                                }
-                                const combo = estCombo(choisis);
-                                const nbArticles = choisis.reduce((t, m) => t + quantiteActe(m.produit), 0);
-                                const libelle = combo
-                                    ? `Valider la vente combo (${nbArticles})`
-                                    : choisis.length === 1 ? `Valider : ${libellePlusUn(choisis[0].produit)}` : `Valider (${choisis.length})`;
-                                return (
-                                    <div className={`mt-4 flex flex-wrap items-center gap-3 rounded-2xl p-3 ${combo ? "bg-gradient-to-r from-amber-50 via-orange-50 to-pink-50 ring-1 ring-orange-200" : "bg-slate-50 ring-1 ring-slate-200"}`}>
-                                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                                            {combo && <span className="rounded-full bg-gradient-to-r from-amber-400 to-pink-500 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-white">🎁 Combo</span>}
-                                            {choisis.map((m) => {
-                                                const multiple = PRODUITS_MULTIPLES.includes(produitCode(m.produit));
-                                                const n = quantiteActe(m.produit);
-                                                return (
-                                                    <span key={m.produit} className="inline-flex items-center gap-1.5 rounded-full bg-white py-1 pl-3.5 pr-1.5 text-base font-black text-slate-700 ring-1 ring-slate-200">
-                                                        {emojiProduit(m.produit)} {nomActe(m.produit)}
-                                                        {multiple && (
-                                                            <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-1">
-                                                                <button type="button" aria-label={`Un ${nomActe(m.produit)} de moins`} onClick={() => reglerQuantite(m.produit, n - 1)} disabled={n <= 1} className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none hover:bg-white disabled:opacity-30">−</button>
-                                                                <span className="w-5 text-center tabular-nums">{n}</span>
-                                                                <button type="button" aria-label={`Un ${nomActe(m.produit)} de plus`} onClick={() => reglerQuantite(m.produit, n + 1)} className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none hover:bg-white">+</button>
-                                                            </span>
-                                                        )}
-                                                        <button type="button" aria-label={`Retirer ${nomActe(m.produit)}`} onClick={() => basculerActe(m.produit)} className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100">
-                                                            <X size={16} className="text-slate-400" />
-                                                        </button>
-                                                    </span>
-                                                );
-                                            })}
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={validerDeclaration}
-                                            className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-black text-white shadow-md transition-all hover:-translate-y-0.5 active:scale-[0.98] ${combo ? "bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500" : "bg-slate-900"}`}
-                                        >
-                                            {libelle} →
-                                        </button>
-                                    </div>
-                                );
-                            })()}
-                        </section>
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_330px] xl:grid-cols-[1fr_360px]">
+                    <div className="min-w-0 space-y-5">
+                        {conseillerId && <DefiJourBandeau conseillerId={conseillerId} nom={nom} />}
 
-                        {/* ── Outils : accès direct (le menu est trop petit pour naviguer) ── */}
-                        <section className="carte-accueil relative overflow-hidden rounded-[24px] border-2 border-slate-900 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,.08)]">
-                            <div className="mb-4 flex items-center gap-3">
-                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-xl">🧰</span>
-                                <div>
-                                    <h2 className="text-lg font-black leading-tight text-slate-900">Outils</h2>
-                                    <p className="text-xs font-semibold text-slate-400">Aide à la vente</p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                                {[
-                                    { href: "/dashboard/outils/telephones", Icone: Smartphone, titre: "Comparateur téléphones", texte: "Prix Free Flex et comptant, jusqu'à 3 modèles" },
-                                    { href: "/dashboard/outils/odr", Icone: Ticket, titre: "Coupons ODR", texte: "Coupons de remboursement, impression en 1 clic" },
-                                    { href: "/dashboard/outils/box", Icone: Calculator, titre: "Calculatrice box (bêta)", texte: "Comparer l'offre du client et l'offre Free" },
-                                ].map(({ href, Icone, titre, texte }) => (
-                                    <Link key={href} href={`${href}${`?id=${encodeURIComponent(conseillerId)}&nom=${encodeURIComponent(nom)}`}`} className="tuile-outil group flex items-center gap-3 rounded-2xl bg-red-50/60 p-3 ring-1 ring-red-100 transition-all hover:-translate-y-0.5 hover:bg-red-50">
-                                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#cd1e25] text-white"><Icone size={18} /></span>
-                                        <span className="min-w-0 flex-1">
-                                            <span className="block text-sm font-black text-slate-900">{titre}</span>
-                                            <span className="block truncate text-[11px] font-semibold text-slate-500">{texte}</span>
-                                        </span>
-                                        <ChevronRight size={16} className="shrink-0 text-[#cd1e25] transition-transform group-hover:translate-x-0.5" />
-                                    </Link>
-                                ))}
-                            </div>
-                        </section>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_1fr]">
-                        {/* ── Objectifs du jour en anneaux (la jauge avance à chaque vente) ── */}
-                        <section className="carte-accueil relative overflow-hidden rounded-[24px] border-2 border-slate-900 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,.08)]">
-                            <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-                                <div className="flex items-center gap-3">
-                                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-xl">🎯</span>
-                                    <div>
-                                        <h2 className="text-lg font-black leading-tight text-slate-900">Objectifs du jour</h2>
-                                        {missions.some((m) => m.dernierJourSemaine) && (
-                                            <p className="text-xs font-semibold text-amber-700">📅 Dernier jour de ta semaine : le reste se joue aujourd&apos;hui</p>
-                                        )}
-                                    </div>
-                                </div>
+                        {/* ── Objectifs du jour : tuiles (anneau + « +1 ») ; plusieurs produits = vente combo ── */}
+                        <section>
+                            <div className="flex flex-wrap items-end justify-between gap-2">
+                                <h2 className="text-xl font-black text-slate-900">🎯 Tes objectifs du jour</h2>
                                 {(() => {
                                     const cartes = missions.filter((m) => m.objectif > 0);
                                     const atteints = cartes.filter((m) => m.realise >= m.objectif).length;
@@ -1399,18 +1295,74 @@ export default function Dashboard() {
                                     ) : null;
                                 })()}
                             </div>
-                            <div className="grid grid-cols-3 gap-y-5 sm:grid-cols-4">
+                            <p className="mt-1 text-xs font-semibold text-slate-400">
+                                Touche « +1 » sur un ou plusieurs produits, puis valide en bas · 2 produits ou plus = vente combo 🎁
+                            </p>
+                            {missions.some((m) => m.dernierJourSemaine) && (
+                                <p className="mt-1 text-xs font-semibold text-amber-700">📅 Dernier jour de ta semaine : le reste se joue aujourd&apos;hui</p>
+                            )}
+                            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-4">
                                 {cartesMissions(true, true)}
                             </div>
-                            {conseillerId && <div className="mt-5"><DefiJourBandeau conseillerId={conseillerId} nom={nom} /></div>}
                         </section>
-
-                        <aside className="xl:self-start">
-                            <TeamFeed conseillerId={conseillerId} condense />
-                        </aside>
                     </div>
+
+                    <aside className="max-lg:order-first lg:sticky lg:top-6 lg:self-start">
+                        <TeamFeed conseillerId={conseillerId} condense />
+                    </aside>
                 </div>
             )}
+
+            {/* ── Vente en cours : barre fixe en bas dès qu'un produit est ajouté ── */}
+            {(() => {
+                const choisis = ordonnerAccueil(missions.filter((m) => !m.sansCarte && actesChoisis.includes(m.produit)));
+                if (choisis.length === 0) return null;
+                const combo = estCombo(choisis);
+                const nbArticles = choisis.reduce((t, m) => t + quantiteActe(m.produit), 0);
+                const libelle = combo
+                    ? `Valider la vente combo (${nbArticles})`
+                    : choisis.length === 1 ? `Valider : ${libellePlusUn(choisis[0].produit)}` : `Valider (${choisis.length})`;
+                return (
+                    <>
+                        <div className="h-24" aria-hidden="true" />
+                        <div className="fixed inset-x-0 bottom-4 z-40 mx-auto w-[min(860px,calc(100%-6rem))] pl-4 max-sm:w-[calc(100%-2rem)] max-sm:pl-0" style={{ animation: "barreVente .35s cubic-bezier(.34,1.56,.64,1)" }}>
+                            <div className={`flex flex-wrap items-center gap-3 rounded-2xl p-3 pl-4 text-white shadow-[0_16px_40px_rgba(249,115,22,.4)] ${combo ? "bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500" : "bg-slate-900 shadow-[0_16px_40px_rgba(15,23,42,.35)]"}`}>
+                                <span className="text-2xl" aria-hidden="true">{combo ? "🎁" : "✍️"}</span>
+                                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                                    <span className="w-full text-[11px] font-black uppercase tracking-wider text-white/80">{combo ? "Vente combo" : "Vente en cours"}</span>
+                                    {choisis.map((m) => {
+                                        const multiple = PRODUITS_MULTIPLES.includes(produitCode(m.produit));
+                                        const n = quantiteActe(m.produit);
+                                        return (
+                                            <span key={m.produit} className="inline-flex items-center gap-1 rounded-full bg-white/20 py-0.5 pl-3 pr-1 text-sm font-black">
+                                                {emojiProduit(m.produit)} {nomActe(m.produit)}
+                                                {multiple && (
+                                                    <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-white/20 px-0.5">
+                                                        <button type="button" aria-label={`Un ${nomActe(m.produit)} de moins`} onClick={() => reglerQuantite(m.produit, n - 1)} disabled={n <= 1} className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none hover:bg-white/20 disabled:opacity-30">−</button>
+                                                        <span className="w-4 text-center tabular-nums">{n}</span>
+                                                        <button type="button" aria-label={`Un ${nomActe(m.produit)} de plus`} onClick={() => reglerQuantite(m.produit, n + 1)} className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none hover:bg-white/20">+</button>
+                                                    </span>
+                                                )}
+                                                <button type="button" aria-label={`Retirer ${nomActe(m.produit)}`} onClick={() => basculerActe(m.produit)} className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/20">
+                                                    <X size={15} />
+                                                </button>
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={validerDeclaration}
+                                    className={`shrink-0 rounded-xl bg-white px-5 py-3 text-sm font-black shadow-md transition-all hover:-translate-y-0.5 active:scale-[0.98] ${combo ? "text-orange-600" : "text-slate-900"}`}
+                                >
+                                    {libelle} →
+                                </button>
+                            </div>
+                            <style>{`@keyframes barreVente { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }`}</style>
+                        </div>
+                    </>
+                );
+            })()}
 
             {comboOuvert && (
                 <ComboVenteModal

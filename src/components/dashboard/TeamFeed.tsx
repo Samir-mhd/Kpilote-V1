@@ -563,7 +563,34 @@ function FeedCondense({ entries, conseillerId, dbError }: { entries: Entry[]; co
     const nbVentes = entries.filter((e) => !e.reset).reduce((t, e) => t + e.quantite, 0);
 
     return (
-        <div className="carte-accueil relative overflow-hidden rounded-[24px] border-2 border-slate-900 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,.08)]">
+        <>
+        {/* Tablette portrait / téléphone : bande « Live » qui défile, juste sous l'en-tête. */}
+        <div className="overflow-hidden rounded-2xl bg-slate-900 py-2 lg:hidden">
+            <div className="flex items-center">
+                <span className="z-10 flex shrink-0 items-center gap-1.5 bg-slate-900 pl-3 pr-2 text-[11px] font-black uppercase tracking-wider text-emerald-400">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />Live
+                </span>
+                {groupes.length === 0 ? (
+                    <p className="truncate text-xs font-bold text-white/60">Pas encore de vente aujourd&apos;hui — à toi d&apos;ouvrir le bal ! 🚀</p>
+                ) : (
+                    <div className="min-w-0 overflow-hidden">
+                        <div className="feed-defile flex w-max gap-2" style={{ animationDuration: `${Math.max(20, groupes.length * 6)}s` }}>
+                            {[...groupes, ...groupes].map((g, i) => {
+                                const { texte, temps_fort } = messageGroupe(g);
+                                return (
+                                    <span key={`${g.id}-${i}`} className={`flex shrink-0 items-center gap-2 rounded-full py-1 pl-1 pr-3 text-xs font-bold text-white ${temps_fort ? "bg-amber-400/20" : "bg-white/10"}`}>
+                                        <CartoonAvatar prenom={g.nom} etat={temps_fort ? "en_feu" : "souriant_main"} size={28} />
+                                        {texte}
+                                        {!g.reset && <span className="font-black text-emerald-400">+{g.total}</span>}
+                                    </span>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+        <div className="carte-accueil relative overflow-hidden rounded-[24px] border-2 border-slate-900 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,.08)] max-lg:hidden">
             <div className="mb-4 flex items-center gap-2.5">
                 <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-green-500" />
                 <p className="flex-1 text-sm font-black text-slate-900">En direct de l&apos;équipe</p>
@@ -621,7 +648,11 @@ function FeedCondense({ entries, conseillerId, dbError }: { entries: Entry[]; co
                     to   { opacity: 1; transform: translateY(0) scale(1); }
                 }
                 .animate-feedIn { animation: feedIn .4s cubic-bezier(.34,1.56,.64,1); }
+                @keyframes feedDefile { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+                .feed-defile { animation: feedDefile linear infinite; }
+                @media (prefers-reduced-motion: reduce) { .feed-defile { animation: none; } }
             `}</style>
         </div>
+        </>
     );
 }

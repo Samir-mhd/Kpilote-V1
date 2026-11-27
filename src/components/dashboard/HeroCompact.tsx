@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import CartoonAvatar, { type AvatarEtat } from "@/components/avatar/CartoonAvatar";
 import { AVATAR_PHRASES } from "@/components/dashboard/HeroHeader";
@@ -18,6 +19,8 @@ type Props = {
     /** false = pas planifié aujourd'hui (off, congés…) : jamais de relance d'inactivité. */
     travailleAujourdhui?: boolean;
     genre?: Genre;
+    /** Lien vers les Outils : petit raccourci sous le message. */
+    lienOutils?: string;
 };
 
 // Situations qui priment sur l'état "temps depuis la dernière vente" de l'avatar : un conseiller
@@ -70,7 +73,7 @@ function situation(avatarEtat: AvatarEtat, taux: number, rang: number, realise: 
     return { etat: avatarEtat, phrases: AVATAR_PHRASES[avatarEtat] };
 }
 
-export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, taux, cagnotte, travailleAujourdhui = true, genre = null }: Props) {
+export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, taux, cagnotte, travailleAujourdhui = true, genre = null, lienOutils }: Props) {
     const prenom = nom.split(" ")[0];
     // Heure relue chaque minute pour basculer à l'ouverture / la fermeture sans recharger.
     const [heure, setHeure] = useState(() => new Date().getHours());
@@ -105,7 +108,7 @@ export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, 
             <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-fuchsia-500/20 blur-3xl" />
             <div className="pointer-events-none absolute -left-10 bottom-0 h-48 w-48 rounded-full bg-violet-500/20 blur-3xl" />
 
-            <div className="relative flex flex-col gap-5 p-5 xl:flex-row xl:items-center xl:gap-6 xl:p-6">
+            <div className="relative flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:gap-6 lg:p-6">
                 {/* Avatar + message */}
                 <div className="flex min-w-0 flex-1 items-center gap-4">
                     <CartoonAvatar
@@ -115,15 +118,20 @@ export default function HeroCompact({ nom, avatarEtat, rang, realise, objectif, 
                     />
                     <div className="min-w-0">
                         <h1 className="text-xl font-black leading-tight sm:text-2xl">{titre}</h1>
+                        {lienOutils && (
+                            <Link href={lienOutils} className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-white ring-1 ring-white/20 transition-colors hover:bg-white/20">
+                                🧰 Outils <span className="font-bold text-white/60">· comparateur, ODR, box…</span> →
+                            </Link>
+                        )}
                     </div>
                 </div>
 
                 {/* Chiffres clés */}
-                <div className={`grid shrink-0 gap-2.5 ${cagnotte ? "grid-cols-3" : "grid-cols-2"} xl:w-[440px]`}>
+                <div className={`grid shrink-0 gap-2.5 ${cagnotte ? "grid-cols-3" : "grid-cols-2"} lg:w-[400px] xl:w-[440px]`}>
                     {cagnotte && (
                         <div className="relative rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 p-3.5 shadow-[0_8px_24px_rgba(192,38,211,.35)]">
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70">Cagnotte</p>
-                            <p className="mt-1 text-2xl font-black leading-none tabular-nums sm:text-[26px]">{fmtEuro(cagnotte.total)}</p>
+                            <p className="mt-1 whitespace-nowrap text-2xl font-black leading-none tabular-nums sm:text-[26px] lg:text-2xl xl:text-[26px]">{fmtEuro(cagnotte.total)}</p>
                             {progressionCagnotte !== null && (
                                 <p className={`mt-2.5 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-bold tabular-nums ${progressionCagnotte >= 0 ? "text-emerald-200" : "text-rose-200"}`}>
                                     {progressionCagnotte >= 0 ? <TrendingUp size={12} aria-hidden="true" /> : <TrendingDown size={12} aria-hidden="true" />}

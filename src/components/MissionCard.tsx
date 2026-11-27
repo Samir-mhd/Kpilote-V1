@@ -46,6 +46,10 @@ type Props = {
     emoji?: string;
     /** Reçoit la fonction qui lance la vente de cette carte (comme un clic sur « +1 »). */
     onDeclencheur?: (lancer: (() => void) | null) => void;
+    /** Anneau dans une tuile sombre (Accueil) avec un bouton « +1 » coloré qui ajoute / retire
+     *  le produit de la vente en cours (validée par la barre du bas). Sans onBasculer : pas de bouton
+     *  (produit déclaré seulement via une vente combo). */
+    tuile?: { choisi: boolean; onBasculer?: () => void; libelle: string };
 };
 
 // Mapping couleur Tailwind → hex (pour le SVG arc) + gradient (pour la barre/bouton)
@@ -57,6 +61,10 @@ const PALETTE: Record<string, { hex: string; arcStroke: string; gradient: string
     "bg-sky-500":    { hex: "#0ea5e9", arcStroke: "#38bdf8", gradient: "from-sky-500 to-cyan-400",       glow: "rgba(14,165,233,.35)" },
     "bg-yellow-500": { hex: "#eab308", arcStroke: "#facc15", gradient: "from-yellow-500 to-amber-400",   glow: "rgba(234,179,8,.35)"  },
     "bg-red-500":    { hex: "#ef4444", arcStroke: "#f87171", gradient: "from-red-500 to-rose-400",       glow: "rgba(239,68,68,.35)"  },
+    "bg-teal-500":   { hex: "#14b8a6", arcStroke: "#2dd4bf", gradient: "from-teal-500 to-emerald-400",   glow: "rgba(20,184,166,.35)" },
+    "bg-amber-500":  { hex: "#f59e0b", arcStroke: "#fbbf24", gradient: "from-amber-500 to-orange-400",   glow: "rgba(245,158,11,.35)" },
+    "bg-rose-500":   { hex: "#f43f5e", arcStroke: "#fb7185", gradient: "from-rose-500 to-pink-400",      glow: "rgba(244,63,94,.35)"  },
+    "bg-indigo-500": { hex: "#6366f1", arcStroke: "#818cf8", gradient: "from-indigo-500 to-violet-400",  glow: "rgba(99,102,241,.35)" },
 };
 const DEFAULT_PAL = { hex: "#8b5cf6", arcStroke: "#a78bfa", gradient: "from-violet-500 to-purple-400", glow: "rgba(139,92,246,.35)" };
 
@@ -127,7 +135,7 @@ function genParticles(): Particle[] {
 export default function MissionCard({
     titre, realise, objectif, couleur, onSale, sousChoix, acteDirect, onChoixVariable,
     demanderCrossSell4P, montantCrossSell4P, onCrossSell4P, questionsCrossSellPour, onBoostReady, dernierJourSemaine,
-    compact = false, anneau = false, emoji, onDeclencheur,
+    compact = false, anneau = false, emoji, onDeclencheur, tuile,
 }: Props) {
     const [celebrating, setCelebrating] = useState(false);
     const [celebEmoji, setCelebEmoji] = useState("🎉");
@@ -444,10 +452,20 @@ export default function MissionCard({
         const depasse = realise > objectif;
         const etatAnneau = depasse ? "depasse" : atteint ? "atteint" : "en_cours";
         const traitAnneau = depasse ? `url(#${idOr})` : atteint ? "#10b981" : "#3b82f6";
+        const sousTexte = objectif === 0 && realise === 0
+            ? "Pas d’objectif"
+            : depasse ? `+${realise - objectif} au-dessus` : atteint ? "✓ Atteint" : `Encore ${objectif - realise}`;
         return (
-            <div className="relative flex flex-col items-center text-center">
-                <div className={`relative h-[84px] w-[84px] ${depasse ? "anneau-or" : ""}`} data-etat={etatAnneau}>
-                    <svg viewBox="0 0 84 84" className="h-[84px] w-[84px] -rotate-90">
+            <div
+                className={tuile
+                    ? `tuile-objectif relative flex flex-col overflow-hidden rounded-[22px] bg-slate-900 p-3.5 text-left transition-shadow`
+                    : "relative flex flex-col items-center text-center"}
+                style={tuile ? { boxShadow: `${tuile.choisi ? `0 0 0 3px ${pal.hex}, 0 0 24px ${pal.glow}, ` : ""}0 12px 28px rgba(15,23,42,.18)` } : undefined}
+            >
+                {tuile && <div className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full blur-2xl" style={{ background: `${pal.hex}55` }} />}
+                <div className={tuile ? "relative flex items-center gap-3" : "contents"}>
+                <div className={`relative ${tuile ? "h-[72px] w-[72px] shrink-0" : "h-[84px] w-[84px]"} ${depasse ? "anneau-or" : ""}`} data-etat={etatAnneau}>
+                    <svg viewBox="0 0 84 84" className="h-full w-full -rotate-90">
                         <defs>
                             <linearGradient id={idOr} x1="0" y1="0" x2="1" y2="1">
                                 <stop offset="0%" stopColor="#b45309" />
@@ -459,7 +477,7 @@ export default function MissionCard({
                                 <stop offset="100%" stopColor="#b45309" />
                             </linearGradient>
                         </defs>
-                        <circle cx="42" cy="42" r={R} fill="none" strokeWidth="8" className="anneau-piste stroke-slate-100" />
+                        <circle cx="42" cy="42" r={R} fill="none" strokeWidth="8" className={tuile ? "" : "anneau-piste stroke-slate-100"} stroke={tuile ? "rgba(255,255,255,.14)" : undefined} />
                         <circle
                             cx="42" cy="42" r={R} fill="none" stroke={traitAnneau} strokeWidth="8"
                             strokeLinecap={pctAnneau > 0 ? "round" : "butt"}
@@ -470,14 +488,14 @@ export default function MissionCard({
                     </svg>
                     <span className="absolute inset-0 flex flex-col items-center justify-center">
                         {emoji && <span className="text-xl leading-none">{emoji}</span>}
-                        <span className="mt-0.5 text-sm font-black tabular-nums text-slate-900">
-                            {realise}<span className="text-[11px] text-slate-400">/{objectif}</span>
+                        <span className={`mt-0.5 text-sm font-black tabular-nums ${tuile ? "text-white" : "text-slate-900"}`}>
+                            {realise}<span className={`text-[11px] ${tuile ? "text-white/50" : "text-slate-400"}`}>/{objectif}</span>
                         </span>
                     </span>
                     {depasse ? (
-                        <span className="absolute -right-0.5 top-0 flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 text-xs text-white ring-2 ring-white">★</span>
+                        <span className={`absolute -right-0.5 top-0 flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 text-xs text-white ring-2 ${tuile ? "ring-slate-900" : "ring-white"}`}>★</span>
                     ) : atteint && (
-                        <span className="absolute -right-0.5 top-0 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white ring-2 ring-white">✓</span>
+                        <span className={`absolute -right-0.5 top-0 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white ring-2 ${tuile ? "ring-slate-900" : "ring-white"}`}>✓</span>
                     )}
                     {depasse && (
                         <>
@@ -505,16 +523,29 @@ export default function MissionCard({
                         />
                     ))}
                 </div>
-                <p className="mt-1.5 text-xs font-black text-slate-800">{displayTitre}</p>
-                <p className={`text-[11px] font-bold ${depasse ? "text-amber-600" : atteint ? "text-emerald-600" : "text-slate-400"}`}>
-                    {objectif === 0 && realise === 0
-                        ? "Pas d’objectif"
-                        : depasse
-                        ? `+${realise - objectif} au-dessus`
-                        : atteint
-                        ? "✓ Atteint"
-                        : `Encore ${objectif - realise}`}
-                </p>
+                {tuile ? (
+                    <div className="min-w-0">
+                        <p className="text-sm font-black leading-tight text-white">{displayTitre}</p>
+                        <p className={`mt-0.5 text-[11px] font-bold ${depasse ? "text-amber-300" : atteint ? "text-emerald-300" : "text-white/50"}`}>{sousTexte}</p>
+                    </div>
+                ) : (<>
+                    <p className="mt-1.5 text-xs font-black text-slate-800">{displayTitre}</p>
+                    <p className={`text-[11px] font-bold ${depasse ? "text-amber-600" : atteint ? "text-emerald-600" : "text-slate-400"}`}>{sousTexte}</p>
+                </>)}
+                </div>
+                {tuile && (tuile.onBasculer ? (
+                    <button
+                        type="button"
+                        aria-pressed={tuile.choisi}
+                        onClick={tuile.onBasculer}
+                        className={`relative mt-3 w-full rounded-xl bg-gradient-to-r ${pal.gradient} py-3 text-sm font-black text-white transition-all active:scale-[0.96]`}
+                        style={{ boxShadow: `0 4px 16px ${pal.glow}` }}
+                    >
+                        {tuile.choisi ? "✓ Ajouté" : tuile.libelle}
+                    </button>
+                ) : (
+                    <p className="relative mt-3 rounded-xl bg-white/5 py-3 text-center text-[11px] font-bold text-white/40">{tuile.libelle}</p>
+                ))}
                 {modales}
                 {styleAnim}
                 <style>{`
