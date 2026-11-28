@@ -240,23 +240,44 @@ export default function GestionEquipePage() {
         if (!deleteConfirm?.mode) return;
         const { conseiller, mode } = deleteConfirm;
         setDeleteEnCours(true);
+        const prenom = conseiller.nom.split(" ")[0];
         try {
-            if (mode === "full") {
-                await supabase.from("ventes").delete().eq("conseiller_id", conseiller.id);
+            if (mode === "archive") {
+                // Supprimer la ligne du conseiller effacerait aussi ses ventes et sa variable (suppression
+                // en cascade en base) : pour garder l'historique, on désactive le profil
+                // (invisible de l'équipe, données conservées, réactivable).
+                const { error } = await supabase.from("conseillers").update({ profil_actif: false }).eq("id", conseiller.id);
+                if (error) throw error;
+                setConseillers(prev => prev.map(c => c.id === conseiller.id ? { ...c, profil_actif: false } : c));
+                afficherToast(`${prenom} retiré·e de l'équipe. Historique conservé (profil désactivé).`);
+                setDeleteConfirm(null);
+                return;
             }
-            await supabase.from("objectifs_mensuels").delete().eq("conseiller_id", conseiller.id);
-            await supabase.from("challenges").delete().or(`createur.eq.${conseiller.id},adversaire.eq.${conseiller.id}`);
-            const { error } = await supabase.from("conseillers").delete().eq("id", conseiller.id);
+            // Suppression complète : d'abord les données qui bloquent la suppression du conseiller
+            // (fiches box, forfaits 4P différés) ou qui ne sont pas liées en base.
+            const id = conseiller.id;
+            const etapes: [string, PromiseLike<{ error: { message: string } | null }>][] = [
+                ["fiches box", supabase.from("box_raccordements").delete().eq("conseiller_id", id)],
+                ["forfaits 4P différés", supabase.from("forfait_4p_differes").delete().eq("conseiller_id", id)],
+                ["défis", supabase.from("challenges").delete().or(`createur.eq.${id},adversaire.eq.${id}`)],
+                ["défis du jour", supabase.from("defis_jour").delete().eq("conseiller_id", id)],
+                ["planning", supabase.from("planning_conseillers").delete().eq("conseiller_id", id)],
+                ["quiz", supabase.from("quiz_reponses").delete().eq("conseiller_id", id)],
+                ["stats outils", supabase.from("outils_usage").delete().eq("conseiller_id", id)],
+            ];
+            for (const [nom, q] of etapes) {
+                const { error } = await q;
+                // Table absente ou colonne différente : on continue, seule la suppression finale compte.
+                if (error) console.warn(`Suppression ${nom} :`, error.message);
+            }
+            const { error } = await supabase.from("conseillers").delete().eq("id", id);
             if (error) throw error;
-            setConseillers(prev => prev.filter(c => c.id !== conseiller.id));
-            afficherToast(
-                mode === "full"
-                    ? `${conseiller.nom.split(" ")[0]} et toutes ses données supprimés.`
-                    : `${conseiller.nom.split(" ")[0]} retiré·e de l'équipe. Historique conservé.`
-            );
+            setConseillers(prev => prev.filter(c => c.id !== id));
+            afficherToast(`${prenom} et toutes ses données supprimés.`);
             setDeleteConfirm(null);
-        } catch {
-            afficherToast("Erreur lors de la suppression.", false);
+        } catch (e) {
+            const msg = e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "";
+            afficherToast(`Erreur lors de la suppression${msg ? ` : ${msg}` : "."}`, false);
         } finally {
             setDeleteEnCours(false);
         }
@@ -587,7 +608,7 @@ export default function GestionEquipePage() {
                                 Supprimer {deleteConfirm.conseiller.nom.split(" ")[0]} ?
                             </p>
                             <p className="mt-1 text-sm text-red-500">
-                                Cette action est irréversible. Choisissez ce que vous souhaitez conserver.
+                                Choisissez ce que vous souhaitez conserver.
                             </p>
                         </div>
 
@@ -606,7 +627,7 @@ export default function GestionEquipePage() {
                                     <div>
                                         <p className="font-black text-slate-800">Conserver l'historique</p>
                                         <p className="mt-1 text-xs text-slate-500">
-                                            Le conseiller est retiré de l'équipe. Ses ventes et performances passées restent dans la base — utiles pour les analyses historiques.
+                                            Le profil est désactivé : il n&apos;apparaît plus dans l&apos;équipe, mais ses ventes et performances passées restent dans la base. Réactivable à tout moment (bouton « Désactivé »).
                                         </p>
                                     </div>
                                 </div>
@@ -626,7 +647,7 @@ export default function GestionEquipePage() {
                                     <div>
                                         <p className="font-black text-slate-800">Supprimer toutes les données</p>
                                         <p className="mt-1 text-xs text-slate-500">
-                                            Efface le conseiller, ses ventes, ses objectifs et ses défis. Aucune trace conservée.
+                                            Efface le conseiller, ses ventes, sa variable, ses fiches box, ses objectifs et ses défis. Irréversible, aucune trace conservée.
                                         </p>
                                     </div>
                                 </div>
